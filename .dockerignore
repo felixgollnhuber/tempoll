@@ -1,0 +1,7 @@
+.git
+.next
+coverage
+node_modules
+playwright-report
+test-results
+tempoll-temp

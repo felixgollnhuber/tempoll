@@ -1,0 +1,70 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum EventStatus {
+  OPEN
+  CLOSED
+}
+
+model Event {
+  id                     String             @id @default(cuid())
+  slug                   String             @unique
+  title                  String
+  timezone               String
+  slotMinutes            Int                @default(30)
+  meetingDurationMinutes Int                @default(60)
+  dayStartMinutes        Int
+  dayEndMinutes          Int
+  status                 EventStatus        @default(OPEN)
+  manageTokenHash        String
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+  dates                  EventDate[]
+  participants           Participant[]
+  availabilitySlots      AvailabilitySlot[]
+}
+
+model EventDate {
+  id        String   @id @default(cuid())
+  eventId   String
+  dateKey   String
+  createdAt DateTime @default(now())
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, dateKey])
+  @@index([eventId])
+}
+
+model Participant {
+  id                    String             @id @default(cuid())
+  eventId               String
+  displayName           String
+  displayNameNormalized String
+  color                 String
+  editTokenHash         String
+  lastSeenAt            DateTime?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  event                 Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  availabilitySlots     AvailabilitySlot[]
+
+  @@unique([eventId, displayNameNormalized])
+  @@index([eventId])
+}
+
+model AvailabilitySlot {
+  eventId      String
+  participantId String
+  slotStartAt  DateTime
+  createdAt    DateTime   @default(now())
+  event        Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  participant  Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@id([participantId, slotStartAt])
+  @@index([eventId, slotStartAt])
+}

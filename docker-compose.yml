@@ -1,0 +1,56 @@
+name: tempoll
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      APP_SETUP_COMPLETE: ${APP_SETUP_COMPLETE:-false}
+      APP_NAME: ${APP_NAME:-tempoll}
+      APP_URL: ${APP_URL:?Set the public app URL, for example https://meet.example.com}
+      LEGAL_PAGES_ENABLED: ${LEGAL_PAGES_ENABLED:-false}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-tempoll}:${POSTGRES_PASSWORD:?Set a strong database password}@db:5432/${POSTGRES_DB:-tempoll}?schema=public
+      OPERATOR_LEGAL_NAME: ${OPERATOR_LEGAL_NAME:-}
+      OPERATOR_DISPLAY_NAME: ${OPERATOR_DISPLAY_NAME:-}
+      OPERATOR_STREET_ADDRESS: ${OPERATOR_STREET_ADDRESS:-}
+      OPERATOR_POSTAL_CODE: ${OPERATOR_POSTAL_CODE:-}
+      OPERATOR_CITY: ${OPERATOR_CITY:-}
+      OPERATOR_COUNTRY: ${OPERATOR_COUNTRY:-Austria}
+      OPERATOR_EMAIL: ${OPERATOR_EMAIL:-}
+      OPERATOR_PHONE: ${OPERATOR_PHONE:-}
+      OPERATOR_WEBSITE: ${OPERATOR_WEBSITE:-}
+      OPERATOR_BUSINESS_PURPOSE: ${OPERATOR_BUSINESS_PURPOSE:-}
+      MEDIA_OWNER: ${MEDIA_OWNER:-}
+      EDITORIAL_LINE: ${EDITORIAL_LINE:-}
+      PRIVACY_CONTACT_EMAIL: ${PRIVACY_CONTACT_EMAIL:-}
+      HOSTING_DESCRIPTION: ${HOSTING_DESCRIPTION:-}
+      PRIVACY_PROCESSORS: ${PRIVACY_PROCESSORS:-}
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-tempoll}
+      POSTGRES_USER: ${POSTGRES_USER:-tempoll}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a strong database password}
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-tempoll} -d ${POSTGRES_DB:-tempoll}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    volumes:
+      - tempoll-postgres:/var/lib/postgresql/data
+
+volumes:
+  tempoll-postgres:

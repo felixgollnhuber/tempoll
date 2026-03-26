@@ -1,0 +1,99 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - paragraph [ref=e5]: New event
+        - heading "Create a scheduling board" [level=1] [ref=e6]
+        - paragraph [ref=e7]: Pick one date range, choose the daily window, and generate a shareable event link.
+      - link "Back home" [ref=e8] [cursor=pointer]:
+        - /url: /
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - generic [ref=e11]:
+          - generic [ref=e12]: Event details
+          - generic [ref=e13]: Set one date range, choose the daily window, and share a single link. Every day inside the selected range will appear on the availability grid.
+        - generic [ref=e15]:
+          - generic [ref=e16]:
+            - text: Event title
+            - textbox "Event title" [ref=e17]:
+              - /placeholder: Design review, sprint planning, dinner with friends...
+          - generic [ref=e18]:
+            - generic [ref=e19]:
+              - text: Timezone
+              - combobox [ref=e20]:
+                - generic: Europe/Vienna
+                - img [ref=e21]
+              - combobox [ref=e86]
+            - generic [ref=e24]:
+              - text: Date range
+              - button "Mar 27, 2026 - Mar 29, 2026" [ref=e25]:
+                - generic [ref=e26]:
+                  - img
+                  - generic [ref=e27]: Mar 27, 2026 - Mar 29, 2026
+                - img
+              - generic [ref=e29]:
+                - paragraph [ref=e30]: Mar 27, 2026 - Mar 29, 2026
+                - generic [ref=e31]: 3 days
+          - generic [ref=e32]:
+            - generic [ref=e33]:
+              - text: Daily start
+              - combobox [ref=e34]:
+                - generic: 09:00
+                - img [ref=e35]
+              - combobox [ref=e87]
+            - generic [ref=e38]:
+              - text: Daily end
+              - combobox [ref=e39]:
+                - generic: 18:00
+                - img [ref=e40]
+              - combobox [ref=e88]
+            - generic [ref=e43]:
+              - text: Slot size
+              - combobox [ref=e44]:
+                - generic: 30 min
+                - img [ref=e45]
+              - combobox [ref=e89]
+            - generic [ref=e48]:
+              - text: Meeting duration
+              - combobox [ref=e49]:
+                - generic: 60 min
+                - img [ref=e50]
+              - combobox [ref=e90]
+          - button "Create event" [ref=e53]:
+            - img
+            - text: Create event
+      - generic [ref=e54]:
+        - generic [ref=e55]:
+          - generic [ref=e56]:
+            - generic [ref=e57]: Preview
+            - generic [ref=e58]: This is the shape your event will have before anyone joins.
+          - generic [ref=e59]:
+            - generic [ref=e60]:
+              - paragraph [ref=e61]: Untitled event
+              - paragraph [ref=e62]: Europe/Vienna
+            - generic [ref=e63]:
+              - generic [ref=e64]:
+                - term [ref=e65]: Date range
+                - definition [ref=e66]: Mar 27, 2026 - Mar 29, 2026
+              - generic [ref=e67]:
+                - term [ref=e68]: Days shown
+                - definition [ref=e69]: "3"
+              - generic [ref=e70]:
+                - term [ref=e71]: Daily window
+                - definition [ref=e72]: 09:00 - 18:00
+              - generic [ref=e73]:
+                - term [ref=e74]: Granularity
+                - definition [ref=e75]: 30 min
+              - generic [ref=e76]:
+                - term [ref=e77]: Ranked window
+                - definition [ref=e78]: 60 min
+        - generic [ref=e79]:
+          - generic [ref=e81]: What gets created
+          - generic [ref=e82]:
+            - paragraph [ref=e83]: A public event page people can join without creating an account.
+            - paragraph [ref=e84]: A private organizer page for renaming participants and closing the poll.
+            - paragraph [ref=e85]: A live availability grid that fills every day between the chosen start and end date.
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e96] [cursor=pointer]:
+    - img [ref=e97]
+  - alert [ref=e100]

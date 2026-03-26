@@ -1,0 +1,64 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e4]:
+      - generic [ref=e5]:
+        - generic [ref=e6]: First-run setup
+        - generic [ref=e7]:
+          - heading "Configure Terminfinder before going live." [level=1] [ref=e8]
+          - paragraph [ref=e9]: "This wizard keeps everything local in your browser and generates the exact `.env` file you can paste into Coolify or your server environment."
+      - generic [ref=e10]:
+        - generic [ref=e11]:
+          - generic [ref=e12]: What this setup covers
+          - generic [ref=e13]: App identity, database access, operator details, Austrian legal disclosure fields, and privacy-hosting information.
+        - generic [ref=e14]:
+          - generic [ref=e15]: "Generate a complete `.env` with `APP_SETUP_COMPLETE=true`."
+          - generic [ref=e16]: Review and adjust everything before copying it into the server.
+          - generic [ref=e17]: Restart or redeploy afterwards and the normal app becomes available.
+      - generic [ref=e18]:
+        - generic [ref=e19]:
+          - generic [ref=e20]:
+            - generic [ref=e21]: Setup steps
+            - generic [ref=e22]: This wizard generates the environment file for your self-hosted deployment.
+          - generic [ref=e23]:
+            - generic [ref=e24]:
+              - generic [ref=e25]: "1"
+              - generic [ref=e26]: App basics
+            - generic [ref=e27]:
+              - generic [ref=e28]: "2"
+              - generic [ref=e29]: Database
+            - generic [ref=e30]:
+              - generic [ref=e31]: "3"
+              - generic [ref=e32]: Operator details
+            - generic [ref=e33]:
+              - generic [ref=e34]: "4"
+              - generic [ref=e35]: Legal and privacy
+            - generic [ref=e36]:
+              - generic [ref=e37]: "5"
+              - generic [ref=e38]: Review and export
+        - generic [ref=e39]:
+          - generic [ref=e40]:
+            - generic [ref=e41]:
+              - img [ref=e42]
+              - text: App basics
+            - generic [ref=e45]: "Fill in the fields below. All values stay in your browser until you copy the generated `.env`."
+          - generic [ref=e46]:
+            - generic [ref=e47]:
+              - generic [ref=e48]:
+                - text: App name
+                - textbox "App name" [ref=e49]:
+                  - /placeholder: Terminfinder
+                  - text: Terminfinder
+              - generic [ref=e50]:
+                - text: Public app URL
+                - textbox "Public app URL" [ref=e51]:
+                  - /placeholder: https://meet.example.com
+                  - text: http://localhost:3000
+            - generic [ref=e52]:
+              - generic [ref=e53]: Step 1 of 5
+              - button "Next" [ref=e55]:
+                - text: Next
+                - img
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e61] [cursor=pointer]:
+    - img [ref=e62]
+  - alert [ref=e65]

@@ -1,0 +1,197 @@
+- generic [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - paragraph [ref=e5]: New event
+        - heading "Create a scheduling board" [level=1] [ref=e6]
+        - paragraph [ref=e7]: Pick one date range, choose the daily window, and generate a shareable event link.
+      - link "Back home" [ref=e8] [cursor=pointer]:
+        - /url: /
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - generic [ref=e11]:
+          - generic [ref=e12]: Event details
+          - generic [ref=e13]: Set one date range, choose the daily window, and share a single link. Every day inside the selected range will appear on the availability grid.
+        - generic [ref=e15]:
+          - generic [ref=e16]:
+            - text: Event title
+            - textbox "Event title" [ref=e17]:
+              - /placeholder: Design review, sprint planning, dinner with friends...
+          - generic [ref=e18]:
+            - generic [ref=e19]:
+              - text: Timezone
+              - combobox [ref=e20]:
+                - generic: Europe/Vienna
+                - img [ref=e21]
+              - combobox [ref=e86]
+            - generic [ref=e24]:
+              - text: Date range
+              - button "Mar 27, 2026 - Mar 29, 2026" [expanded] [ref=e25]:
+                - generic [ref=e26]:
+                  - img
+                  - generic [ref=e27]: Mar 27, 2026 - Mar 29, 2026
+                - img
+              - generic [ref=e29]:
+                - paragraph [ref=e30]: Mar 27, 2026 - Mar 29, 2026
+                - generic [ref=e31]: 3 days
+          - generic [ref=e32]:
+            - generic [ref=e33]:
+              - text: Daily start
+              - combobox [ref=e34]:
+                - generic: 09:00
+                - img [ref=e35]
+              - combobox [ref=e87]
+            - generic [ref=e38]:
+              - text: Daily end
+              - combobox [ref=e39]:
+                - generic: 18:00
+                - img [ref=e40]
+              - combobox [ref=e88]
+            - generic [ref=e43]:
+              - text: Slot size
+              - combobox [ref=e44]:
+                - generic: 30 min
+                - img [ref=e45]
+              - combobox [ref=e89]
+            - generic [ref=e48]:
+              - text: Meeting duration
+              - combobox [ref=e49]:
+                - generic: 60 min
+                - img [ref=e50]
+              - combobox [ref=e90]
+          - button "Create event" [ref=e53]:
+            - img
+            - text: Create event
+      - generic [ref=e54]:
+        - generic [ref=e55]:
+          - generic [ref=e56]:
+            - generic [ref=e57]: Preview
+            - generic [ref=e58]: This is the shape your event will have before anyone joins.
+          - generic [ref=e59]:
+            - generic [ref=e60]:
+              - paragraph [ref=e61]: Untitled event
+              - paragraph [ref=e62]: Europe/Vienna
+            - generic [ref=e63]:
+              - generic [ref=e64]:
+                - term [ref=e65]: Date range
+                - definition [ref=e66]: Mar 27, 2026 - Mar 29, 2026
+              - generic [ref=e67]:
+                - term [ref=e68]: Days shown
+                - definition [ref=e69]: "3"
+              - generic [ref=e70]:
+                - term [ref=e71]: Daily window
+                - definition [ref=e72]: 09:00 - 18:00
+              - generic [ref=e73]:
+                - term [ref=e74]: Granularity
+                - definition [ref=e75]: 30 min
+              - generic [ref=e76]:
+                - term [ref=e77]: Ranked window
+                - definition [ref=e78]: 60 min
+        - generic [ref=e79]:
+          - generic [ref=e81]: What gets created
+          - generic [ref=e82]:
+            - paragraph [ref=e83]: A public event page people can join without creating an account.
+            - paragraph [ref=e84]: A private organizer page for renaming participants and closing the poll.
+            - paragraph [ref=e85]: A live availability grid that fills every day between the chosen start and end date.
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e96] [cursor=pointer]:
+    - img [ref=e97]
+  - alert [ref=e100]
+  - dialog [ref=e102]:
+    - generic [ref=e103]:
+      - paragraph [ref=e104]: Choose event range
+      - paragraph [ref=e105]: Weeks start on Monday. The whole interval will be shown.
+    - generic [ref=e108]:
+      - navigation "Navigation bar" [ref=e109]:
+        - button "Go to the Previous Month" [active] [ref=e110]:
+          - img
+        - button "Go to the Next Month" [ref=e111]:
+          - img
+      - generic [ref=e112]:
+        - status [ref=e114]: March 2026
+        - grid "March 2026" [ref=e115]:
+          - rowgroup [ref=e116]:
+            - row [ref=e117]:
+              - columnheader [ref=e118]: Mo
+              - columnheader [ref=e119]: Tu
+              - columnheader [ref=e120]: We
+              - columnheader [ref=e121]: Th
+              - columnheader [ref=e122]: Fr
+              - columnheader [ref=e123]: Sa
+              - columnheader [ref=e124]: Su
+          - rowgroup [ref=e125]:
+            - row "Sunday, March 1st, 2026" [ref=e126]:
+              - gridcell "Sunday, March 1st, 2026" [ref=e127]:
+                - button "Sunday, March 1st, 2026" [disabled]: "1"
+            - row "Monday, March 2nd, 2026 Tuesday, March 3rd, 2026 Wednesday, March 4th, 2026 Thursday, March 5th, 2026 Friday, March 6th, 2026 Saturday, March 7th, 2026 Sunday, March 8th, 2026" [ref=e128]:
+              - gridcell "Monday, March 2nd, 2026" [ref=e129]:
+                - button "Monday, March 2nd, 2026" [disabled]: "2"
+              - gridcell "Tuesday, March 3rd, 2026" [ref=e130]:
+                - button "Tuesday, March 3rd, 2026" [disabled]: "3"
+              - gridcell "Wednesday, March 4th, 2026" [ref=e131]:
+                - button "Wednesday, March 4th, 2026" [disabled]: "4"
+              - gridcell "Thursday, March 5th, 2026" [ref=e132]:
+                - button "Thursday, March 5th, 2026" [disabled]: "5"
+              - gridcell "Friday, March 6th, 2026" [ref=e133]:
+                - button "Friday, March 6th, 2026" [disabled]: "6"
+              - gridcell "Saturday, March 7th, 2026" [ref=e134]:
+                - button "Saturday, March 7th, 2026" [disabled]: "7"
+              - gridcell "Sunday, March 8th, 2026" [ref=e135]:
+                - button "Sunday, March 8th, 2026" [disabled]: "8"
+            - row "Monday, March 9th, 2026 Tuesday, March 10th, 2026 Wednesday, March 11th, 2026 Thursday, March 12th, 2026 Friday, March 13th, 2026 Saturday, March 14th, 2026 Sunday, March 15th, 2026" [ref=e136]:
+              - gridcell "Monday, March 9th, 2026" [ref=e137]:
+                - button "Monday, March 9th, 2026" [disabled]: "9"
+              - gridcell "Tuesday, March 10th, 2026" [ref=e138]:
+                - button "Tuesday, March 10th, 2026" [disabled]: "10"
+              - gridcell "Wednesday, March 11th, 2026" [ref=e139]:
+                - button "Wednesday, March 11th, 2026" [disabled]: "11"
+              - gridcell "Thursday, March 12th, 2026" [ref=e140]:
+                - button "Thursday, March 12th, 2026" [disabled]: "12"
+              - gridcell "Friday, March 13th, 2026" [ref=e141]:
+                - button "Friday, March 13th, 2026" [disabled]: "13"
+              - gridcell "Saturday, March 14th, 2026" [ref=e142]:
+                - button "Saturday, March 14th, 2026" [disabled]: "14"
+              - gridcell "Sunday, March 15th, 2026" [ref=e143]:
+                - button "Sunday, March 15th, 2026" [disabled]: "15"
+            - row "Monday, March 16th, 2026 Tuesday, March 17th, 2026 Wednesday, March 18th, 2026 Thursday, March 19th, 2026 Friday, March 20th, 2026 Saturday, March 21st, 2026 Sunday, March 22nd, 2026" [ref=e144]:
+              - gridcell "Monday, March 16th, 2026" [ref=e145]:
+                - button "Monday, March 16th, 2026" [disabled]: "16"
+              - gridcell "Tuesday, March 17th, 2026" [ref=e146]:
+                - button "Tuesday, March 17th, 2026" [disabled]: "17"
+              - gridcell "Wednesday, March 18th, 2026" [ref=e147]:
+                - button "Wednesday, March 18th, 2026" [disabled]: "18"
+              - gridcell "Thursday, March 19th, 2026" [ref=e148]:
+                - button "Thursday, March 19th, 2026" [disabled]: "19"
+              - gridcell "Friday, March 20th, 2026" [ref=e149]:
+                - button "Friday, March 20th, 2026" [disabled]: "20"
+              - gridcell "Saturday, March 21st, 2026" [ref=e150]:
+                - button "Saturday, March 21st, 2026" [disabled]: "21"
+              - gridcell "Sunday, March 22nd, 2026" [ref=e151]:
+                - button "Sunday, March 22nd, 2026" [disabled]: "22"
+            - row "Monday, March 23rd, 2026 Tuesday, March 24th, 2026 Wednesday, March 25th, 2026 Today, Thursday, March 26th, 2026 Friday, March 27th, 2026, selected Saturday, March 28th, 2026, selected Sunday, March 29th, 2026, selected" [ref=e152]:
+              - gridcell "Monday, March 23rd, 2026" [ref=e153]:
+                - button "Monday, March 23rd, 2026" [disabled]: "23"
+              - gridcell "Tuesday, March 24th, 2026" [ref=e154]:
+                - button "Tuesday, March 24th, 2026" [disabled]: "24"
+              - gridcell "Wednesday, March 25th, 2026" [ref=e155]:
+                - button "Wednesday, March 25th, 2026" [disabled]: "25"
+              - gridcell "Today, Thursday, March 26th, 2026" [ref=e156]:
+                - button "Today, Thursday, March 26th, 2026" [ref=e157]: "26"
+              - gridcell "Friday, March 27th, 2026, selected" [selected] [ref=e158]:
+                - button "Friday, March 27th, 2026, selected" [ref=e159]: "27"
+              - gridcell "Saturday, March 28th, 2026, selected" [selected] [ref=e160]:
+                - button "Saturday, March 28th, 2026, selected" [ref=e161]: "28"
+              - gridcell "Sunday, March 29th, 2026, selected" [selected] [ref=e162]:
+                - button "Sunday, March 29th, 2026, selected" [ref=e163]: "29"
+            - row "Monday, March 30th, 2026 Tuesday, March 31st, 2026" [ref=e164]:
+              - gridcell "Monday, March 30th, 2026" [ref=e165]:
+                - button "Monday, March 30th, 2026" [ref=e166]: "30"
+              - gridcell "Tuesday, March 31st, 2026" [ref=e167]:
+                - button "Tuesday, March 31st, 2026" [ref=e168]: "31"
+    - generic [ref=e170]:
+      - generic [ref=e171]:
+        - paragraph [ref=e172]: Mar 27, 2026 - Mar 29, 2026
+        - paragraph [ref=e173]: 3 days selected
+      - generic [ref=e174]:
+        - button "Cancel" [ref=e175]
+        - button "Apply" [ref=e176]
