@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -8,6 +9,7 @@ import { cn } from "@/lib/utils";
 
 type AppChromeProps = {
   appName: string;
+  logoSrc?: string;
   setupComplete: boolean;
   legalPagesEnabled: boolean;
   children: React.ReactNode;
@@ -15,12 +17,20 @@ type AppChromeProps = {
 
 export function AppChrome({
   appName,
+  logoSrc,
   setupComplete,
   legalPagesEnabled,
   children,
 }: AppChromeProps) {
   const pathname = usePathname();
   const hideChrome = !setupComplete && pathname === "/setup";
+  const [logoFailed, setLogoFailed] = useState(false);
+
+  useEffect(() => {
+    setLogoFailed(false);
+  }, [logoSrc]);
+
+  const showLogo = Boolean(logoSrc) && !logoFailed;
 
   if (hideChrome) {
     return <>{children}</>;
@@ -30,14 +40,32 @@ export function AppChrome({
     <>
       <header className="border-b bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/70">
         <div className="app-shell flex h-16 items-center justify-between gap-4">
-          <Link href="/" className="text-lg font-semibold tracking-tight">
-            {appName}
+          <Link
+            href="/"
+            className="inline-flex items-center text-lg font-semibold tracking-tight"
+          >
+            {showLogo && logoSrc ? (
+              <img
+                src={logoSrc}
+                alt={appName}
+                className="h-7 w-auto shrink-0"
+                onError={() => setLogoFailed(true)}
+              />
+            ) : (
+              appName
+            )}
           </Link>
           <nav className="flex items-center gap-2">
-            <Link href="/new" className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}>
+            <Link
+              href="/new"
+              className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
+            >
               New event
             </Link>
-            <Link href="/#recent-events" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+            <Link
+              href="/#recent-events"
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+            >
               Recent events
             </Link>
           </nav>
