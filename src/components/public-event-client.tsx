@@ -37,7 +37,6 @@ type PublicEventClientProps = {
     | {
         participantId: string;
         displayName: string;
-        editToken: string;
       }
     | null;
 };
@@ -46,7 +45,6 @@ type ParticipantSessionState =
   | {
       participantId: string;
       displayName: string;
-      editToken: string;
     }
   | null;
 
@@ -357,8 +355,6 @@ export function PublicEventClient({
                 "Content-Type": "application/json",
               },
               body: JSON.stringify({
-                participantId: session.participantId,
-                editToken: session.editToken,
                 selectedSlotStarts: nextSelectedSlotStarts,
               }),
             });
@@ -592,7 +588,7 @@ export function PublicEventClient({
 
     const payload = (await response.json()) as {
       error?: string;
-      session?: ParticipantSessionState & { editUrl: string };
+      session?: ParticipantSessionState;
     };
 
     setJoining(false);

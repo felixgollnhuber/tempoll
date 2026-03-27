@@ -1,7 +1,14 @@
 .git
+.github
+.env*
 .next
 coverage
+dist
 node_modules
 playwright-report
 test-results
 tempoll-temp
+.playwright-cli
+.pnpm-store
+docker-compose.override.yaml
+*.log

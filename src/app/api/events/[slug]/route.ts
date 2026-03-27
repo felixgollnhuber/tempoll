@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { getPublicEventSnapshot } from "@/lib/event-service";
+import { PRIVATE_NO_STORE_HEADERS, PUBLIC_NO_STORE_HEADERS, mergeHeaders } from "@/lib/security";
 import { getParticipantCookieName } from "@/lib/tokens";
 
 type Context = {
@@ -29,9 +30,12 @@ export async function GET(_request: Request, { params }: Context) {
     },
     {
       status: 200,
-      headers: {
-        "Cache-Control": "no-store",
-      },
+      headers: mergeHeaders(
+        cookieValue ? PRIVATE_NO_STORE_HEADERS : PUBLIC_NO_STORE_HEADERS,
+        {
+          Vary: "Cookie",
+        },
+      ),
     },
   );
 }

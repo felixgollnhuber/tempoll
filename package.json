@@ -11,6 +11,8 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:ui": "vitest --ui",
+    "security:scan-secrets": "node scripts/secret-scan.mjs",
+    "security:audit": "pnpm audit --prod",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
@@ -61,5 +63,13 @@
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.1"
+  },
+  "pnpm": {
+    "overrides": {
+      "@hono/node-server": "1.19.11",
+      "effect": "3.21.0",
+      "hono": "4.12.9",
+      "lodash": "4.17.23"
+    }
   }
 }

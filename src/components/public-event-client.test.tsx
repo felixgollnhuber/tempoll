@@ -161,7 +161,6 @@ describe("PublicEventClient", () => {
         initialSession={{
           participantId: "p1",
           displayName: "Felix",
-          editToken: "secret",
         }}
       />,
     );
@@ -185,7 +184,6 @@ describe("PublicEventClient", () => {
         initialSession={{
           participantId: "p1",
           displayName: "Felix",
-          editToken: "secret",
         }}
       />,
     );
@@ -225,7 +223,6 @@ describe("PublicEventClient", () => {
         initialSession={{
           participantId: "p1",
           displayName: "Felix",
-          editToken: "secret",
         }}
       />,
     );
@@ -263,7 +260,6 @@ describe("PublicEventClient", () => {
         initialSession={{
           participantId: "p1",
           displayName: "Felix",
-          editToken: "secret",
         }}
       />,
     );
@@ -293,7 +289,6 @@ describe("PublicEventClient", () => {
         initialSession={{
           participantId: "p1",
           displayName: "Felix",
-          editToken: "secret",
         }}
       />,
     );
@@ -341,7 +336,6 @@ describe("PublicEventClient", () => {
         initialSession={{
           participantId: "p1",
           displayName: "Felix",
-          editToken: "secret",
         }}
       />,
     );

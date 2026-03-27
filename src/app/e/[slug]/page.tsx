@@ -10,21 +10,16 @@ type EventPageProps = {
   params: Promise<{
     slug: string;
   }>;
-  searchParams: Promise<{
-    participantId?: string;
-    token?: string;
-  }>;
 };
 
-export default async function EventPage({ params, searchParams }: EventPageProps) {
+export const dynamic = "force-dynamic";
+
+export default async function EventPage({ params }: EventPageProps) {
   const { slug } = await params;
-  const { participantId, token } = await searchParams;
   const cookieStore = await cookies();
+  const cookieValue = cookieStore.get(getParticipantCookieName(slug))?.value;
 
-  const directSessionValue =
-    participantId && token ? `${participantId}.${token}` : cookieStore.get(getParticipantCookieName(slug))?.value;
-
-  const event = await getPublicEventSnapshot(slug, directSessionValue);
+  const event = await getPublicEventSnapshot(slug, cookieValue);
   if (!event) {
     notFound();
   }
@@ -40,19 +35,12 @@ export default async function EventPage({ params, searchParams }: EventPageProps
         slug={slug}
         initialSnapshot={event.snapshot}
         initialSession={
-          event.participant && participantId && token
+          event.participant
             ? {
-                participantId,
+                participantId: event.participant.id,
                 displayName: event.participant.displayName,
-                editToken: token,
               }
-            : event.participant
-              ? {
-                  participantId: event.participant.id,
-                  displayName: event.participant.displayName,
-                  editToken: directSessionValue?.split(".")[1] ?? "",
-                }
-              : null
+            : null
         }
       />
     </main>
