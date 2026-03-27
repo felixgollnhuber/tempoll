@@ -48,7 +48,7 @@ export function AppChrome({
 
       <footer className="mt-auto border-t">
         <div className="app-shell flex flex-col gap-3 py-6 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-          <p>{appName} is a self-hosted scheduling board for modern teams.</p>
+          <p>{appName} is a self-hostable, realtime scheduling board for modern teams.</p>
           {legalPagesEnabled ? (
             <div className="flex items-center gap-4">
               <Link href="/imprint" className="hover:text-foreground">

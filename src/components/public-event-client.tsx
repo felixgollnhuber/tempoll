@@ -1,7 +1,7 @@
 "use client";
 
 import { CalendarDaysIcon, Clock3Icon, Loader2Icon, LockIcon, UsersIcon } from "lucide-react";
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -34,41 +34,74 @@ type ParticipantSessionState =
   | null;
 
 type DraftSelection = Record<string, boolean>;
+type BoardMode = "edit" | "view";
 
 function slotKey(dateKey: string, minutes: number) {
   return `${dateKey}-${minutes}`;
 }
 
-function getHeatColor(slot: { availabilityCount: number; selectedByCurrentUser: boolean }) {
-  if (slot.selectedByCurrentUser) {
-    return "bg-primary shadow-[inset_0_0_0_1px_rgba(255,255,255,0.28)]";
-  }
+function getInitialMode(hasEditableSession: boolean): BoardMode {
+  return hasEditableSession ? "edit" : "view";
+}
 
-  if (slot.availabilityCount >= 6) {
+function getHeatColor(availabilityCount: number) {
+  if (availabilityCount >= 6) {
     return "bg-primary/80";
   }
 
-  if (slot.availabilityCount === 5) {
+  if (availabilityCount === 5) {
     return "bg-primary/65";
   }
 
-  if (slot.availabilityCount === 4) {
+  if (availabilityCount === 4) {
     return "bg-primary/50";
   }
 
-  if (slot.availabilityCount === 3) {
+  if (availabilityCount === 3) {
     return "bg-primary/36";
   }
 
-  if (slot.availabilityCount === 2) {
+  if (availabilityCount === 2) {
     return "bg-primary/24";
   }
 
-  if (slot.availabilityCount === 1) {
+  if (availabilityCount === 1) {
     return "bg-primary/12";
   }
 
   return "bg-background";
+}
+
+function getCurrentUserSelectionClass(isSelected: boolean) {
+  if (!isSelected) {
+    return "";
+  }
+
+  return "outline outline-2 -outline-offset-2 outline-primary/85 ring-2 ring-inset ring-background";
+}
+
+function getActiveViewSelectionClass(isActive: boolean) {
+  if (!isActive) {
+    return "";
+  }
+
+  return "ring-2 ring-inset ring-foreground/20";
+}
+
+function getParticipantHighlightStyle({
+  isHighlighted,
+  participantColor,
+}: {
+  isHighlighted: boolean;
+  participantColor?: string;
+}): CSSProperties | undefined {
+  if (!isHighlighted || !participantColor) {
+    return undefined;
+  }
+
+  return {
+    backgroundImage: `linear-gradient(135deg, transparent 0%, transparent 56%, ${participantColor}99 56%, ${participantColor}99 69%, transparent 69%, transparent 100%)`,
+  };
 }
 
 function getCellHeightClass(slotMinutes: number) {
@@ -114,10 +147,14 @@ export function PublicEventClient({
   initialSnapshot,
   initialSession,
 }: PublicEventClientProps) {
+  const initialHasEditableSession = Boolean(initialSession && initialSnapshot.status === "OPEN");
   const [snapshot, setSnapshot] = useState(initialSnapshot);
   const [session, setSession] = useState<ParticipantSessionState>(initialSession);
   const [name, setName] = useState("");
   const [selectedMap, setSelectedMap] = useState(() => getSelectedMap(initialSnapshot));
+  const [mode, setMode] = useState<BoardMode>(() => getInitialMode(initialHasEditableSession));
+  const [activeSlotKey, setActiveSlotKey] = useState<string | null>(null);
+  const [activeParticipantId, setActiveParticipantId] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
   const [draftVersion, setDraftVersion] = useState(0);
@@ -135,6 +172,7 @@ export function PublicEventClient({
     setSelectedMap(getSelectedMap(nextSnapshot));
     lastSavedSignatureRef.current = getSelectedSlotStarts(nextSnapshot).join("|");
   }, []);
+  const canEdit = Boolean(session && snapshot.status === "OPEN");
 
   const fetchSnapshot = useCallback(async () => {
     const response = await fetch(`/api/events/${slug}`, {
@@ -172,7 +210,7 @@ export function PublicEventClient({
   }, [fetchSnapshot, slug]);
 
   useEffect(() => {
-    if (!session || snapshot.status === "CLOSED") {
+    if (!canEdit) {
       return;
     }
 
@@ -253,26 +291,111 @@ export function PublicEventClient({
     }, 500);
 
     return () => window.clearTimeout(handle);
-  }, [applySnapshot, draftVersion, selectedMap, session, slug, snapshot.slots, snapshot.status]);
+  }, [applySnapshot, canEdit, draftVersion, selectedMap, session, slug, snapshot.slots]);
 
+  useEffect(() => {
+    if (!canEdit) {
+      setMode("view");
+      dragValue.current = null;
+    }
+  }, [canEdit]);
+
+  useEffect(() => {
+    if (mode === "edit") {
+      setActiveSlotKey(null);
+    }
+  }, [mode]);
+
+  useEffect(() => {
+    if (!activeParticipantId) {
+      return;
+    }
+
+    const participantExists = snapshot.participants.some((participant) => participant.id === activeParticipantId);
+    if (!participantExists) {
+      setActiveParticipantId(null);
+    }
+  }, [activeParticipantId, snapshot.participants]);
+
+  const currentParticipantId = session?.participantId ?? snapshot.currentParticipant?.id ?? null;
   const slotMap = useMemo(
     () =>
       new Map(
-        snapshot.slots.map((slot) => [
-          slotKey(slot.dateKey, slot.minutes),
-          {
-            ...slot,
-            selectedByCurrentUser: selectedMap[slotKey(slot.dateKey, slot.minutes)] ?? false,
-          },
-        ]),
+        snapshot.slots.map((slot) => {
+          const key = slotKey(slot.dateKey, slot.minutes);
+          const selectedByCurrentUser = selectedMap[key] ?? false;
+          let participantIds = slot.participantIds;
+
+          if (currentParticipantId) {
+            if (selectedByCurrentUser && !slot.selectedByCurrentUser) {
+              participantIds = slot.participantIds.includes(currentParticipantId)
+                ? slot.participantIds
+                : [...slot.participantIds, currentParticipantId];
+            } else if (!selectedByCurrentUser && slot.selectedByCurrentUser) {
+              participantIds = slot.participantIds.filter(
+                (participantId) => participantId !== currentParticipantId,
+              );
+            }
+          }
+
+          return [
+            key,
+            {
+              ...slot,
+              participantIds,
+              availabilityCount: participantIds.length,
+              selectedByCurrentUser,
+            },
+          ];
+        }),
       ),
-    [selectedMap, snapshot.slots],
+    [currentParticipantId, selectedMap, snapshot.slots],
+  );
+  const dateLabelsByKey = useMemo(
+    () => new Map(snapshot.dates.map((date) => [date.dateKey, date.label])),
+    [snapshot.dates],
+  );
+  const timeLabelsByMinutes = useMemo(
+    () => new Map(snapshot.timeRows.map((timeRow) => [timeRow.minutes, timeRow.label])),
+    [snapshot.timeRows],
   );
   const participantNamesById = useMemo(
     () => new Map(snapshot.participants.map((participant) => [participant.id, participant.displayName])),
     [snapshot.participants],
   );
+  const participantColorById = useMemo(
+    () => new Map(snapshot.participants.map((participant) => [participant.id, participant.color])),
+    [snapshot.participants],
+  );
+  const participantsWithAvailability = useMemo(
+    () => snapshot.participants.filter((participant) => participant.selectedSlotCount > 0),
+    [snapshot.participants],
+  );
   const cellHeightClass = getCellHeightClass(snapshot.slotMinutes);
+  const activeParticipant =
+    activeParticipantId
+      ? snapshot.participants.find((participant) => participant.id === activeParticipantId) ?? null
+      : null;
+  const activeSlot = activeSlotKey ? (slotMap.get(activeSlotKey) ?? null) : null;
+  const activeSlotDetails = useMemo(() => {
+    if (!activeSlot) {
+      return null;
+    }
+
+    const availableSet = new Set(activeSlot.participantIds);
+
+    return {
+      slot: activeSlot,
+      dateLabel: dateLabelsByKey.get(activeSlot.dateKey) ?? activeSlot.dateKey,
+      timeLabel: timeLabelsByMinutes.get(activeSlot.minutes) ?? "",
+      availableParticipants: snapshot.participants.filter((participant) =>
+        availableSet.has(participant.id),
+      ),
+      unavailableParticipants: participantsWithAvailability.filter(
+        (participant) => !availableSet.has(participant.id),
+      ),
+    };
+  }, [activeSlot, dateLabelsByKey, participantsWithAvailability, snapshot.participants, timeLabelsByMinutes]);
 
   async function handleJoin() {
     setJoining(true);
@@ -301,13 +424,14 @@ export function PublicEventClient({
     }
 
     setSession(payload.session);
+    setMode("edit");
     setName("");
     toast.success("You joined the event");
     await fetchSnapshot();
   }
 
   function updateCell(dateKey: string, minutes: number, nextValue?: boolean) {
-    if (!session || snapshot.status === "CLOSED") {
+    if (!canEdit) {
       return;
     }
 
@@ -321,13 +445,25 @@ export function PublicEventClient({
     setDraftVersion((current) => current + 1);
   }
 
+  function toggleParticipantHighlight(participantId: string) {
+    setActiveParticipantId((current) => (current === participantId ? null : participantId));
+  }
+
   function participantList() {
     return (
       <div className="space-y-2">
         {snapshot.participants.map((participant) => (
-          <div
+          <button
             key={participant.id}
-            className="flex items-center justify-between gap-3 rounded-md border bg-muted/20 px-3 py-2"
+            type="button"
+            aria-pressed={activeParticipantId === participant.id}
+            className={cn(
+              "flex w-full items-center justify-between gap-3 rounded-md border bg-muted/20 px-3 py-2 text-left transition-colors hover:bg-muted/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+              activeParticipantId === participant.id
+                ? "border-foreground/10 bg-background/90 shadow-sm"
+                : "",
+            )}
+            onClick={() => toggleParticipantHighlight(participant.id)}
           >
             <div className="flex items-center gap-3">
               <span
@@ -344,7 +480,10 @@ export function PublicEventClient({
                 </p>
               </div>
             </div>
-          </div>
+            {activeParticipantId === participant.id ? (
+              <span className="text-[11px] font-medium text-muted-foreground">Highlighting</span>
+            ) : null}
+          </button>
         ))}
       </div>
     );
@@ -403,8 +542,20 @@ export function PublicEventClient({
                 </span>
                 {session ? (
                   <span className="inline-flex items-center gap-1">
-                    <span className="size-3 rounded-[3px] bg-primary shadow-[inset_0_0_0_1px_rgba(255,255,255,0.28)]" />
-                    your selection
+                    <span className="size-3 rounded-[3px] bg-primary/24 outline outline-2 -outline-offset-2 outline-primary/85 ring-1 ring-inset ring-background" />
+                    your availability
+                  </span>
+                ) : null}
+                {activeParticipant ? (
+                  <span className="inline-flex items-center gap-1">
+                    <span
+                      className="size-3 rounded-[3px] border bg-background"
+                      style={getParticipantHighlightStyle({
+                        isHighlighted: true,
+                        participantColor: activeParticipant.color,
+                      })}
+                    />
+                    {activeParticipant.displayName} highlighted
                   </span>
                 ) : null}
               </div>
@@ -462,12 +613,37 @@ export function PublicEventClient({
         ) : null}
 
         <Card className="overflow-hidden">
-          <CardHeader className="flex flex-row items-start justify-between gap-4 p-4 pb-2">
-            <div>
+          <CardHeader className="flex flex-col gap-3 p-4 pb-2 sm:flex-row sm:items-start sm:justify-between">
+            <div className="space-y-1">
               <CardTitle className="text-base">Availability</CardTitle>
               <CardDescription className="text-xs">
-                Drag across the grid to paint availability.
+                {mode === "edit"
+                  ? "Drag across the grid to paint your availability while keeping the team heatmap in view."
+                  : "Click any slot to see who is available and who is not."}
               </CardDescription>
+            </div>
+            <div className="inline-flex rounded-md border bg-muted/30 p-1">
+              <Button
+                type="button"
+                size="sm"
+                variant={mode === "edit" ? "secondary" : "ghost"}
+                className="h-7 px-3"
+                aria-pressed={mode === "edit"}
+                disabled={!canEdit}
+                onClick={() => setMode("edit")}
+              >
+                Edit
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={mode === "view" ? "secondary" : "ghost"}
+                className="h-7 px-3"
+                aria-pressed={mode === "view"}
+                onClick={() => setMode("view")}
+              >
+                View
+              </Button>
             </div>
           </CardHeader>
           <CardContent className="p-4 pt-0">
@@ -513,7 +689,8 @@ export function PublicEventClient({
                       {isMajorTimeLabel(timeRow.minutes) ? timeRow.label : ""}
                     </div>
                     {snapshot.dates.map((date) => {
-                      const slot = slotMap.get(slotKey(date.dateKey, timeRow.minutes));
+                      const key = slotKey(date.dateKey, timeRow.minutes);
+                      const slot = slotMap.get(key);
                       if (!slot) {
                         return null;
                       }
@@ -525,29 +702,60 @@ export function PublicEventClient({
                         ? `${date.label} ${timeRow.label} · ${slot.availabilityCount}/${snapshot.participants.length} available · ${availableNames.join(", ")}`
                         : `${date.label} ${timeRow.label} · nobody available`;
 
+                      const isActiveViewSlot = mode === "view" && activeSlotKey === key;
+                      const isHighlightedParticipantAvailable = activeParticipantId
+                        ? slot.participantIds.includes(activeParticipantId)
+                        : false;
+
                       return (
                         <button
-                          key={`${date.dateKey}-${timeRow.minutes}`}
+                          key={key}
                           type="button"
-                          aria-pressed={slot.selectedByCurrentUser}
+                          aria-label={availabilityTitle}
+                          aria-pressed={mode === "edit" ? slot.selectedByCurrentUser : isActiveViewSlot}
                           title={availabilityTitle}
+                          data-current-user-selected={slot.selectedByCurrentUser ? "true" : undefined}
+                          data-highlighted-participant-availability={
+                            isHighlightedParticipantAvailable ? "true" : undefined
+                          }
                           className={cn(
-                            "min-w-[4.75rem] border-0 transition-colors hover:brightness-[0.98] focus-visible:relative focus-visible:z-20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0",
+                            "min-w-[4.75rem] border-0 transition-colors focus-visible:relative focus-visible:z-20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0",
                             cellHeightClass,
-                            getHeatColor(slot),
+                            mode === "edit" && canEdit
+                              ? "cursor-crosshair hover:brightness-[0.98]"
+                              : "cursor-pointer hover:brightness-[0.99]",
+                            getHeatColor(slot.availabilityCount),
+                            getCurrentUserSelectionClass(slot.selectedByCurrentUser),
+                            getActiveViewSelectionClass(isActiveViewSlot),
                           )}
-                          disabled={!session || snapshot.status === "CLOSED"}
+                          style={getParticipantHighlightStyle({
+                            isHighlighted: isHighlightedParticipantAvailable,
+                            participantColor: activeParticipantId
+                              ? participantColorById.get(activeParticipantId)
+                              : undefined,
+                          })}
                           onPointerDown={() => {
+                            if (mode !== "edit" || !canEdit) {
+                              return;
+                            }
+
                             const nextValue = !slot.selectedByCurrentUser;
                             dragValue.current = nextValue;
                             updateCell(date.dateKey, timeRow.minutes, nextValue);
                           }}
                           onPointerEnter={() => {
-                            if (dragValue.current === null) {
+                            if (mode !== "edit" || dragValue.current === null) {
                               return;
                             }
 
                             updateCell(date.dateKey, timeRow.minutes, dragValue.current);
+                          }}
+                          onClick={() => {
+                            if (mode !== "view") {
+                              return;
+                            }
+
+                            setActiveSlotKey(key);
                           }}
                         >
                           <span className="sr-only">{availabilityTitle}</span>
@@ -558,6 +766,82 @@ export function PublicEventClient({
                 ))}
               </div>
             </div>
+            {mode === "view" ? (
+              <div className="mt-4 rounded-md border bg-muted/10 p-4">
+                <div className="space-y-1">
+                  <h3 className="text-sm font-semibold text-foreground">Slot details</h3>
+                  {activeSlotDetails ? (
+                    <p className="text-xs text-muted-foreground">
+                      {activeSlotDetails.dateLabel} · {activeSlotDetails.timeLabel} ·{" "}
+                      {activeSlotDetails.slot.availabilityCount}/{snapshot.participants.length} available
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Select a slot in the heatmap to inspect availability for that time.
+                    </p>
+                  )}
+                </div>
+
+                {activeSlotDetails ? (
+                  <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                    <div className="space-y-2">
+                      <h4 className="text-xs font-medium tracking-[0.14em] text-muted-foreground uppercase">
+                        Available
+                      </h4>
+                      {activeSlotDetails.availableParticipants.length ? (
+                        <div className="space-y-2">
+                          {activeSlotDetails.availableParticipants.map((participant) => (
+                            <div
+                              key={participant.id}
+                              className="flex items-center gap-3 rounded-md border bg-background/80 px-3 py-2"
+                            >
+                              <span
+                                className="size-2.5 rounded-full shadow-sm"
+                                style={{ background: participant.color }}
+                              />
+                              <span className="text-sm font-medium text-foreground">
+                                {participant.displayName}
+                                {participant.isCurrentUser ? " (you)" : ""}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">Nobody is available in this slot.</p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <h4 className="text-xs font-medium tracking-[0.14em] text-muted-foreground uppercase">
+                        Not available
+                      </h4>
+                      {activeSlotDetails.unavailableParticipants.length ? (
+                        <div className="space-y-2">
+                          {activeSlotDetails.unavailableParticipants.map((participant) => (
+                            <div
+                              key={participant.id}
+                              className="flex items-center gap-3 rounded-md border border-dashed bg-background/60 px-3 py-2"
+                            >
+                              <span
+                                className="size-2.5 rounded-full opacity-65 shadow-sm"
+                                style={{ background: participant.color }}
+                              />
+                              <span className="text-sm font-medium text-foreground">
+                                {participant.displayName}
+                                {participant.isCurrentUser ? " (you)" : ""}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          Everyone with at least one selection is available here.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       </div>
@@ -597,7 +881,7 @@ export function PublicEventClient({
           <CardHeader className="p-4 pb-2">
             <CardTitle className="text-sm">Participants</CardTitle>
             <CardDescription className="text-xs">
-              Open visibility keeps coordination simple and transparent.
+              Click a participant to highlight their availability on the grid.
             </CardDescription>
           </CardHeader>
           <CardContent className="p-4 pt-0">{participantList()}</CardContent>
