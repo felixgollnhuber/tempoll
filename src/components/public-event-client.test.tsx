@@ -195,6 +195,11 @@ describe("PublicEventClient", () => {
     const cell = screen.getByRole("button", {
       name: /Mon, Mar 30 09:00 · 2\/4 available/i,
     });
+
+    expect(screen.queryByText("your availability")).not.toBeInTheDocument();
+    expect(cell).not.toHaveAttribute("data-current-user-selected");
+    expect(cell.className).not.toContain("outline-primary/85");
+
     fireEvent.click(cell);
 
     expect(screen.getByText("Slot details")).toBeInTheDocument();

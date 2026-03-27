@@ -849,7 +849,7 @@ export function PublicEventClient({
                   <span className="size-3 rounded-[3px] bg-primary/65" />
                   high overlap
                 </span>
-                {session ? (
+                {session && mode === "edit" ? (
                   <span className="inline-flex items-center gap-1">
                     <span className="size-3 rounded-[3px] bg-primary/24 outline outline-2 -outline-offset-2 outline-primary/85 ring-1 ring-inset ring-background" />
                     your availability
@@ -1049,6 +1049,8 @@ export function PublicEventClient({
                           : `${date.label} ${timeRow.label} · nobody available`;
 
                         const isActiveViewSlot = mode === "view" && activeSlotKey === key;
+                        const showCurrentUserSelection =
+                          mode === "edit" && slot.selectedByCurrentUser;
                         const isHighlightedParticipantAvailable = activeParticipantId
                           ? slot.participantIds.includes(activeParticipantId)
                           : false;
@@ -1063,7 +1065,9 @@ export function PublicEventClient({
                             data-slot-key={key}
                             data-date-key={date.dateKey}
                             data-minutes={timeRow.minutes}
-                            data-current-user-selected={slot.selectedByCurrentUser ? "true" : undefined}
+                            data-current-user-selected={
+                              showCurrentUserSelection ? "true" : undefined
+                            }
                             data-highlighted-participant-availability={
                               isHighlightedParticipantAvailable ? "true" : undefined
                             }
@@ -1074,7 +1078,7 @@ export function PublicEventClient({
                                 ? "cursor-crosshair touch-none hover:brightness-[0.98]"
                                 : "cursor-pointer hover:brightness-[0.99]",
                               getHeatColor(slot.availabilityCount),
-                              getCurrentUserSelectionClass(slot.selectedByCurrentUser),
+                              getCurrentUserSelectionClass(showCurrentUserSelection),
                               getActiveViewSelectionClass(isActiveViewSlot),
                             )}
                             style={getParticipantHighlightStyle({
