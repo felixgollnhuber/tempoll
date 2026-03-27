@@ -60,8 +60,6 @@ export const participantCreateSchema = z.object({
 });
 
 export const availabilityMutationSchema = z.object({
-  participantId: z.string().min(1),
-  editToken: z.string().min(1),
   selectedSlotStarts: z.array(z.string().datetime()).max(1000),
 });
 

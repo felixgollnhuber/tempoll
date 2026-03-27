@@ -2,7 +2,7 @@
 
 A modern, self-hosted When2Meet-style scheduler built with `Next.js 16`, `shadcn/ui`, `Prisma 7`, and `Postgres`.
 
-The repository is ready for GitHub-based deployment with Coolify using the included [`docker-compose.yaml`](/Users/felixgollnhuber/Developer/tempoll/docker-compose.yaml).
+The repository is ready for GitHub-based deployment with Coolify using the included [`docker-compose.yaml`](./docker-compose.yaml).
 
 ## What is included
 
@@ -37,6 +37,13 @@ pnpm dev
 ```
 
 The app will be available at `http://localhost:3000`.
+
+### Open-source safety notes
+
+- `.env.example` and `.env.coolify.example` intentionally contain placeholders and local-only example values. Do not commit your real `.env`.
+- Participant edit links are consumed server-side and immediately redirected to the canonical event URL, so raw participant tokens do not remain in the rendered page URL.
+- Organizer links are bearer secrets. They are stored only in browser-local recent history and are visibly marked as private in the UI.
+- Run `pnpm security:scan-secrets` and `pnpm security:audit` before publishing changes.
 
 ### Local Postgres example
 
@@ -98,10 +105,10 @@ SERVICE_PASSWORD_TEMPOLL_DB=local-dev-password docker compose --env-file .env.co
 
 ## Coolify notes
 
-- The repository ships with a Git-ready [`docker-compose.yaml`](/Users/felixgollnhuber/Developer/tempoll/docker-compose.yaml) that includes both the app and a Postgres database.
+- The repository ships with a Git-ready [`docker-compose.yaml`](./docker-compose.yaml) that includes both the app and a Postgres database.
 - Coolify's Docker Compose mode treats the compose file as the source of truth for services, storage, and environment variables.
 - Add the repository in Coolify as an `Application` using the `Docker Compose` build pack.
-- Use [.env.coolify.example](/Users/felixgollnhuber/Developer/tempoll/.env.coolify.example) as the starting point for the Coolify environment variables.
+- Use [`.env.coolify.example`](./.env.coolify.example) as the starting point for the Coolify environment variables.
 - In Coolify, assign your domain to the `app` service and set the internal service port to `3000`.
 - Set `APP_URL` to the final public URL of the app.
 - Keep `TEMPOLL_DB_NAME` and `TEMPOLL_DB_USER` as the non-secret database metadata.

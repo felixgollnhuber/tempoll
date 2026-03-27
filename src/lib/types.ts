@@ -12,13 +12,9 @@ export type ParticipantSession = {
   participantId: string;
   displayName: string;
   color: string;
-  editToken: string;
-  editUrl: string;
 };
 
 export type AvailabilityBatchMutation = {
-  participantId: string;
-  editToken: string;
   selectedSlotStarts: string[];
 };
 

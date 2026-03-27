@@ -10,6 +10,8 @@ type ManagePageProps = {
   }>;
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function ManagePage({ params }: ManagePageProps) {
   const { token } = await params;
   const view = await getManageEventView(token);
