@@ -1,7 +1,6 @@
 export type SetupWizardValues = {
   appName: string;
   appUrl: string;
-  databaseUrl: string;
   legalPagesEnabled: string;
   operatorLegalName: string;
   operatorDisplayName: string;
@@ -25,7 +24,6 @@ export type SetupWizardErrors = Partial<Record<keyof SetupWizardValues, string>>
 export const defaultSetupWizardValues: SetupWizardValues = {
   appName: "tempoll",
   appUrl: "http://localhost:3000",
-  databaseUrl: "postgresql://postgres:postgres@localhost:55432/tempoll?schema=public",
   legalPagesEnabled: "false",
   operatorLegalName: "",
   operatorDisplayName: "",
@@ -61,10 +59,6 @@ function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-function isValidDatabaseUrl(value: string) {
-  return value.startsWith("postgres://") || value.startsWith("postgresql://");
-}
-
 export function createSetupWizardValues(
   partial: Partial<SetupWizardValues> = {},
 ): SetupWizardValues {
@@ -79,7 +73,7 @@ export function getStepFieldNames(step: number): Array<keyof SetupWizardValues> 
     case 0:
       return ["appName", "appUrl"];
     case 1:
-      return ["databaseUrl"];
+      return [];
     case 2:
       return [];
     case 3:
@@ -102,7 +96,6 @@ export function validateSetupValues(
       [
         "appName",
         "appUrl",
-        "databaseUrl",
       ].includes(field) &&
       !value
     ) {
@@ -112,10 +105,6 @@ export function validateSetupValues(
 
     if (field === "appUrl" && value && !isValidUrl(value)) {
       errors[field] = "Use a full URL including http:// or https://.";
-    }
-
-    if (field === "databaseUrl" && value && !isValidDatabaseUrl(value)) {
-      errors[field] = "Use a PostgreSQL connection string.";
     }
 
     if (
@@ -155,7 +144,6 @@ export function buildEnvFileContent(values: SetupWizardValues) {
     "APP_SETUP_COMPLETE=true",
     `APP_NAME=${quoteEnvValue(cleanValue(values.appName))}`,
     `APP_URL=${quoteEnvValue(cleanValue(values.appUrl))}`,
-    `DATABASE_URL=${quoteEnvValue(cleanValue(values.databaseUrl))}`,
     `LEGAL_PAGES_ENABLED=${cleanValue(values.legalPagesEnabled) === "true" ? "true" : "false"}`,
     "",
     `OPERATOR_LEGAL_NAME=${quoteEnvValue(cleanValue(values.operatorLegalName))}`,

@@ -67,9 +67,6 @@ export function getSetupDraftValues(): SetupWizardValues {
   return createSetupWizardValues({
     appName: getEnv("APP_NAME") ?? appConfig.appName,
     appUrl: getEnv("APP_URL") ?? appConfig.appUrl,
-    databaseUrl:
-      getEnv("DATABASE_URL") ??
-      "postgresql://postgres:postgres@localhost:55432/tempoll?schema=public",
     legalPagesEnabled: getBooleanEnv("LEGAL_PAGES_ENABLED", false) ? "true" : "false",
     operatorLegalName: getEnv("OPERATOR_LEGAL_NAME") ?? "",
     operatorDisplayName: getEnv("OPERATOR_DISPLAY_NAME") ?? "",

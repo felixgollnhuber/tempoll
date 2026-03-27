@@ -15,7 +15,7 @@ services:
       APP_NAME: ${APP_NAME:-tempoll}
       APP_URL: ${APP_URL:?Set the public app URL, for example https://meet.example.com}
       LEGAL_PAGES_ENABLED: ${LEGAL_PAGES_ENABLED:-false}
-      DATABASE_URL: postgresql://${POSTGRES_USER:-tempoll}:${POSTGRES_PASSWORD:?Set a strong database password}@db:5432/${POSTGRES_DB:-tempoll}?schema=public
+      DATABASE_URL: postgresql://${TEMPOLL_DB_USER:-tempoll}:${SERVICE_PASSWORD_TEMPOLL_DB:?Set or let Coolify generate the database password secret}@db:5432/${TEMPOLL_DB_NAME:-tempoll}?schema=public
       OPERATOR_LEGAL_NAME: ${OPERATOR_LEGAL_NAME:-}
       OPERATOR_DISPLAY_NAME: ${OPERATOR_DISPLAY_NAME:-}
       OPERATOR_STREET_ADDRESS: ${OPERATOR_STREET_ADDRESS:-}
@@ -36,21 +36,21 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-tempoll}
-      POSTGRES_USER: ${POSTGRES_USER:-tempoll}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a strong database password}
+      POSTGRES_DB: ${TEMPOLL_DB_NAME:-tempoll}
+      POSTGRES_USER: ${TEMPOLL_DB_USER:-tempoll}
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_TEMPOLL_DB:?Set or let Coolify generate the database password secret}
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "pg_isready -U ${POSTGRES_USER:-tempoll} -d ${POSTGRES_DB:-tempoll}",
+          "pg_isready -U ${TEMPOLL_DB_USER:-tempoll} -d ${TEMPOLL_DB_NAME:-tempoll}",
         ]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 20s
     volumes:
-      - tempoll-postgresql:/var/lib/postgresql/data
+      - tempoll-postgres:/var/lib/postgresql/data
 
 volumes:
-  tempoll-postgresql:
+  tempoll-postgres:

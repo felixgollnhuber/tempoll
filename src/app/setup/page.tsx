@@ -29,8 +29,8 @@ export default function SetupPage() {
                 Configure {appConfig.appName} before going live.
               </h1>
               <p className="max-w-2xl text-base text-muted-foreground">
-                This wizard keeps everything local in your browser and generates the exact `.env`
-                file you can paste into Coolify or your server environment.
+                This wizard keeps everything local in your browser and generates the non-secret app
+                configuration you can paste into Coolify or your server environment.
               </p>
             </div>
           </div>
@@ -39,16 +39,16 @@ export default function SetupPage() {
             <CardHeader>
               <CardTitle>What this setup covers</CardTitle>
               <CardDescription>
-                App identity, database access, operator details, Austrian legal disclosure fields,
-                and privacy-hosting information.
+                App identity, bundled infrastructure guidance, operator details, Austrian legal
+                disclosure fields, and privacy-hosting information.
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3 text-sm text-muted-foreground sm:grid-cols-3">
               <div className="rounded-lg border bg-muted/25 px-4 py-3">
-                Generate a complete `.env` with `APP_SETUP_COMPLETE=true`.
+                Generate an app config snippet with `APP_SETUP_COMPLETE=true`.
               </div>
               <div className="rounded-lg border bg-muted/25 px-4 py-3">
-                Review and adjust everything before copying it into the server.
+                Keep database secrets in Coolify. The browser setup never shows them.
               </div>
               <div className="rounded-lg border bg-muted/25 px-4 py-3">
                 Restart or redeploy afterwards and the normal app becomes available.

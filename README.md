@@ -2,7 +2,7 @@
 
 A modern, self-hosted When2Meet-style scheduler built with `Next.js 16`, `shadcn/ui`, `Prisma 7`, and `Postgres`.
 
-The repository is ready for GitHub-based deployment with Coolify using the included [`docker-compose.yml`](/Users/felixgollnhuber/Developer/TerminFinder/docker-compose.yml).
+The repository is ready for GitHub-based deployment with Coolify using the included [`docker-compose.yaml`](/Users/felixgollnhuber/Developer/tempoll/docker-compose.yaml).
 
 ## What is included
 
@@ -27,7 +27,7 @@ pnpm install
 pnpm dev
 ```
 
-If `APP_SETUP_COMPLETE=false` or the variable is missing, the app redirects to `/setup` and generates a finished `.env` file for you to copy into your deployment environment.
+If `APP_SETUP_COMPLETE=false` or the variable is missing, the app redirects to `/setup` and generates a non-secret app config snippet for you to copy into your deployment environment.
 
 Once your final `.env` is in place and `APP_SETUP_COMPLETE=true`, run:
 
@@ -59,7 +59,7 @@ You can also boot the bundled stack directly:
 
 ```bash
 cp .env.coolify.example .env.coolify
-docker compose --env-file .env.coolify up -d
+SERVICE_PASSWORD_TEMPOLL_DB=local-dev-password docker compose --env-file .env.coolify up -d
 ```
 
 ## Scripts
@@ -85,24 +85,31 @@ docker compose --env-file .env.coolify up -d
 - `APP_SETUP_COMPLETE` controls whether the app is considered configured.
 - `LEGAL_PAGES_ENABLED` controls whether `/imprint` and `/privacy` are exposed at all.
 - While setup is incomplete, normal routes redirect to `/setup` and most API routes return a setup-required response.
-- The setup wizard generates a full `.env` file containing:
+- The setup wizard generates a non-secret app config snippet containing:
   - app basics such as `APP_NAME` and `APP_URL`
-  - `DATABASE_URL`
   - optional operator/imprint fields
   - optional privacy and hosting disclosure fields
+- The setup wizard never shows or exports:
+  - `DATABASE_URL`
+  - the database password
+  - Coolify infrastructure secrets
 - Operator-specific data is intentionally read from env-backed config so the project can be open-sourced without hard-coded personal details.
 - If you keep `LEGAL_PAGES_ENABLED=false`, the footer hides legal links and both legal routes return `404`.
 
 ## Coolify notes
 
-- The repository ships with a Git-ready [`docker-compose.yml`](/Users/felixgollnhuber/Developer/TerminFinder/docker-compose.yml) that includes both the app and a Postgres database.
+- The repository ships with a Git-ready [`docker-compose.yaml`](/Users/felixgollnhuber/Developer/tempoll/docker-compose.yaml) that includes both the app and a Postgres database.
 - Coolify's Docker Compose mode treats the compose file as the source of truth for services, storage, and environment variables.
 - Add the repository in Coolify as an `Application` using the `Docker Compose` build pack.
-- Use [.env.coolify.example](/Users/felixgollnhuber/Developer/TerminFinder/.env.coolify.example) as the starting point for the Coolify environment variables.
+- Use [.env.coolify.example](/Users/felixgollnhuber/Developer/tempoll/.env.coolify.example) as the starting point for the Coolify environment variables.
 - In Coolify, assign your domain to the `app` service and set the internal service port to `3000`.
 - Set `APP_URL` to the final public URL of the app.
-- `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD` create the bundled database automatically on first boot.
-- On first deployment you can keep `APP_SETUP_COMPLETE=false`, open `/setup`, generate the final env, then update the variables in Coolify and redeploy.
+- Keep `TEMPOLL_DB_NAME` and `TEMPOLL_DB_USER` as the non-secret database metadata.
+- The database password is derived from the Coolify-managed `SERVICE_PASSWORD_TEMPOLL_DB` secret and is never shown by `/setup`.
+- `DATABASE_URL` is built inside Docker Compose from `TEMPOLL_DB_NAME`, `TEMPOLL_DB_USER`, and `SERVICE_PASSWORD_TEMPOLL_DB`.
+- On first deployment you can keep `APP_SETUP_COMPLETE=false`, open `/setup`, copy the generated app config, merge it into Coolify, and redeploy.
+- While `APP_SETUP_COMPLETE=false`, the container skips `prisma migrate deploy` so `/setup` can load without a migration boot loop.
+- For existing persistent Postgres volumes, make sure `SERVICE_PASSWORD_TEMPOLL_DB` matches the current live database password before redeploying. Changing DB credentials after first initialization is an infrastructure migration or volume-reset task.
 - The healthcheck endpoint is `/api/health`.
 
 ## Data model

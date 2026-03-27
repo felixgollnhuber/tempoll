@@ -30,7 +30,7 @@ type SetupWizardProps = {
 
 const stepLabels = [
   "App basics",
-  "Database",
+  "Infrastructure",
   "Operator details",
   "Legal and privacy",
   "Review and export",
@@ -66,7 +66,7 @@ export function SetupWizard({ initialValues }: SetupWizardProps) {
 
   async function copyEnv() {
     await navigator.clipboard.writeText(envPreview);
-    toast.success("Copied .env content");
+    toast.success("Copied app config");
   }
 
   function renderInput(
@@ -119,9 +119,45 @@ export function SetupWizard({ initialValues }: SetupWizardProps) {
     if (step === 1) {
       return (
         <div className="grid gap-4">
-          {renderInput("databaseUrl", "PostgreSQL connection string", {
-            placeholder: "postgresql://user:password@host:port/database?schema=public",
-          })}
+          <div className="rounded-lg border bg-muted/20 p-4">
+            <h3 className="text-sm font-medium text-foreground">Bundled Postgres infrastructure</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              tempoll uses the bundled Postgres service from the Docker Compose stack. The database
+              password is managed by Coolify and is never entered, shown, or exported by this
+              browser wizard. On a fresh stack, Coolify generates the password before the first
+              Postgres initialization.
+            </p>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-lg border bg-muted/15 px-4 py-3 text-sm text-muted-foreground">
+              <div className="font-medium text-foreground">Database name</div>
+              <div className="mt-1 font-mono text-xs">TEMPOLL_DB_NAME</div>
+            </div>
+            <div className="rounded-lg border bg-muted/15 px-4 py-3 text-sm text-muted-foreground">
+              <div className="font-medium text-foreground">Database user</div>
+              <div className="mt-1 font-mono text-xs">TEMPOLL_DB_USER</div>
+            </div>
+            <div className="rounded-lg border bg-muted/15 px-4 py-3 text-sm text-muted-foreground">
+              <div className="font-medium text-foreground">Generated password</div>
+              <div className="mt-1 font-mono text-xs">SERVICE_PASSWORD_TEMPOLL_DB</div>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-dashed bg-muted/15 px-4 py-3 text-sm text-muted-foreground">
+            Keep these infrastructure variables in Coolify. This setup wizard only exports
+            non-secret app and legal configuration, and the Docker Compose stack derives
+            <code className="mx-1 rounded bg-muted px-1 py-0.5 text-xs">DATABASE_URL</code>
+            internally.
+          </div>
+
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-100">
+            If you already have a persistent Postgres volume, make sure
+            <code className="mx-1 rounded bg-amber-100 px-1 py-0.5 text-xs dark:bg-amber-950/40">
+              SERVICE_PASSWORD_TEMPOLL_DB
+            </code>
+            matches the current live database password before redeploying.
+          </div>
         </div>
       );
     }
@@ -213,13 +249,24 @@ export function SetupWizard({ initialValues }: SetupWizardProps) {
     return (
       <div className="space-y-4">
         <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
-          Copy this `.env` content into your server environment, redeploy the app, and the setup wizard will disappear automatically.
+          Copy this app configuration into Coolify, keep the infrastructure database variables
+          unchanged, and redeploy the app. The setup wizard will disappear automatically afterwards.
           {values.legalPagesEnabled === "true"
             ? " Imprint and privacy pages are enabled."
             : " Imprint and privacy pages will stay disabled until you opt in."}
         </div>
+        <div className="rounded-lg border border-dashed bg-muted/15 p-4 text-sm text-muted-foreground">
+          This export intentionally does not contain
+          <code className="mx-1 rounded bg-muted px-1 py-0.5 text-xs">DATABASE_URL</code>
+          or any database password. Keep
+          <code className="mx-1 rounded bg-muted px-1 py-0.5 text-xs">TEMPOLL_DB_NAME</code>,
+          <code className="mx-1 rounded bg-muted px-1 py-0.5 text-xs">TEMPOLL_DB_USER</code>,
+          and
+          <code className="mx-1 rounded bg-muted px-1 py-0.5 text-xs">SERVICE_PASSWORD_TEMPOLL_DB</code>
+          managed separately in Coolify.
+        </div>
         <div className="space-y-2">
-          <Label htmlFor="envPreview">Generated .env</Label>
+          <Label htmlFor="envPreview">Generated app config</Label>
           <Textarea
             id="envPreview"
             readOnly
@@ -237,7 +284,7 @@ export function SetupWizard({ initialValues }: SetupWizardProps) {
         <CardHeader>
           <CardTitle>Setup steps</CardTitle>
           <CardDescription>
-            This wizard generates the environment file for your self-hosted deployment.
+            This wizard generates the non-secret app configuration for your self-hosted deployment.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
@@ -268,7 +315,8 @@ export function SetupWizard({ initialValues }: SetupWizardProps) {
             {stepLabels[step]}
           </CardTitle>
           <CardDescription>
-            Fill in the fields below. All values stay in your browser until you copy the generated `.env`.
+            Fill in the fields below. All values stay in your browser until you copy the generated
+            app config snippet.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">

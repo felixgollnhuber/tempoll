@@ -19,14 +19,14 @@ describe("setup wizard helpers", () => {
       createSetupWizardValues({
         appName: "",
         appUrl: "not-a-url",
-        databaseUrl: "mysql://localhost/db",
+        operatorWebsite: "invalid-site",
       }),
-      ["appName", "appUrl", "databaseUrl"],
+      ["appName", "appUrl", "operatorWebsite"],
     );
 
     expect(errors.appName).toBeTruthy();
     expect(errors.appUrl).toContain("Use a full URL");
-    expect(errors.databaseUrl).toContain("PostgreSQL");
+    expect(errors.operatorWebsite).toContain("Use a full URL");
   });
 
   it("does not require legal disclosure fields", () => {
@@ -48,7 +48,6 @@ describe("setup wizard helpers", () => {
       createSetupWizardValues({
         appName: "tempoll",
         appUrl: "https://meet.example.com",
-        databaseUrl: "postgresql://user:pass@db:5432/app?schema=public",
         legalPagesEnabled: "false",
         operatorLegalName: "Jane Doe",
         operatorDisplayName: "Jane Doe",
@@ -70,5 +69,7 @@ describe("setup wizard helpers", () => {
     expect(envFile).toContain('APP_NAME="tempoll"');
     expect(envFile).toContain('PRIVACY_PROCESSORS="Coolify; Hetzner"');
     expect(envFile).toContain('PRIVACY_CONTACT_EMAIL="hello@example.com"');
+    expect(envFile).not.toContain("DATABASE_URL");
+    expect(envFile).not.toContain("SERVICE_PASSWORD");
   });
 });
