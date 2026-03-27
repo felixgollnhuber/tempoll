@@ -9,7 +9,7 @@ import {
   SparklesIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +27,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import {
+  defaultCreateEventDefaults,
+  readCreateEventDefaults,
+  saveCreateEventDefaults,
+} from "@/lib/create-event-defaults";
 import { cn } from "@/lib/utils";
 import { eventCreateSchema } from "@/lib/validators";
 
@@ -121,10 +126,30 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
       ? browserTimezone
       : "Europe/Vienna";
   });
-  const [slotMinutes, setSlotMinutes] = useState(30);
+  const [slotMinutes, setSlotMinutes] = useState(defaultCreateEventDefaults.slotMinutes);
   const [meetingDurationMinutes, setMeetingDurationMinutes] = useState(60);
-  const [dayStartMinutes, setDayStartMinutes] = useState(9 * 60);
-  const [dayEndMinutes, setDayEndMinutes] = useState(18 * 60);
+  const [dayStartMinutes, setDayStartMinutes] = useState(
+    defaultCreateEventDefaults.dayStartMinutes,
+  );
+  const [dayEndMinutes, setDayEndMinutes] = useState(
+    defaultCreateEventDefaults.dayEndMinutes,
+  );
+
+  useEffect(() => {
+    const storedDefaults = readCreateEventDefaults();
+    const supportsTimeOption = (minutes: number) =>
+      timeOptions.some((option) => option.value === minutes);
+
+    if (supportsTimeOption(storedDefaults.dayStartMinutes)) {
+      setDayStartMinutes(storedDefaults.dayStartMinutes);
+    }
+
+    if (supportsTimeOption(storedDefaults.dayEndMinutes)) {
+      setDayEndMinutes(storedDefaults.dayEndMinutes);
+    }
+
+    setSlotMinutes(storedDefaults.slotMinutes);
+  }, [timeOptions]);
 
   const selectedDates =
     dateRange?.from && dateRange?.to
@@ -265,6 +290,11 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
       }
 
       toast.success("Event created");
+      saveCreateEventDefaults({
+        dayStartMinutes,
+        dayEndMinutes,
+        slotMinutes,
+      });
       router.push(`/manage/${payload.manageKey}`);
     });
   }
