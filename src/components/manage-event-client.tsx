@@ -27,6 +27,9 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
   const [title, setTitle] = useState(initialView.snapshot.title);
   const [status, setStatus] = useState(initialView.snapshot.status);
   const [isPending, startTransition] = useTransition();
+  const hasAnyAvailability = snapshot.participants.some(
+    (participant) => participant.selectedSlotCount > 0,
+  );
 
   useEffect(() => {
     const eventSource = new EventSource(`/api/events/${initialView.snapshot.slug}/stream`);
@@ -242,27 +245,29 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Best windows right now</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {snapshot.suggestions.map((suggestion, index) => (
-              <div
-                key={suggestion.slotStart}
-                className="rounded-lg border bg-muted/20 px-4 py-3"
-              >
-                <p className="text-xs font-medium text-muted-foreground">
-                  Option {index + 1}
-                </p>
-                <p className="mt-2 text-sm font-semibold">{suggestion.label}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {suggestion.availableCount} people available
-                </p>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+        {hasAnyAvailability ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Best windows right now</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {snapshot.suggestions.map((suggestion, index) => (
+                <div
+                  key={suggestion.slotStart}
+                  className="rounded-lg border bg-muted/20 px-4 py-3"
+                >
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Option {index + 1}
+                  </p>
+                  <p className="mt-2 text-sm font-semibold">{suggestion.label}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {suggestion.availableCount} people available
+                  </p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        ) : null}
       </aside>
     </div>
   );

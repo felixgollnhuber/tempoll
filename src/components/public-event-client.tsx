@@ -274,6 +274,9 @@ export function PublicEventClient({
     lastSavedSignatureRef.current = getSelectedSlotStarts(nextSnapshot).join("|");
   }, []);
   const canEdit = Boolean(session && snapshot.status === "OPEN");
+  const hasAnyAvailability = snapshot.participants.some(
+    (participant) => participant.selectedSlotCount > 0,
+  );
 
   const fetchSnapshot = useCallback(async () => {
     const response = await fetch(`/api/events/${slug}`, {
@@ -1198,35 +1201,37 @@ export function PublicEventClient({
       </div>
 
       <aside className="hidden space-y-4 xl:block">
-        <Card>
-          <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-sm">Best matching windows</CardTitle>
-            <CardDescription className="text-xs">
-              Ranked by overlap across the full {snapshot.meetingDurationMinutes}-minute meeting.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2 p-4 pt-0">
-            {snapshot.suggestions.map((suggestion, index) => (
-              <div
-                key={suggestion.slotStart}
-                className="rounded-md border bg-muted/20 px-3 py-2"
-              >
-                <p className="text-[11px] font-medium text-muted-foreground">
-                  Option {index + 1}
-                </p>
-                <p className="mt-1 text-sm font-semibold text-foreground">{suggestion.label}</p>
-                {suggestion.localLabel ? (
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    Your timezone: {suggestion.localLabel}
+        {hasAnyAvailability ? (
+          <Card>
+            <CardHeader className="p-4 pb-2">
+              <CardTitle className="text-sm">Best matching windows</CardTitle>
+              <CardDescription className="text-xs">
+                Ranked by overlap across the full {snapshot.meetingDurationMinutes}-minute meeting.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 p-4 pt-0">
+              {snapshot.suggestions.map((suggestion, index) => (
+                <div
+                  key={suggestion.slotStart}
+                  className="rounded-md border bg-muted/20 px-3 py-2"
+                >
+                  <p className="text-[11px] font-medium text-muted-foreground">
+                    Option {index + 1}
                   </p>
-                ) : null}
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  {suggestion.availableCount} participants free for the full window
-                </p>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+                  <p className="mt-1 text-sm font-semibold text-foreground">{suggestion.label}</p>
+                  {suggestion.localLabel ? (
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      Your timezone: {suggestion.localLabel}
+                    </p>
+                  ) : null}
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    {suggestion.availableCount} participants free for the full window
+                  </p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        ) : null}
 
         <Card>
           <CardHeader className="p-4 pb-2">

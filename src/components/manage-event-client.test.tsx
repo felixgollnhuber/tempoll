@@ -59,4 +59,21 @@ describe("ManageEventClient", () => {
     expect(screen.getByText(view.shareUrl).className).toContain("[overflow-wrap:anywhere]");
     expect(screen.getByText(view.manageUrl).className).toContain("[overflow-wrap:anywhere]");
   });
+
+  it("hides best windows before anyone has entered availability", () => {
+    const view = createManageView();
+    view.snapshot.participants = view.snapshot.participants.map((participant) => ({
+      ...participant,
+      selectedSlotCount: 0,
+    }));
+    view.snapshot.suggestions = view.snapshot.suggestions.map((suggestion) => ({
+      ...suggestion,
+      availableCount: 0,
+      participantIds: [],
+    }));
+
+    render(<ManageEventClient initialView={view} />);
+
+    expect(screen.queryByText("Best windows right now")).not.toBeInTheDocument();
+  });
 });

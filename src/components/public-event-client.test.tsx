@@ -117,6 +117,42 @@ afterEach(() => {
 });
 
 describe("PublicEventClient", () => {
+  it("hides best matching windows before anyone has selected availability", () => {
+    const snapshot = createSnapshot({ withCurrentUser: false });
+    snapshot.slots = snapshot.slots.map((slot) => ({
+      ...slot,
+      availabilityCount: 0,
+      participantIds: [],
+      selectedByCurrentUser: false,
+    }));
+    snapshot.participants = snapshot.participants.map((participant) => ({
+      ...participant,
+      selectedSlotCount: 0,
+      isCurrentUser: false,
+    }));
+    snapshot.suggestions = [
+      {
+        slotStart: "2026-03-30T07:00:00.000Z",
+        slotEnd: "2026-03-30T08:00:00.000Z",
+        dateKey: "2026-03-30",
+        label: "Mon, Mar 30 · 09:00-10:00",
+        localLabel: null,
+        availableCount: 0,
+        participantIds: [],
+      },
+    ];
+
+    render(
+      <PublicEventClient
+        slug="test-event"
+        initialSnapshot={snapshot}
+        initialSession={null}
+      />,
+    );
+
+    expect(screen.queryByText("Best matching windows")).not.toBeInTheDocument();
+  });
+
   it("keeps the heatmap visible in edit mode while marking the current user's slots", () => {
     render(
       <PublicEventClient
