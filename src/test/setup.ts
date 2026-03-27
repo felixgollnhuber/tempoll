@@ -50,4 +50,9 @@ Object.defineProperties(HTMLElement.prototype, {
       return true;
     },
   },
+  scrollIntoView: {
+    configurable: true,
+    writable: true,
+    value() {},
+  },
 });

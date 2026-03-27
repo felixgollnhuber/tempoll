@@ -1,6 +1,8 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { readCreateEventDefaults } from "@/lib/create-event-defaults";
 import { CreateEventForm } from "./create-event-form";
 
 const push = vi.fn();
@@ -18,20 +20,31 @@ vi.mock("sonner", () => ({
   },
 }));
 
+const defaultTimezones = ["Europe/Vienna"];
+const defaultTimeOptions = [
+  { value: 8 * 60, label: "08:00" },
+  { value: 9 * 60, label: "09:00" },
+  { value: 17 * 60, label: "17:00" },
+  { value: 18 * 60, label: "18:00" },
+];
+
+function renderCreateEventForm() {
+  return render(
+    <CreateEventForm timezones={defaultTimezones} timeOptions={defaultTimeOptions} />,
+  );
+}
+
+beforeEach(() => {
+  window.localStorage.clear();
+  push.mockReset();
+});
+
 describe("CreateEventForm", () => {
   it("shows a friendly inline title validation message before submitting", () => {
     const fetchMock = vi.fn();
     global.fetch = fetchMock as typeof fetch;
 
-    render(
-      <CreateEventForm
-        timezones={["Europe/Vienna"]}
-        timeOptions={[
-          { value: 9 * 60, label: "09:00" },
-          { value: 18 * 60, label: "18:00" },
-        ]}
-      />,
-    );
+    renderCreateEventForm();
 
     fireEvent.change(screen.getByLabelText("Event title"), {
       target: { value: "ab" },
@@ -48,15 +61,7 @@ describe("CreateEventForm", () => {
   });
 
   it("clears the inline title validation message once the input is corrected", () => {
-    render(
-      <CreateEventForm
-        timezones={["Europe/Vienna"]}
-        timeOptions={[
-          { value: 9 * 60, label: "09:00" },
-          { value: 18 * 60, label: "18:00" },
-        ]}
-      />,
-    );
+    renderCreateEventForm();
 
     const titleInput = screen.getByLabelText("Event title");
 
@@ -77,5 +82,54 @@ describe("CreateEventForm", () => {
       screen.queryByText("Event title must be at least 3 characters long."),
     ).not.toBeInTheDocument();
     expect(titleInput).not.toHaveAttribute("aria-invalid");
+  });
+
+  it("stores the last used daily window and slot size after a successful event creation", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        manageKey: "manage-key-123",
+      }),
+    });
+    global.fetch = fetchMock as typeof fetch;
+
+    renderCreateEventForm();
+
+    await user.type(screen.getByLabelText("Event title"), "Sprint planning");
+
+    await user.click(screen.getByRole("combobox", { name: "Daily start" }));
+    await user.click(screen.getByRole("option", { name: "08:00" }));
+
+    await user.click(screen.getByRole("combobox", { name: "Daily end" }));
+    await user.click(screen.getByRole("option", { name: "17:00" }));
+
+    await user.click(screen.getByRole("combobox", { name: "Slot size" }));
+    await user.click(screen.getByRole("option", { name: "15 min" }));
+
+    await user.click(screen.getByRole("button", { name: "Create event" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(push).toHaveBeenCalledWith("/manage/manage-key-123");
+    });
+
+    const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const payload = JSON.parse(String(requestInit.body)) as {
+      dayStartMinutes: number;
+      dayEndMinutes: number;
+      slotMinutes: number;
+    };
+
+    expect(payload).toMatchObject({
+      dayStartMinutes: 8 * 60,
+      dayEndMinutes: 17 * 60,
+      slotMinutes: 15,
+    });
+    expect(readCreateEventDefaults()).toEqual({
+      dayStartMinutes: 8 * 60,
+      dayEndMinutes: 17 * 60,
+      slotMinutes: 15,
+    });
   });
 });
