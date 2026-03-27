@@ -799,8 +799,8 @@ export function PublicEventClient({
   }
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_250px]">
-      <div className="space-y-4">
+    <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_250px]">
+      <div className="min-w-0 space-y-4">
         <Card>
           <CardHeader className="gap-3 p-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -921,7 +921,7 @@ export function PublicEventClient({
           </Card>
         ) : null}
 
-        <Card className="overflow-hidden">
+        <Card className="min-w-0 overflow-hidden">
           <CardHeader className="flex flex-col gap-3 p-4 pb-2 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-1">
               <CardTitle className="text-base">Availability</CardTitle>
@@ -959,7 +959,7 @@ export function PublicEventClient({
               </Button>
             </div>
           </CardHeader>
-          <CardContent className="p-4 pt-0">
+          <CardContent className="min-w-0 p-4 pt-0">
             <div className="space-y-3">
               {usesDateWindowing ? (
                 <div className="flex items-center justify-between gap-3 rounded-md border bg-muted/20 p-2">
@@ -996,7 +996,7 @@ export function PublicEventClient({
                 </div>
               ) : null}
 
-              <div ref={gridContainerRef} className="overflow-hidden rounded-md border">
+              <div ref={gridContainerRef} className="min-w-0 overflow-hidden rounded-md border">
                 <div
                   className={cn(
                     "grid gap-px bg-border select-none",
@@ -1200,7 +1200,7 @@ export function PublicEventClient({
         </Card>
       </div>
 
-      <aside className="hidden space-y-4 xl:block">
+      <aside className="hidden min-w-0 space-y-4 xl:block">
         {hasAnyAvailability ? (
           <Card>
             <CardHeader className="p-4 pb-2">
