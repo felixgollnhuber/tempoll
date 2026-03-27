@@ -13,6 +13,9 @@ type AppChromeProps = {
   children: React.ReactNode;
 };
 
+const featureRequestMailto =
+  "mailto:tempoll-featurerequest@felixgollnhuber.dev?subject=Feature%20request%20or%20suggestion%20for%20tempoll";
+
 export function AppChrome({
   appName,
   setupComplete,
@@ -49,16 +52,21 @@ export function AppChrome({
       <footer className="mt-auto border-t">
         <div className="app-shell flex flex-col gap-3 py-6 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <p>{appName} is a self-hostable, realtime scheduling board for modern teams.</p>
-          {legalPagesEnabled ? (
-            <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4">
+            <a href={featureRequestMailto} className="hover:text-foreground">
+              Feature request or suggestion
+            </a>
+            {legalPagesEnabled ? (
               <Link href="/imprint" className="hover:text-foreground">
                 Imprint
               </Link>
+            ) : null}
+            {legalPagesEnabled ? (
               <Link href="/privacy" className="hover:text-foreground">
                 Privacy
               </Link>
-            </div>
-          ) : null}
+            ) : null}
+          </div>
         </div>
       </footer>
     </>
