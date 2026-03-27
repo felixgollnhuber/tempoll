@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Loader2Icon, Trash2Icon } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -233,7 +234,12 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
               <div className="rounded-md border bg-muted/20 px-4 py-3 text-sm text-muted-foreground [overflow-wrap:anywhere]">
                 {initialView.shareUrl}
               </div>
-              <CopyButton value={initialView.shareUrl} label="Copy public URL" />
+              <div className="flex flex-wrap gap-2">
+                <Button asChild>
+                  <Link href={initialView.shareUrl}>Open public event</Link>
+                </Button>
+                <CopyButton value={initialView.shareUrl} label="Copy public URL" />
+              </div>
             </div>
             <div className="space-y-2">
               <Label>Private organizer URL</Label>
