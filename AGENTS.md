@@ -144,6 +144,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## Practical workflow reminders
 
+- If Codex creates a new git branch, the branch name must be English-only.
+  - use English slugs even when the user writes in German
+  - do not create German branch names like `codex/passe-viewmodemarkierung-an`
 - If changing deployment-related files, re-run at minimum:
   - `pnpm build`
   - `docker build -t tempoll-debug .`
