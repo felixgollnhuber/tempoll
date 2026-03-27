@@ -86,6 +86,10 @@ function getRangeDays(range: DateRange | undefined) {
   }).length;
 }
 
+function getRangeDaysText(days: number) {
+  return `${days} day${days === 1 ? "" : "s"}`;
+}
+
 export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -356,7 +360,14 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
                         <CalendarRangeIcon className="size-4 text-muted-foreground" />
                         <span className="truncate">{selectedRangeLabel}</span>
                       </span>
-                      <ChevronDownIcon className="size-4 text-muted-foreground" />
+                      <span className="ml-3 flex shrink-0 items-center gap-2">
+                        {selectedRangeDays > 0 ? (
+                          <Badge variant="secondary" className="rounded-full px-2.5">
+                            {getRangeDaysText(selectedRangeDays)}
+                          </Badge>
+                        ) : null}
+                        <ChevronDownIcon className="size-4 text-muted-foreground" />
+                      </span>
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent
@@ -387,7 +398,9 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
                         <div className="min-w-0">
                           <p className="truncate text-sm font-medium">{draftRangeLabel}</p>
                           <p className="text-xs text-muted-foreground">
-                            {draftRangeDays > 0 ? `${draftRangeDays} days selected` : "Select a full range"}
+                            {draftRangeDays > 0
+                              ? `${getRangeDaysText(draftRangeDays)} selected`
+                              : "Select a full range"}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
@@ -415,12 +428,6 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
                     </div>
                   </PopoverContent>
                 </Popover>
-                <div className="rounded-md border bg-muted/40 px-3 py-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="truncate text-sm font-medium">{selectedRangeLabel}</p>
-                    <Badge variant="secondary">{selectedRangeDays} days</Badge>
-                  </div>
-                </div>
                 {fieldErrors.dates ? (
                   <p id="dates-error" className="text-sm text-destructive">
                     {fieldErrors.dates}
