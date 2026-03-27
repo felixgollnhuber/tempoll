@@ -1,7 +1,0 @@
-[   68859ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://127.0.0.1:3000/:0
-[   69467ms] Error: An unexpected Turbopack error occurred. Please see the output of `next dev` for more details.
-    at getServerError (http://127.0.0.1:3000/_next/static/chunks/11y7_next_dist_08kviqv._.js:2075:62)
-    at http://127.0.0.1:3000/_next/static/chunks/11y7_next_dist_client_0589y2t._.js:3677:27
-[  133525ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:3000/_next/webpack-hmr' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:3000/_next/static/chunks/11y7_next_dist_client_0589y2t._.js:2342
-[  134527ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:3000/_next/webpack-hmr' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:3000/_next/static/chunks/11y7_next_dist_client_0589y2t._.js:2342
-[  135529ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:3000/_next/webpack-hmr' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:3000/_next/static/chunks/11y7_next_dist_client_0589y2t._.js:2342
