@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PublicEventClient } from "./public-event-client";
 import type { PublicEventSnapshot } from "@/lib/types";
@@ -7,9 +7,66 @@ import type { PublicEventSnapshot } from "@/lib/types";
 function createSnapshot(options?: {
   status?: PublicEventSnapshot["status"];
   withCurrentUser?: boolean;
+  dayCount?: number;
 }): PublicEventSnapshot {
   const status = options?.status ?? "OPEN";
   const withCurrentUser = options?.withCurrentUser ?? true;
+  const dayCount = options?.dayCount ?? 2;
+  const dates = [
+    { dateKey: "2026-03-30", label: "Mon, Mar 30" },
+    { dateKey: "2026-03-31", label: "Tue, Mar 31" },
+    { dateKey: "2026-04-01", label: "Wed, Apr 1" },
+    { dateKey: "2026-04-02", label: "Thu, Apr 2" },
+    { dateKey: "2026-04-03", label: "Fri, Apr 3" },
+    { dateKey: "2026-04-04", label: "Sat, Apr 4" },
+    { dateKey: "2026-04-05", label: "Sun, Apr 5" },
+  ].slice(0, dayCount);
+  const timeRows = [
+    { minutes: 9 * 60, label: "09:00" },
+    { minutes: 9 * 60 + 30, label: "09:30" },
+  ];
+  const slots = dates.flatMap((date, index) => {
+    const firstParticipantIds =
+      index === 0 ? (withCurrentUser ? ["p1", "p2"] : ["p2"]) : index === 1 ? ["p2", "p3"] : [];
+    const secondParticipantIds = index === 0 ? ["p2"] : [];
+
+    return [
+      {
+        slotStart: `${date.dateKey}T07:00:00.000Z`,
+        dateKey: date.dateKey,
+        minutes: timeRows[0].minutes,
+        availabilityCount: firstParticipantIds.length,
+        participantIds: firstParticipantIds,
+        selectedByCurrentUser: withCurrentUser && index === 0,
+      },
+      {
+        slotStart: `${date.dateKey}T07:30:00.000Z`,
+        dateKey: date.dateKey,
+        minutes: timeRows[1].minutes,
+        availabilityCount: secondParticipantIds.length,
+        participantIds: secondParticipantIds,
+        selectedByCurrentUser: false,
+      },
+    ];
+  });
+  const participantDefinitions = [
+    { id: "p1", displayName: "Felix", color: "#ef7f3b" },
+    { id: "p2", displayName: "Gabriel", color: "#22b8a0" },
+    { id: "p3", displayName: "Nora", color: "#6b8afd" },
+    { id: "p4", displayName: "Sam", color: "#a36cf7" },
+  ];
+  const selectedSlotCountByParticipant = new Map(
+    participantDefinitions.map((participant) => [participant.id, 0]),
+  );
+
+  for (const slot of slots) {
+    for (const participantId of slot.participantIds) {
+      selectedSlotCountByParticipant.set(
+        participantId,
+        (selectedSlotCountByParticipant.get(participantId) ?? 0) + 1,
+      );
+    }
+  }
 
   return {
     id: "event_1",
@@ -21,90 +78,43 @@ function createSnapshot(options?: {
     meetingDurationMinutes: 60,
     dayStartMinutes: 9 * 60,
     dayEndMinutes: 10 * 60,
-    dates: [
-      { dateKey: "2026-03-30", label: "Mon, Mar 30" },
-      { dateKey: "2026-03-31", label: "Tue, Mar 31" },
-    ],
-    timeRows: [
-      { minutes: 9 * 60, label: "09:00" },
-      { minutes: 9 * 60 + 30, label: "09:30" },
-    ],
-    slots: [
-      {
-        slotStart: "2026-03-30T07:00:00.000Z",
-        dateKey: "2026-03-30",
-        minutes: 9 * 60,
-        availabilityCount: 2,
-        participantIds: ["p1", "p2"],
-        selectedByCurrentUser: withCurrentUser,
-      },
-      {
-        slotStart: "2026-03-31T07:00:00.000Z",
-        dateKey: "2026-03-31",
-        minutes: 9 * 60,
-        availabilityCount: 2,
-        participantIds: ["p2", "p3"],
-        selectedByCurrentUser: false,
-      },
-      {
-        slotStart: "2026-03-30T07:30:00.000Z",
-        dateKey: "2026-03-30",
-        minutes: 9 * 60 + 30,
-        availabilityCount: 1,
-        participantIds: ["p2"],
-        selectedByCurrentUser: false,
-      },
-      {
-        slotStart: "2026-03-31T07:30:00.000Z",
-        dateKey: "2026-03-31",
-        minutes: 9 * 60 + 30,
-        availabilityCount: 0,
-        participantIds: [],
-        selectedByCurrentUser: false,
-      },
-    ],
-    participants: [
-      {
-        id: "p1",
-        displayName: "Felix",
-        color: "#ef7f3b",
-        selectedSlotCount: withCurrentUser ? 1 : 0,
-        isCurrentUser: withCurrentUser,
-      },
-      {
-        id: "p2",
-        displayName: "Gabriel",
-        color: "#22b8a0",
-        selectedSlotCount: 2,
-        isCurrentUser: false,
-      },
-      {
-        id: "p3",
-        displayName: "Nora",
-        color: "#6b8afd",
-        selectedSlotCount: 1,
-        isCurrentUser: false,
-      },
-      {
-        id: "p4",
-        displayName: "Sam",
-        color: "#a36cf7",
-        selectedSlotCount: 0,
-        isCurrentUser: false,
-      },
-    ],
+    dates,
+    timeRows,
+    slots,
+    participants: participantDefinitions.map((participant) => ({
+      ...participant,
+      selectedSlotCount: selectedSlotCountByParticipant.get(participant.id) ?? 0,
+      isCurrentUser: withCurrentUser && participant.id === "p1",
+    })),
     suggestions: [],
     currentParticipant: withCurrentUser
       ? {
           id: "p1",
           displayName: "Felix",
           color: "#ef7f3b",
-          selectedSlotCount: 1,
+          selectedSlotCount: selectedSlotCountByParticipant.get("p1") ?? 0,
           isCurrentUser: true,
         }
       : null,
   };
 }
+
+function setViewportWidth(width: number) {
+  Object.defineProperty(window, "innerWidth", {
+    configurable: true,
+    writable: true,
+    value: width,
+  });
+  window.dispatchEvent(new Event("resize"));
+}
+
+beforeEach(() => {
+  setViewportWidth(1024);
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("PublicEventClient", () => {
   it("keeps the heatmap visible in edit mode while marking the current user's slots", () => {
@@ -202,6 +212,38 @@ describe("PublicEventClient", () => {
     expect(availableCell).not.toHaveAttribute("data-highlighted-participant-availability");
   });
 
+  it("shows day navigation when the date range overflows and moves the visible window one day at a time", async () => {
+    setViewportWidth(240);
+
+    render(
+      <PublicEventClient
+        slug="test-event"
+        initialSnapshot={createSnapshot({ dayCount: 5 })}
+        initialSession={{
+          participantId: "p1",
+          displayName: "Felix",
+          editToken: "secret",
+        }}
+      />,
+    );
+
+    expect(await screen.findByText("Mon, Mar 30 to Tue, Mar 31")).toBeInTheDocument();
+    expect(await screen.findByText("Days 1 - 2 of 5")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show previous days" })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Show next days" }));
+
+    expect(await screen.findByText("Tue, Mar 31 to Wed, Apr 1")).toBeInTheDocument();
+    expect(await screen.findByText("Days 2 - 3 of 5")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show previous days" })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Show next days" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show next days" }));
+
+    expect(await screen.findByText("Thu, Apr 2 to Fri, Apr 3")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show next days" })).toBeDisabled();
+  });
+
   it("keeps edit interactions on the grid and does not open slot details while painting", () => {
     render(
       <PublicEventClient
@@ -222,8 +264,14 @@ describe("PublicEventClient", () => {
       name: /Tue, Mar 31 09:30 · nobody available/i,
     });
 
-    fireEvent.pointerDown(firstCell);
-    fireEvent.pointerEnter(secondCell);
+    Object.defineProperty(document, "elementsFromPoint", {
+      configurable: true,
+      value: vi.fn(() => [secondCell]),
+    });
+
+    fireEvent.pointerDown(firstCell, { isPrimary: true, pointerId: 1, clientX: 8, clientY: 8 });
+    fireEvent.pointerMove(firstCell, { isPrimary: true, pointerId: 1, clientX: 16, clientY: 16 });
+    fireEvent.pointerUp(firstCell, { isPrimary: true, pointerId: 1, clientX: 16, clientY: 16 });
 
     expect(firstCell).toHaveAttribute("aria-pressed", "true");
     expect(secondCell).toHaveAttribute("aria-pressed", "true");

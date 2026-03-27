@@ -131,8 +131,8 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
   }
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[1fr_340px]">
-      <div className="space-y-6">
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="min-w-0 space-y-6">
         <Card>
           <CardHeader>
             <CardTitle className="text-3xl">Manage event</CardTitle>
@@ -216,7 +216,7 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
         </Card>
       </div>
 
-      <aside className="space-y-6">
+      <aside className="min-w-0 space-y-6">
         <Card>
           <CardHeader>
             <CardTitle>Share links</CardTitle>
@@ -227,14 +227,14 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label>Public event URL</Label>
-              <div className="rounded-md border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+              <div className="rounded-md border bg-muted/20 px-4 py-3 text-sm text-muted-foreground [overflow-wrap:anywhere]">
                 {initialView.shareUrl}
               </div>
               <CopyButton value={initialView.shareUrl} label="Copy public URL" />
             </div>
             <div className="space-y-2">
               <Label>Private organizer URL</Label>
-              <div className="rounded-md border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+              <div className="rounded-md border bg-muted/20 px-4 py-3 text-sm text-muted-foreground [overflow-wrap:anywhere]">
                 {initialView.manageUrl}
               </div>
               <CopyButton value={initialView.manageUrl} label="Copy organizer URL" />

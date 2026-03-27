@@ -8,6 +8,14 @@ class MockEventSource {
   close() {}
 }
 
+class MockResizeObserver {
+  observe() {}
+
+  unobserve() {}
+
+  disconnect() {}
+}
+
 afterEach(() => {
   cleanup();
 });
@@ -16,4 +24,30 @@ Object.defineProperty(globalThis, "EventSource", {
   configurable: true,
   writable: true,
   value: MockEventSource,
+});
+
+Object.defineProperty(globalThis, "ResizeObserver", {
+  configurable: true,
+  writable: true,
+  value: MockResizeObserver,
+});
+
+Object.defineProperties(HTMLElement.prototype, {
+  setPointerCapture: {
+    configurable: true,
+    writable: true,
+    value() {},
+  },
+  releasePointerCapture: {
+    configurable: true,
+    writable: true,
+    value() {},
+  },
+  hasPointerCapture: {
+    configurable: true,
+    writable: true,
+    value() {
+      return true;
+    },
+  },
 });
