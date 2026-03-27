@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 import { eventCreateSchema } from "@/lib/validators";
 
 type CreateEventFormProps = {
@@ -36,6 +37,31 @@ type CreateEventFormProps = {
     label: string;
   }>;
 };
+
+const eventFieldOrder = [
+  "title",
+  "timezone",
+  "dates",
+  "dayStartMinutes",
+  "dayEndMinutes",
+  "slotMinutes",
+  "meetingDurationMinutes",
+] as const;
+
+type EventField = (typeof eventFieldOrder)[number];
+type EventFormErrors = Partial<Record<EventField, string>>;
+
+const eventFieldIds: Record<EventField, string> = {
+  title: "title",
+  timezone: "timezone-trigger",
+  dates: "date-range-trigger",
+  dayStartMinutes: "day-start-trigger",
+  dayEndMinutes: "day-end-trigger",
+  slotMinutes: "slot-size-trigger",
+  meetingDurationMinutes: "meeting-duration-trigger",
+};
+
+const eventFieldSet = new Set<EventField>(eventFieldOrder);
 
 function getRangeLabel(range: DateRange | undefined) {
   if (range?.from && range?.to) {
@@ -64,6 +90,7 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<EventFormErrors>({});
   const [isRangePickerOpen, setIsRangePickerOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
@@ -111,6 +138,57 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
   const getTimeLabel = (minutes: number) =>
     timeOptions.find((option) => option.value === minutes)?.label ?? String(minutes);
 
+  function clearErrors(...fields: EventField[]) {
+    setErrorMessage(null);
+
+    if (fields.length === 0) {
+      return;
+    }
+
+    setFieldErrors((current) => {
+      let hasChanges = false;
+      const next = { ...current };
+
+      for (const field of fields) {
+        if (!next[field]) {
+          continue;
+        }
+
+        delete next[field];
+        hasChanges = true;
+      }
+
+      return hasChanges ? next : current;
+    });
+  }
+
+  function focusField(field: EventField) {
+    window.requestAnimationFrame(() => {
+      document.getElementById(eventFieldIds[field])?.focus();
+    });
+  }
+
+  function getFieldErrors(
+    issues: Array<{
+      message: string;
+      path: PropertyKey[];
+    }>,
+  ) {
+    const nextErrors: EventFormErrors = {};
+
+    for (const issue of issues) {
+      const field = issue.path[0];
+
+      if (typeof field !== "string" || !eventFieldSet.has(field as EventField)) {
+        continue;
+      }
+
+      nextErrors[field as EventField] ??= issue.message;
+    }
+
+    return nextErrors;
+  }
+
   function openRangePicker(open: boolean) {
     setIsRangePickerOpen(open);
     if (open) {
@@ -124,14 +202,19 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
     }
 
     setDateRange(draftDateRange);
+    clearErrors("dates");
     setIsRangePickerOpen(false);
   }
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setErrorMessage(null);
 
     if (!dateRange?.from || !dateRange?.to) {
-      setErrorMessage("Choose a start and end date for the event.");
+      setFieldErrors({
+        dates: "Choose a start and end date for the event.",
+      });
+      focusField("dates");
       return;
     }
 
@@ -146,10 +229,20 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
     });
 
     if (!parsed.success) {
-      setErrorMessage(parsed.error.issues[0]?.message ?? "Please check your event settings.");
+      const nextErrors = getFieldErrors(parsed.error.issues);
+      setFieldErrors(nextErrors);
+
+      const firstInvalidField = eventFieldOrder.find((field) => nextErrors[field]);
+      if (firstInvalidField) {
+        focusField(firstInvalidField);
+        return;
+      }
+
+      setErrorMessage("Please check your event settings.");
       return;
     }
 
+    setFieldErrors({});
     setErrorMessage(null);
     startTransition(async () => {
       const response = await fetch("/api/events", {
@@ -190,15 +283,43 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
                 id="title"
                 placeholder="Design review, sprint planning, dinner with friends..."
                 value={title}
-                onChange={(event) => setTitle(event.target.value)}
+                aria-invalid={fieldErrors.title ? true : undefined}
+                aria-describedby={fieldErrors.title ? "title-error" : undefined}
+                className={cn(
+                  fieldErrors.title &&
+                    "border-destructive focus-visible:ring-destructive/20",
+                )}
+                onChange={(event) => {
+                  setTitle(event.target.value);
+                  clearErrors("title");
+                }}
               />
+              {fieldErrors.title ? (
+                <p id="title-error" className="text-sm text-destructive">
+                  {fieldErrors.title}
+                </p>
+              ) : null}
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label>Timezone</Label>
-                <Select value={timezone} onValueChange={setTimezone}>
-                  <SelectTrigger>
+                <Label htmlFor={eventFieldIds.timezone}>Timezone</Label>
+                <Select
+                  value={timezone}
+                  onValueChange={(value) => {
+                    setTimezone(value);
+                    clearErrors("timezone");
+                  }}
+                >
+                  <SelectTrigger
+                    id={eventFieldIds.timezone}
+                    aria-invalid={fieldErrors.timezone ? true : undefined}
+                    aria-describedby={fieldErrors.timezone ? "timezone-error" : undefined}
+                    className={cn(
+                      fieldErrors.timezone &&
+                        "border-destructive focus:ring-destructive/20",
+                    )}
+                  >
                     <SelectValue placeholder="Pick a timezone" />
                   </SelectTrigger>
                   <SelectContent className="max-h-80">
@@ -209,16 +330,27 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
                     ))}
                   </SelectContent>
                 </Select>
+                {fieldErrors.timezone ? (
+                  <p id="timezone-error" className="text-sm text-destructive">
+                    {fieldErrors.timezone}
+                  </p>
+                ) : null}
               </div>
 
               <div className="space-y-2">
-                <Label>Date range</Label>
+                <Label htmlFor={eventFieldIds.dates}>Date range</Label>
                 <Popover open={isRangePickerOpen} onOpenChange={openRangePicker}>
                   <PopoverTrigger asChild>
                     <Button
+                      id={eventFieldIds.dates}
                       type="button"
                       variant="outline"
-                      className="h-9 w-full justify-between font-normal"
+                      aria-invalid={fieldErrors.dates ? true : undefined}
+                      aria-describedby={fieldErrors.dates ? "dates-error" : undefined}
+                      className={cn(
+                        "h-9 w-full justify-between font-normal",
+                        fieldErrors.dates && "border-destructive",
+                      )}
                     >
                       <span className="flex min-w-0 items-center gap-2">
                         <CalendarRangeIcon className="size-4 text-muted-foreground" />
@@ -289,6 +421,11 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
                     <Badge variant="secondary">{selectedRangeDays} days</Badge>
                   </div>
                 </div>
+                {fieldErrors.dates ? (
+                  <p id="dates-error" className="text-sm text-destructive">
+                    {fieldErrors.dates}
+                  </p>
+                ) : null}
               </div>
             </div>
 
@@ -296,12 +433,25 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label>Daily start</Label>
+                <Label htmlFor={eventFieldIds.dayStartMinutes}>Daily start</Label>
                 <Select
                   value={String(dayStartMinutes)}
-                  onValueChange={(value) => setDayStartMinutes(Number(value))}
+                  onValueChange={(value) => {
+                    setDayStartMinutes(Number(value));
+                    clearErrors("dayStartMinutes", "dayEndMinutes");
+                  }}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger
+                    id={eventFieldIds.dayStartMinutes}
+                    aria-invalid={fieldErrors.dayStartMinutes ? true : undefined}
+                    aria-describedby={
+                      fieldErrors.dayStartMinutes ? "day-start-error" : undefined
+                    }
+                    className={cn(
+                      fieldErrors.dayStartMinutes &&
+                        "border-destructive focus:ring-destructive/20",
+                    )}
+                  >
                     <SelectValue placeholder="Pick a start time" />
                   </SelectTrigger>
                   <SelectContent className="max-h-80">
@@ -312,15 +462,31 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
                     ))}
                   </SelectContent>
                 </Select>
+                {fieldErrors.dayStartMinutes ? (
+                  <p id="day-start-error" className="text-sm text-destructive">
+                    {fieldErrors.dayStartMinutes}
+                  </p>
+                ) : null}
               </div>
 
               <div className="space-y-2">
-                <Label>Daily end</Label>
+                <Label htmlFor={eventFieldIds.dayEndMinutes}>Daily end</Label>
                 <Select
                   value={String(dayEndMinutes)}
-                  onValueChange={(value) => setDayEndMinutes(Number(value))}
+                  onValueChange={(value) => {
+                    setDayEndMinutes(Number(value));
+                    clearErrors("dayStartMinutes", "dayEndMinutes");
+                  }}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger
+                    id={eventFieldIds.dayEndMinutes}
+                    aria-invalid={fieldErrors.dayEndMinutes ? true : undefined}
+                    aria-describedby={fieldErrors.dayEndMinutes ? "day-end-error" : undefined}
+                    className={cn(
+                      fieldErrors.dayEndMinutes &&
+                        "border-destructive focus:ring-destructive/20",
+                    )}
+                  >
                     <SelectValue placeholder="Pick an end time" />
                   </SelectTrigger>
                   <SelectContent className="max-h-80">
@@ -331,15 +497,31 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
                     ))}
                   </SelectContent>
                 </Select>
+                {fieldErrors.dayEndMinutes ? (
+                  <p id="day-end-error" className="text-sm text-destructive">
+                    {fieldErrors.dayEndMinutes}
+                  </p>
+                ) : null}
               </div>
 
               <div className="space-y-2">
-                <Label>Slot size</Label>
+                <Label htmlFor={eventFieldIds.slotMinutes}>Slot size</Label>
                 <Select
                   value={String(slotMinutes)}
-                  onValueChange={(value) => setSlotMinutes(Number(value))}
+                  onValueChange={(value) => {
+                    setSlotMinutes(Number(value));
+                    clearErrors("slotMinutes", "meetingDurationMinutes");
+                  }}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger
+                    id={eventFieldIds.slotMinutes}
+                    aria-invalid={fieldErrors.slotMinutes ? true : undefined}
+                    aria-describedby={fieldErrors.slotMinutes ? "slot-size-error" : undefined}
+                    className={cn(
+                      fieldErrors.slotMinutes &&
+                        "border-destructive focus:ring-destructive/20",
+                    )}
+                  >
                     <SelectValue placeholder="Choose slot size" />
                   </SelectTrigger>
                   <SelectContent>
@@ -350,15 +532,35 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
                     ))}
                   </SelectContent>
                 </Select>
+                {fieldErrors.slotMinutes ? (
+                  <p id="slot-size-error" className="text-sm text-destructive">
+                    {fieldErrors.slotMinutes}
+                  </p>
+                ) : null}
               </div>
 
               <div className="space-y-2">
-                <Label>Meeting duration</Label>
+                <Label htmlFor={eventFieldIds.meetingDurationMinutes}>Meeting duration</Label>
                 <Select
                   value={String(meetingDurationMinutes)}
-                  onValueChange={(value) => setMeetingDurationMinutes(Number(value))}
+                  onValueChange={(value) => {
+                    setMeetingDurationMinutes(Number(value));
+                    clearErrors("slotMinutes", "meetingDurationMinutes");
+                  }}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger
+                    id={eventFieldIds.meetingDurationMinutes}
+                    aria-invalid={fieldErrors.meetingDurationMinutes ? true : undefined}
+                    aria-describedby={
+                      fieldErrors.meetingDurationMinutes
+                        ? "meeting-duration-error"
+                        : undefined
+                    }
+                    className={cn(
+                      fieldErrors.meetingDurationMinutes &&
+                        "border-destructive focus:ring-destructive/20",
+                    )}
+                  >
                     <SelectValue placeholder="Choose duration" />
                   </SelectTrigger>
                   <SelectContent>
@@ -369,6 +571,11 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
                     ))}
                   </SelectContent>
                 </Select>
+                {fieldErrors.meetingDurationMinutes ? (
+                  <p id="meeting-duration-error" className="text-sm text-destructive">
+                    {fieldErrors.meetingDurationMinutes}
+                  </p>
+                ) : null}
               </div>
             </div>
 

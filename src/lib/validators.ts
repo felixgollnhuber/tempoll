@@ -8,11 +8,26 @@ const meetingDurationSet = new Set<number>(meetingDurationOptions);
 
 export const eventCreateSchema = z
   .object({
-    title: z.string().trim().min(3).max(80),
-    timezone: z.string().trim().min(1),
-    dates: z.array(z.string().regex(dateKeyRegex)).min(1).max(31),
-    dayStartMinutes: z.number().int().min(0).max(23 * 60 + 30),
-    dayEndMinutes: z.number().int().min(30).max(24 * 60),
+    title: z
+      .string()
+      .trim()
+      .min(3, "Event title must be at least 3 characters long.")
+      .max(80, "Event title must be 80 characters or fewer."),
+    timezone: z.string().trim().min(1, "Choose a timezone."),
+    dates: z
+      .array(z.string().regex(dateKeyRegex, "Choose valid calendar dates."))
+      .min(1, "Choose a start and end date.")
+      .max(31, "Choose a date range of up to 31 days."),
+    dayStartMinutes: z
+      .number()
+      .int()
+      .min(0, "Choose a valid daily start time.")
+      .max(23 * 60 + 30, "Choose a valid daily start time."),
+    dayEndMinutes: z
+      .number()
+      .int()
+      .min(30, "Choose a valid daily end time.")
+      .max(24 * 60, "Choose a valid daily end time."),
     slotMinutes: z.coerce.number().refine((value) => slotMinuteSet.has(value), {
       message: "Select a supported slot size.",
     }),
