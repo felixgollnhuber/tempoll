@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { Loader2Icon, Trash2Icon } from "lucide-react";
-import { useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
+import { EventHeatmap } from "@/components/event-heatmap";
 import { CopyButton } from "@/components/copy-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { buildFinalizedSlot } from "@/lib/availability";
 import type { ManageEventView, PublicEventSnapshot } from "@/lib/types";
 
 type ManageEventClientProps = {
@@ -27,32 +29,72 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
   const [snapshot, setSnapshot] = useState<PublicEventSnapshot>(initialView.snapshot);
   const [title, setTitle] = useState(initialView.snapshot.title);
   const [status, setStatus] = useState(initialView.snapshot.status);
+  const [finalSlotStart, setFinalSlotStart] = useState<string | null>(
+    initialView.snapshot.finalizedSlot?.slotStart ?? null,
+  );
   const [isPending, startTransition] = useTransition();
   const hasAnyAvailability = snapshot.participants.some(
     (participant) => participant.selectedSlotCount > 0,
   );
+  const draftFinalizedSlot = useMemo(() => {
+    if (status !== "CLOSED" || !finalSlotStart) {
+      return null;
+    }
+
+    return buildFinalizedSlot({
+      dates: snapshot.dates.map((date) => date.dateKey),
+      timezone: snapshot.timezone,
+      dayStartMinutes: snapshot.dayStartMinutes,
+      dayEndMinutes: snapshot.dayEndMinutes,
+      slotMinutes: snapshot.slotMinutes,
+      meetingDurationMinutes: snapshot.meetingDurationMinutes,
+      slots: snapshot.slots,
+      finalSlotStart,
+    });
+  }, [
+    finalSlotStart,
+    snapshot.dates,
+    snapshot.dayEndMinutes,
+    snapshot.dayStartMinutes,
+    snapshot.meetingDurationMinutes,
+    snapshot.slotMinutes,
+    snapshot.slots,
+    snapshot.timezone,
+    status,
+  ]);
+  const isClosingWithoutFixedDate = status === "CLOSED" && !draftFinalizedSlot;
+
+  const refreshSnapshot = useCallback(async () => {
+    const response = await fetch(`/api/events/${initialView.snapshot.slug}`, {
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      return;
+    }
+
+    const payload = (await response.json()) as { snapshot: PublicEventSnapshot };
+    setSnapshot(payload.snapshot);
+    setTitle(payload.snapshot.title);
+    setStatus(payload.snapshot.status);
+    setFinalSlotStart(payload.snapshot.finalizedSlot?.slotStart ?? null);
+  }, [initialView.snapshot.slug]);
 
   useEffect(() => {
     const eventSource = new EventSource(`/api/events/${initialView.snapshot.slug}/stream`);
-    eventSource.addEventListener("event-update", async () => {
-      const response = await fetch(`/api/events/${initialView.snapshot.slug}`, {
-        cache: "no-store",
-      });
-
-      if (!response.ok) {
-        return;
-      }
-
-      const payload = (await response.json()) as { snapshot: PublicEventSnapshot };
-      setSnapshot(payload.snapshot);
-      setTitle(payload.snapshot.title);
-      setStatus(payload.snapshot.status);
+    eventSource.addEventListener("event-update", () => {
+      void refreshSnapshot();
     });
 
     return () => eventSource.close();
-  }, [initialView.snapshot.slug]);
+  }, [initialView.snapshot.slug, refreshSnapshot]);
 
   function updateEvent() {
+    if (isClosingWithoutFixedDate) {
+      toast.error("Pick a fixed date before closing this event.");
+      return;
+    }
+
     startTransition(async () => {
       const response = await fetch(`/api/manage/${initialView.manageKey}`, {
         method: "PATCH",
@@ -63,6 +105,7 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
           action: "updateEvent",
           title,
           status,
+          finalSlotStart: status === "CLOSED" ? finalSlotStart : null,
         }),
       });
 
@@ -73,11 +116,7 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
       }
 
       toast.success("Event updated");
-      setSnapshot((current) => ({
-        ...current,
-        title,
-        status,
-      }));
+      await refreshSnapshot();
     });
   }
 
@@ -127,54 +166,146 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
       }
 
       toast.success("Participant removed");
-      setSnapshot((current) => ({
-        ...current,
-        participants: current.participants.filter((participant) => participant.id !== participantId),
-      }));
+      await refreshSnapshot();
     });
   }
 
-  return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
-      <div className="min-w-0 space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-3xl">Manage event</CardTitle>
-            <CardDescription>
-              Share the public board, keep the private organizer URL safe and
-              control whether new changes are still allowed.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-6 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="title">Title</Label>
-              <Input
-                id="title"
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <Select value={status} onValueChange={(value) => setStatus(value as "OPEN" | "CLOSED")}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="OPEN">Open for edits</SelectItem>
-                  <SelectItem value="CLOSED">Closed</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="md:col-span-2">
-              <Button onClick={updateEvent} disabled={isPending} className="h-10">
-                {isPending ? <Loader2Icon className="size-4 animate-spin" /> : null}
-                Save changes
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+  function handleStatusChange(nextStatus: "OPEN" | "CLOSED") {
+    setStatus(nextStatus);
+    if (nextStatus === "OPEN") {
+      setFinalSlotStart(null);
+    }
+  }
 
+  const savedFinalSlot = snapshot.status === "CLOSED" ? snapshot.finalizedSlot : null;
+  const hasSavedFixedDate =
+    Boolean(savedFinalSlot) && savedFinalSlot?.slotStart === draftFinalizedSlot?.slotStart;
+  const bestWindowsCard = hasAnyAvailability ? (
+    <Card>
+      <CardHeader className="p-4 pb-2">
+        <CardTitle className="text-sm">Best windows right now</CardTitle>
+        <CardDescription className="text-xs">
+          Ranked by overlap across the full {snapshot.meetingDurationMinutes}-minute meeting.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-2 p-4 pt-0">
+        {snapshot.suggestions.map((suggestion, index) => (
+          <div key={suggestion.slotStart} className="rounded-md border bg-muted/20 px-3 py-2">
+            <p className="text-[11px] font-medium text-muted-foreground">Option {index + 1}</p>
+            <p className="mt-1 text-sm font-semibold text-foreground">{suggestion.label}</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {suggestion.availableCount} people available
+            </p>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  ) : null;
+  const sidebarTopContent = draftFinalizedSlot ? (
+    <>
+      <Card>
+        <CardHeader className="p-4 pb-2">
+          <CardTitle className="text-sm">Fixed date</CardTitle>
+          <CardDescription className="text-xs">
+            {hasSavedFixedDate
+              ? "This is the published fixed date for the closed event."
+              : "This fixed date is selected locally and will be published after saving."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3 p-4 pt-0">
+          <div className="rounded-md border bg-muted/20 px-3 py-2">
+            <p className="text-sm font-semibold text-foreground">{draftFinalizedSlot.label}</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {draftFinalizedSlot.availableCount} participants free for the full window
+            </p>
+          </div>
+          <div className="flex flex-col gap-2">
+            {hasSavedFixedDate ? (
+              <Button asChild size="sm" className="w-full">
+                <a href={`/api/events/${snapshot.slug}/ics`}>Add to calendar (.ics)</a>
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="w-full"
+              onClick={() => setFinalSlotStart(null)}
+            >
+              Clear fixed date
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+      {bestWindowsCard}
+    </>
+  ) : (
+    bestWindowsCard
+  );
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-3xl">Manage event</CardTitle>
+          <CardDescription>
+            Share the public board, keep the private organizer URL safe, control whether new changes
+            are still allowed and set the fixed date before closing the event.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-6 md:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="title">Title</Label>
+            <Input id="title" value={title} onChange={(event) => setTitle(event.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>Status</Label>
+            <Select value={status} onValueChange={(value) => handleStatusChange(value as "OPEN" | "CLOSED")}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="OPEN">Open for edits</SelectItem>
+                <SelectItem value="CLOSED">Closed</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="md:col-span-2 space-y-3">
+            <Button onClick={updateEvent} disabled={isPending || isClosingWithoutFixedDate} className="h-10">
+              {isPending ? <Loader2Icon className="size-4 animate-spin" /> : null}
+              Save changes
+            </Button>
+            {isClosingWithoutFixedDate ? (
+              <p className="text-sm text-destructive">
+                Pick a fixed date in the heatmap before closing this event.
+              </p>
+            ) : null}
+          </div>
+        </CardContent>
+      </Card>
+
+      <EventHeatmap
+        snapshot={snapshot}
+        mode="view"
+        canEdit={false}
+        showModeToggle={false}
+        displayStatus={status}
+        finalSlotStart={status === "CLOSED" ? finalSlotStart : null}
+        allowFinalSlotSelection={status === "CLOSED"}
+        onFinalSlotSelect={setFinalSlotStart}
+        sidebarTopContent={sidebarTopContent}
+        getDescription={({ usesDateWindowing }) =>
+          status === "CLOSED"
+            ? usesDateWindowing
+              ? "Select a slot to inspect overlap and use the button below to set the fixed date. Use the arrows to move through the date range."
+              : "Click any slot to inspect availability and set the fixed date for this closed event."
+            : usesDateWindowing
+              ? "Select a slot to inspect availability. Close the event to choose the fixed date."
+              : "Click any slot to inspect availability. Close the event when you are ready to choose the fixed date."
+        }
+      />
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
         <Card>
           <CardHeader>
             <CardTitle>Participants</CardTitle>
@@ -184,10 +315,7 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
           </CardHeader>
           <CardContent className="space-y-4">
             {snapshot.participants.map((participant) => (
-              <div
-                key={participant.id}
-                className="rounded-lg border bg-muted/20 p-4"
-              >
+              <div key={participant.id} className="rounded-lg border bg-muted/20 p-4">
                 <div className="flex items-center gap-3">
                   <span
                     className="size-3 rounded-full shadow-sm"
@@ -218,63 +346,39 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
             ))}
           </CardContent>
         </Card>
-      </div>
 
-      <aside className="min-w-0 space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Share links</CardTitle>
-            <CardDescription>
-              Keep the organizer link private. The public link is safe to share.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Public event URL</Label>
-              <div className="rounded-md border bg-muted/20 px-4 py-3 text-sm text-muted-foreground [overflow-wrap:anywhere]">
-                {initialView.shareUrl}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button asChild>
-                  <Link href={initialView.shareUrl}>Open public event</Link>
-                </Button>
-                <CopyButton value={initialView.shareUrl} label="Copy public URL" />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Private organizer URL</Label>
-              <div className="rounded-md border bg-muted/20 px-4 py-3 text-sm text-muted-foreground [overflow-wrap:anywhere]">
-                {initialView.manageUrl}
-              </div>
-              <CopyButton value={initialView.manageUrl} label="Copy organizer URL" />
-            </div>
-          </CardContent>
-        </Card>
-
-        {hasAnyAvailability ? (
+        <aside className="min-w-0 space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Best windows right now</CardTitle>
+              <CardTitle>Share links</CardTitle>
+              <CardDescription>
+                Keep the organizer link private. The public link is safe to share.
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {snapshot.suggestions.map((suggestion, index) => (
-                <div
-                  key={suggestion.slotStart}
-                  className="rounded-lg border bg-muted/20 px-4 py-3"
-                >
-                  <p className="text-xs font-medium text-muted-foreground">
-                    Option {index + 1}
-                  </p>
-                  <p className="mt-2 text-sm font-semibold">{suggestion.label}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {suggestion.availableCount} people available
-                  </p>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Public event URL</Label>
+                <div className="rounded-md border bg-muted/20 px-4 py-3 text-sm text-muted-foreground [overflow-wrap:anywhere]">
+                  {initialView.shareUrl}
                 </div>
-              ))}
+                <div className="flex flex-wrap gap-2">
+                  <Button asChild>
+                    <Link href={initialView.shareUrl}>Open public event</Link>
+                  </Button>
+                  <CopyButton value={initialView.shareUrl} label="Copy public URL" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Private organizer URL</Label>
+                <div className="rounded-md border bg-muted/20 px-4 py-3 text-sm text-muted-foreground [overflow-wrap:anywhere]">
+                  {initialView.manageUrl}
+                </div>
+                <CopyButton value={initialView.manageUrl} label="Copy organizer URL" />
+              </div>
             </CardContent>
           </Card>
-        ) : null}
-      </aside>
+        </aside>
+      </div>
     </div>
   );
 }

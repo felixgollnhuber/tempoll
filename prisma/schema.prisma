@@ -21,6 +21,7 @@ model Event {
   dayStartMinutes        Int
   dayEndMinutes          Int
   status                 EventStatus        @default(OPEN)
+  finalSlotStartAt       DateTime?
   manageTokenHash        String
   createdAt              DateTime           @default(now())
   updatedAt              DateTime           @updatedAt

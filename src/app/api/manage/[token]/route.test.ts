@@ -35,6 +35,7 @@ describe("PATCH /api/manage/[token]", () => {
           action: "updateEvent",
           title: "Updated title",
           status: "OPEN",
+          finalSlotStart: null,
         }),
         headers: {
           "Content-Type": "application/json",
@@ -65,6 +66,7 @@ describe("PATCH /api/manage/[token]", () => {
           action: "updateEvent",
           title: "Updated title",
           status: "OPEN",
+          finalSlotStart: null,
         }),
         headers: {
           "Content-Type": "application/json",

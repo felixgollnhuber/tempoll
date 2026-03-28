@@ -68,6 +68,7 @@ export const manageUpdateSchema = z.discriminatedUnion("action", [
     action: z.literal("updateEvent"),
     title: z.string().trim().min(3).max(80),
     status: z.enum(["OPEN", "CLOSED"]),
+    finalSlotStart: z.string().datetime().nullable(),
   }),
   z.object({
     action: z.literal("renameParticipant"),
