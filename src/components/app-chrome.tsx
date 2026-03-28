@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { HistoryIcon, PlusIcon } from "lucide-react";
 
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -41,7 +42,7 @@ export function AppChrome({
   return (
     <>
       <header className="border-b bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-        <div className="app-shell flex min-h-16 flex-wrap items-center justify-between gap-x-2 gap-y-3 py-3 sm:flex-nowrap sm:gap-4">
+        <div className="app-shell flex h-16 items-center justify-between gap-3 sm:gap-4">
           <Link
             href="/"
             className="inline-flex shrink-0 items-center text-base font-semibold tracking-tight sm:text-lg"
@@ -58,21 +59,21 @@ export function AppChrome({
               appName
             )}
           </Link>
-          <nav className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1.5 sm:flex-nowrap sm:gap-2">
+          <nav className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
             <LanguageSwitcher
-              className="h-9 min-w-16 px-2.5 text-xs sm:min-w-28 sm:px-3 sm:text-sm"
-              compactLabel
+              className="h-9 w-12 px-2 sm:w-[8.75rem] sm:px-3 sm:text-sm"
+              mobileIcon
             />
             <Link
               href="/new"
               aria-label={messages.appChrome.newEvent}
               className={cn(
-                buttonVariants({ variant: "ghost" }),
-                "h-9 px-3 text-xs sm:px-4 sm:text-sm",
+                buttonVariants({ variant: "outline" }),
+                "size-9 p-0 sm:h-9 sm:w-auto sm:border-transparent sm:bg-transparent sm:px-4 sm:shadow-none sm:hover:bg-accent sm:hover:text-accent-foreground",
               )}
             >
               <span aria-hidden="true" className="sm:hidden">
-                {messages.appChrome.newEventCompact}
+                <PlusIcon className="size-4" />
               </span>
               <span aria-hidden="true" className="hidden sm:inline">
                 {messages.appChrome.newEvent}
@@ -83,11 +84,11 @@ export function AppChrome({
               aria-label={messages.appChrome.recentEvents}
               className={cn(
                 buttonVariants({ variant: "outline" }),
-                "h-9 px-3 text-xs sm:px-4 sm:text-sm",
+                "size-9 p-0 sm:h-9 sm:w-auto sm:px-4 sm:text-sm",
               )}
             >
               <span aria-hidden="true" className="sm:hidden">
-                {messages.appChrome.recentEventsCompact}
+                <HistoryIcon className="size-4" />
               </span>
               <span aria-hidden="true" className="hidden sm:inline">
                 {messages.appChrome.recentEvents}
