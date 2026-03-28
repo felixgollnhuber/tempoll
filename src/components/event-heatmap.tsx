@@ -731,7 +731,13 @@ export function EventHeatmap({
       );
 
   return (
-    <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_250px]">
+    <div
+      data-slot="event-heatmap-layout"
+      className={cn(
+        "grid min-w-0 gap-4",
+        showSidebar ? "xl:grid-cols-[minmax(0,1fr)_250px]" : "grid-cols-1",
+      )}
+    >
       <div className="min-w-0 space-y-4">
         <Card className="min-w-0 overflow-hidden">
           <CardHeader className="gap-3 p-4">

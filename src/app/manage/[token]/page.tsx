@@ -23,7 +23,7 @@ export default async function ManagePage({ params }: ManagePageProps) {
   }
 
   return (
-    <main className="app-shell flex-1 py-10 sm:py-14">
+    <main className="app-shell flex-1 pt-10 pb-20 sm:pt-14 sm:pb-24">
       <RecentEventTracker
         slug={view.snapshot.slug}
         title={view.snapshot.title}

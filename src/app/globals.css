@@ -91,6 +91,7 @@
     @apply bg-background text-foreground;
     background-image:
       radial-gradient(circle at top, color-mix(in srgb, var(--primary) 10%, transparent) 0, transparent 34%),
+      radial-gradient(circle at bottom, color-mix(in srgb, var(--primary) 8%, transparent) 0, transparent 30%),
       linear-gradient(180deg, color-mix(in srgb, white 55%, transparent) 0%, transparent 100%);
   }
   html {

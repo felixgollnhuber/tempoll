@@ -51,7 +51,7 @@ export const en = {
   },
   home: {
     badge: "Self-hosted, realtime, account-free",
-    title: "A cleaner When2Meet for modern teams.",
+    title: "The clearer alternative to When2Meet.",
     description:
       "Create an event, share the link, and let people paint their availability on a live heatmap. The organizer gets a private manage page and everyone else can join with just a name.",
     primaryCta: "Create an event",
@@ -279,8 +279,8 @@ export const en = {
       "Open a public board or organizer page and it will appear here for quick access.",
     lastOpened: "Last opened {timestamp}",
     privateLinkSaved: "Private link saved",
-    openPublic: "Open public",
-    openOrganizer: "Open organizer",
+    openPublic: "Open board",
+    openOrganizer: "Manage event",
     remove: "Remove",
   },
   notFound: {
@@ -612,7 +612,7 @@ export const de: Messages = {
   },
   home: {
     badge: "Self-hosted, in Echtzeit, ohne Konto",
-    title: "Ein übersichtlicheres When2Meet für moderne Teams.",
+    title: "Die übersichtliche Alternative zu When2Meet.",
     description:
       "Erstelle ein Event, teile den Link und lass alle ihre Verfügbarkeit direkt auf einer Live-Heatmap markieren. Die organisierende Person erhält eine private Verwaltungsseite, alle anderen steigen nur mit einem Namen ein.",
     primaryCta: "Event erstellen",
@@ -849,8 +849,8 @@ export const de: Messages = {
       "Öffne ein öffentliches Board oder eine Organizer-Seite, dann erscheint es hier für den schnellen Zugriff.",
     lastOpened: "Zuletzt geöffnet {timestamp}",
     privateLinkSaved: "Privater Link gespeichert",
-    openPublic: "Öffentlich öffnen",
-    openOrganizer: "Organizer öffnen",
+    openPublic: "Board öffnen",
+    openOrganizer: "Event verwalten",
     remove: "Entfernen",
   },
   notFound: {

@@ -125,6 +125,17 @@ describe("ManageEventClient", () => {
     ).toBeTruthy();
   });
 
+  it("renders the heatmap as a single content column when the embedded sidebar is disabled", () => {
+    const view = createManageView();
+    renderWithI18n(<ManageEventClient initialView={view} />);
+
+    const heatmapLayout = document.querySelector('[data-slot="event-heatmap-layout"]');
+
+    expect(heatmapLayout).not.toBeNull();
+    expect(heatmapLayout).toHaveClass("grid-cols-1");
+    expect(heatmapLayout?.className).not.toContain("xl:grid-cols-[minmax(0,1fr)_250px]");
+  });
+
   it("renders the heatmap and lets the organizer select a fixed date on closed events", () => {
     const view = createManageView({ status: "CLOSED" });
     renderWithI18n(<ManageEventClient initialView={view} />);
