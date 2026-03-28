@@ -70,32 +70,34 @@ function slotKey(dateKey: string, minutes: number) {
   return `${dateKey}-${minutes}`;
 }
 
-function getHeatColor(availabilityCount: number) {
-  if (availabilityCount >= 6) {
+function getHeatColor(availabilityCount: number, maxAvailabilityCount: number) {
+  if (availabilityCount <= 0 || maxAvailabilityCount <= 0) {
+    return "bg-background";
+  }
+
+  const ratio = availabilityCount / maxAvailabilityCount;
+
+  if (ratio >= 1) {
     return "bg-primary/80";
   }
 
-  if (availabilityCount === 5) {
+  if (ratio >= 0.8) {
     return "bg-primary/65";
   }
 
-  if (availabilityCount === 4) {
+  if (ratio >= 0.6) {
     return "bg-primary/50";
   }
 
-  if (availabilityCount === 3) {
+  if (ratio >= 0.4) {
     return "bg-primary/36";
   }
 
-  if (availabilityCount === 2) {
+  if (ratio >= 0.2) {
     return "bg-primary/24";
   }
 
-  if (availabilityCount === 1) {
-    return "bg-primary/12";
-  }
-
-  return "bg-background";
+  return "bg-primary/12";
 }
 
 function getCurrentUserSelectionClass(isSelected: boolean) {
@@ -405,6 +407,16 @@ export function EventHeatmap({
       ),
     [currentParticipantId, effectiveSelectedMap, snapshot.slots],
   );
+  const maxAvailabilityCount = useMemo(
+    () =>
+      Array.from(slotMap.values()).reduce(
+        (currentMax, slot) => Math.max(currentMax, slot.availabilityCount),
+        0,
+      ),
+    [slotMap],
+  );
+  const someOverlapLegendClass = getHeatColor(maxAvailabilityCount > 0 ? 1 : 0, maxAvailabilityCount);
+  const highOverlapLegendClass = getHeatColor(maxAvailabilityCount, maxAvailabilityCount);
   const dateLabelsByKey = useMemo(
     () => new Map(snapshot.dates.map((date) => [date.dateKey, date.label])),
     [snapshot.dates],
@@ -782,11 +794,11 @@ export function EventHeatmap({
                   {messages.publicEvent.legendEmpty}
                 </span>
                 <span className="inline-flex items-center gap-1">
-                  <span className="size-3 rounded-[3px] bg-primary/24" />
+                  <span className={cn("size-3 rounded-[3px]", someOverlapLegendClass)} />
                   {messages.publicEvent.legendSomeOverlap}
                 </span>
                 <span className="inline-flex items-center gap-1">
-                  <span className="size-3 rounded-[3px] bg-primary/65" />
+                  <span className={cn("size-3 rounded-[3px]", highOverlapLegendClass)} />
                   {messages.publicEvent.legendHighOverlap}
                 </span>
                 {supportsPainting && mode === "edit" ? (
@@ -1004,7 +1016,9 @@ export function EventHeatmap({
                               mode === "edit" && supportsPainting
                                 ? "cursor-crosshair touch-none hover:brightness-[0.98]"
                                 : "cursor-pointer hover:brightness-[0.99]",
-                              isInFinalSlotWindow ? "" : getHeatColor(slot.availabilityCount),
+                              isInFinalSlotWindow
+                                ? ""
+                                : getHeatColor(slot.availabilityCount, maxAvailabilityCount),
                               getCurrentUserSelectionClass(showCurrentUserSelection),
                               getActiveViewSelectionClass(isActiveViewSlot),
                               getFinalizedSlotClass(isInFinalSlotWindow),

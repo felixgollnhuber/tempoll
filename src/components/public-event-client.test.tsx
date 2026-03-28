@@ -102,6 +102,33 @@ function createSnapshot(options?: {
   };
 }
 
+function recalculateParticipantSelectionCounts(snapshot: PublicEventSnapshot) {
+  const selectedSlotCountByParticipant = new Map(
+    snapshot.participants.map((participant) => [participant.id, 0]),
+  );
+
+  for (const slot of snapshot.slots) {
+    for (const participantId of slot.participantIds) {
+      selectedSlotCountByParticipant.set(
+        participantId,
+        (selectedSlotCountByParticipant.get(participantId) ?? 0) + 1,
+      );
+    }
+  }
+
+  snapshot.participants = snapshot.participants.map((participant) => ({
+    ...participant,
+    selectedSlotCount: selectedSlotCountByParticipant.get(participant.id) ?? 0,
+  }));
+
+  if (snapshot.currentParticipant) {
+    snapshot.currentParticipant = {
+      ...snapshot.currentParticipant,
+      selectedSlotCount: selectedSlotCountByParticipant.get(snapshot.currentParticipant.id) ?? 0,
+    };
+  }
+}
+
 function setViewportWidth(width: number) {
   Object.defineProperty(window, "innerWidth", {
     configurable: true,
@@ -193,8 +220,74 @@ describe("PublicEventClient", () => {
     });
 
     expect(cell).toHaveAttribute("data-current-user-selected", "true");
-    expect(cell.className).toContain("bg-primary/24");
+    expect(cell.className).toContain("bg-primary/80");
     expect(screen.queryByText("Slot details")).not.toBeInTheDocument();
+  });
+
+  it("uses relative overlap buckets for cells and legend based on the current maximum overlap", () => {
+    const snapshot = createSnapshot({ withCurrentUser: false });
+    snapshot.slots = snapshot.slots.map((slot) => {
+      if (slot.slotStart === "2026-03-30T07:00:00.000Z") {
+        return {
+          ...slot,
+          participantIds: ["p1", "p2", "p3"],
+          availabilityCount: 3,
+        };
+      }
+
+      if (slot.slotStart === "2026-03-31T07:00:00.000Z") {
+        return {
+          ...slot,
+          participantIds: ["p1", "p2"],
+          availabilityCount: 2,
+        };
+      }
+
+      if (slot.slotStart === "2026-03-30T07:30:00.000Z") {
+        return {
+          ...slot,
+          participantIds: ["p1"],
+          availabilityCount: 1,
+        };
+      }
+
+      return {
+        ...slot,
+        participantIds: [],
+        availabilityCount: 0,
+      };
+    });
+    recalculateParticipantSelectionCounts(snapshot);
+
+    renderWithI18n(
+      <PublicEventClient
+        slug="test-event"
+        initialSnapshot={snapshot}
+        initialSession={null}
+      />,
+    );
+
+    const countThreeCell = screen.getByRole("button", {
+      name: /Mon, Mar 30 09:00 · 3\/4 available/i,
+    });
+    const countTwoCell = screen.getByRole("button", {
+      name: /Tue, Mar 31 09:00 · 2\/4 available/i,
+    });
+    const countOneCell = screen.getByRole("button", {
+      name: /Mon, Mar 30 09:30 · 1\/4 available/i,
+    });
+
+    expect(countThreeCell.className).toContain("bg-primary/80");
+    expect(countTwoCell.className).toContain("bg-primary/50");
+    expect(countOneCell.className).toContain("bg-primary/24");
+
+    const someOverlapSwatch = screen.getByText("some overlap").querySelector("span");
+    const highOverlapSwatch = screen.getByText("high overlap").querySelector("span");
+
+    expect(someOverlapSwatch).not.toBeNull();
+    expect(highOverlapSwatch).not.toBeNull();
+    expect(someOverlapSwatch?.className).toContain("bg-primary/24");
+    expect(highOverlapSwatch?.className).toContain("bg-primary/80");
   });
 
   it("switches to view mode and shows available plus unavailable participants for a slot", () => {
