@@ -13,6 +13,14 @@
 </p>
 
 <p align="center">
+  tempoll is a modern When2Meet-style scheduler: organizers create an event, participants join with just a name, and everyone edits availability on a live heatmap.
+</p>
+
+<p align="center">
+  Use tempoll for free at <a href="https://tempoll.app">tempoll.app</a>.
+</p>
+
+<p align="center">
   <a href="#quick-start"><strong>Quick start</strong></a>
   ·
   <a href="#how-tempoll-works"><strong>How it works</strong></a>
