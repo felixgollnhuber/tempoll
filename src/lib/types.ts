@@ -55,6 +55,16 @@ export type BestTimeSuggestion = {
   participantIds: string[];
 };
 
+export type FinalizedEventSlot = {
+  slotStart: string;
+  slotEnd: string;
+  dateKey: string;
+  label: string;
+  localLabel: string | null;
+  availableCount: number;
+  participantIds: string[];
+};
+
 export type PublicEventSnapshot = {
   id: string;
   slug: string;
@@ -70,6 +80,7 @@ export type PublicEventSnapshot = {
   slots: SnapshotSlot[];
   participants: SnapshotParticipant[];
   suggestions: BestTimeSuggestion[];
+  finalizedSlot: FinalizedEventSlot | null;
   currentParticipant: SnapshotParticipant | null;
 };
 

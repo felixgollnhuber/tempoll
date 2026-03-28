@@ -8,6 +8,7 @@ function createSnapshot(options?: {
   status?: PublicEventSnapshot["status"];
   withCurrentUser?: boolean;
   dayCount?: number;
+  finalizedSlot?: PublicEventSnapshot["finalizedSlot"];
 }): PublicEventSnapshot {
   const status = options?.status ?? "OPEN";
   const withCurrentUser = options?.withCurrentUser ?? true;
@@ -87,6 +88,7 @@ function createSnapshot(options?: {
       isCurrentUser: withCurrentUser && participant.id === "p1",
     })),
     suggestions: [],
+    finalizedSlot: options?.finalizedSlot ?? null,
     currentParticipant: withCurrentUser
       ? {
           id: "p1",
@@ -342,5 +344,57 @@ describe("PublicEventClient", () => {
 
     expect(screen.getByRole("button", { name: "Edit" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "View" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("shows the fixed date and marks it on the heatmap for closed events", () => {
+    const snapshot = createSnapshot({
+      status: "CLOSED",
+      finalizedSlot: {
+        slotStart: "2026-03-30T07:00:00.000Z",
+        slotEnd: "2026-03-30T08:00:00.000Z",
+        dateKey: "2026-03-30",
+        label: "Mon, Mar 30 · 09:00-10:00",
+        localLabel: null,
+        availableCount: 1,
+        participantIds: ["p2"],
+      },
+    });
+    snapshot.suggestions = [
+      {
+        slotStart: "2026-03-31T07:00:00.000Z",
+        slotEnd: "2026-03-31T08:00:00.000Z",
+        dateKey: "2026-03-31",
+        label: "Tue, Mar 31 · 09:00-10:00",
+        localLabel: null,
+        availableCount: 2,
+        participantIds: ["p2", "p3"],
+      },
+    ];
+
+    render(
+      <PublicEventClient
+        slug="test-event"
+        initialSnapshot={snapshot}
+        initialSession={null}
+      />,
+    );
+
+    expect(screen.getByText("Fixed date")).toBeInTheDocument();
+    expect(screen.queryByText("Best matching windows")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Add to calendar (.ics)" })).toHaveAttribute(
+      "href",
+      "/api/events/test-event/ics",
+    );
+
+    const firstCell = screen.getByRole("button", {
+      name: /Mon, Mar 30 09:00 · 2\/4 available/i,
+    });
+    const secondCell = screen.getByRole("button", {
+      name: /Mon, Mar 30 09:30 · 1\/4 available/i,
+    });
+
+    expect(firstCell).toHaveAttribute("data-final-slot-start", "true");
+    expect(firstCell).toHaveAttribute("data-final-slot-window", "true");
+    expect(secondCell).toHaveAttribute("data-final-slot-window", "true");
   });
 });

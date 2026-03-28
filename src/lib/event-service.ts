@@ -2,7 +2,11 @@ import { Prisma } from "@prisma/client";
 
 import { appConfig } from "@/lib/config";
 import { prisma } from "@/lib/prisma";
-import { buildSnapshot, getAllowedSlotStarts } from "@/lib/availability";
+import {
+  buildSnapshot,
+  getAllowedFinalSlotStarts,
+  getAllowedSlotStarts,
+} from "@/lib/availability";
 import {
   buildManageKey,
   buildManageUrl,
@@ -122,6 +126,7 @@ function toSnapshot(
       color: participant.color,
       availabilitySlotStarts: participant.availabilitySlots.map((slot) => slot.slotStartAt.toISOString()),
     })),
+    finalSlotStart: event.finalSlotStartAt?.toISOString() ?? null,
     currentParticipantId,
   });
 }
@@ -444,6 +449,7 @@ export async function updateManagedEvent(
         action: "updateEvent";
         title: string;
         status: "OPEN" | "CLOSED";
+        finalSlotStart: string | null;
       }
     | {
         action: "renameParticipant";
@@ -454,6 +460,35 @@ export async function updateManagedEvent(
   const event = await verifyManageKey(manageKey);
 
   if (input.action === "updateEvent") {
+    let finalSlotStartAt: Date | null = null;
+
+    if (input.status === "CLOSED") {
+      if (!input.finalSlotStart) {
+        throw conflict(
+          "Pick a fixed date before closing this event.",
+          "final_slot_required",
+        );
+      }
+
+      const allowedFinalSlotStarts = getAllowedFinalSlotStarts({
+        dates: event.dates.map((date) => date.dateKey),
+        timezone: event.timezone,
+        dayStartMinutes: event.dayStartMinutes,
+        dayEndMinutes: event.dayEndMinutes,
+        slotMinutes: event.slotMinutes,
+        meetingDurationMinutes: event.meetingDurationMinutes,
+      });
+
+      if (!allowedFinalSlotStarts.has(input.finalSlotStart)) {
+        throw conflict(
+          "Pick a valid fixed date that fits the full meeting duration.",
+          "final_slot_invalid",
+        );
+      }
+
+      finalSlotStartAt = new Date(input.finalSlotStart);
+    }
+
     await prisma.event.update({
       where: {
         id: event.id,
@@ -461,6 +496,7 @@ export async function updateManagedEvent(
       data: {
         title: input.title,
         status: input.status,
+        finalSlotStartAt,
       },
     });
   }

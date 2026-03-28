@@ -21,6 +21,7 @@ describe("availability helpers", () => {
       dayStartMinutes: 9 * 60,
       dayEndMinutes: 12 * 60,
       dates: ["2026-04-10"],
+      finalSlotStart: null,
       participants: [
         {
           id: "p1",
@@ -58,5 +59,73 @@ describe("availability helpers", () => {
     expect(snapshot.suggestions[0]?.slotStart).toBe(
       buildSlotStart("2026-04-10", 9 * 60, "Europe/Vienna"),
     );
+    expect(snapshot.finalizedSlot).toBeNull();
+  });
+
+  it("builds a finalized slot from the stored start and clears invalid starts", () => {
+    const validSlotStart = buildSlotStart("2026-04-10", 9 * 60, "Europe/Vienna");
+
+    const snapshot = buildSnapshot({
+      id: "event_1",
+      slug: "design-review",
+      title: "Design Review",
+      timezone: "Europe/Vienna",
+      status: "CLOSED",
+      slotMinutes: 30,
+      meetingDurationMinutes: 60,
+      dayStartMinutes: 9 * 60,
+      dayEndMinutes: 11 * 60,
+      dates: ["2026-04-10"],
+      finalSlotStart: validSlotStart,
+      participants: [
+        {
+          id: "p1",
+          displayName: "Alice",
+          color: "red",
+          availabilitySlotStarts: [
+            validSlotStart,
+            buildSlotStart("2026-04-10", 9 * 60 + 30, "Europe/Vienna"),
+          ],
+        },
+        {
+          id: "p2",
+          displayName: "Bob",
+          color: "blue",
+          availabilitySlotStarts: [
+            validSlotStart,
+            buildSlotStart("2026-04-10", 9 * 60 + 30, "Europe/Vienna"),
+          ],
+        },
+      ],
+    });
+
+    expect(snapshot.finalizedSlot).toMatchObject({
+      slotStart: validSlotStart,
+      availableCount: 2,
+    });
+
+    const invalidSnapshot = buildSnapshot({
+      id: "event_1",
+      slug: "design-review",
+      title: "Design Review",
+      timezone: "Europe/Vienna",
+      status: "CLOSED",
+      slotMinutes: 30,
+      meetingDurationMinutes: 60,
+      dayStartMinutes: 9 * 60,
+      dayEndMinutes: 11 * 60,
+      dates: ["2026-04-10"],
+      finalSlotStart: buildSlotStart("2026-04-10", 10 * 60 + 30, "Europe/Vienna"),
+      participants: [
+        {
+          id: "p1",
+          displayName: "Alice",
+          color: "red",
+          availabilitySlotStarts: [validSlotStart],
+        },
+      ],
+    });
+
+    expect(invalidSnapshot.finalizedSlot).toBeNull();
   });
 });

@@ -2,6 +2,7 @@ import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 
 import type {
   BestTimeSuggestion,
+  FinalizedEventSlot,
   PublicEventSnapshot,
   SnapshotDate,
   SnapshotParticipant,
@@ -26,9 +27,27 @@ type BuildSnapshotInput = {
     color: string;
     availabilitySlotStarts: string[];
   }>;
+  finalSlotStart?: string | null;
   currentParticipantId?: string | null;
   viewerTimezone?: string | null;
 };
+
+type MeetingWindow = {
+  dateKey: string;
+  slotStart: string;
+  slotEnd: string;
+  slotStarts: string[];
+};
+
+type MeetingWindowSummary = FinalizedEventSlot & {
+  sumCount: number;
+};
+
+function isMeetingWindowSummary(
+  value: MeetingWindowSummary | null,
+): value is MeetingWindowSummary {
+  return value !== null;
+}
 
 function pad(value: number) {
   return String(value).padStart(2, "0");
@@ -57,10 +76,7 @@ export function sortDateKeys(dateKeys: string[]) {
 export function buildSlotStart(dateKey: string, minutes: number, timezone: string) {
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
-  return fromZonedTime(
-    `${dateKey}T${pad(hours)}:${pad(mins)}:00`,
-    timezone,
-  ).toISOString();
+  return fromZonedTime(`${dateKey}T${pad(hours)}:${pad(mins)}:00`, timezone).toISOString();
 }
 
 export function formatDateKeyLabel(dateKey: string, timezone: string) {
@@ -79,6 +95,210 @@ export function getViewerTimezone() {
   }
 }
 
+export function buildTimeRows({
+  slotMinutes,
+  dayStartMinutes,
+  dayEndMinutes,
+}: {
+  slotMinutes: number;
+  dayStartMinutes: number;
+  dayEndMinutes: number;
+}) {
+  const timeRows: SnapshotTimeRow[] = [];
+
+  for (let minutes = dayStartMinutes; minutes < dayEndMinutes; minutes += slotMinutes) {
+    timeRows.push({
+      minutes,
+      label: minutesToLabel(minutes),
+    });
+  }
+
+  return timeRows;
+}
+
+function getMeetingWindowSize(slotMinutes: number, meetingDurationMinutes: number) {
+  return Math.max(1, Math.floor(meetingDurationMinutes / slotMinutes));
+}
+
+export function buildMeetingWindows({
+  dates,
+  timezone,
+  dayStartMinutes,
+  dayEndMinutes,
+  slotMinutes,
+  meetingDurationMinutes,
+}: {
+  dates: string[];
+  timezone: string;
+  dayStartMinutes: number;
+  dayEndMinutes: number;
+  slotMinutes: number;
+  meetingDurationMinutes: number;
+}) {
+  const meetingWindows: MeetingWindow[] = [];
+  const timeRows = buildTimeRows({
+    slotMinutes,
+    dayStartMinutes,
+    dayEndMinutes,
+  });
+  const windowSize = getMeetingWindowSize(slotMinutes, meetingDurationMinutes);
+
+  for (const dateKey of sortDateKeys(dates)) {
+    for (let index = 0; index <= timeRows.length - windowSize; index += 1) {
+      const windowRows = timeRows.slice(index, index + windowSize);
+      const slotStarts = windowRows.map((timeRow) => buildSlotStart(dateKey, timeRow.minutes, timezone));
+      const slotStart = slotStarts[0];
+
+      if (!slotStart) {
+        continue;
+      }
+
+      const slotEnd = new Date(
+        new Date(slotStarts[slotStarts.length - 1]).getTime() + slotMinutes * 60 * 1000,
+      ).toISOString();
+
+      meetingWindows.push({
+        dateKey,
+        slotStart,
+        slotEnd,
+        slotStarts,
+      });
+    }
+  }
+
+  return meetingWindows;
+}
+
+function getMeetingWindowLabels({
+  slotStart,
+  slotEnd,
+  timezone,
+  viewerTimezone,
+}: {
+  slotStart: string;
+  slotEnd: string;
+  timezone: string;
+  viewerTimezone?: string | null;
+}) {
+  const start = new Date(slotStart);
+  const end = new Date(slotEnd);
+
+  return {
+    label: `${formatInTimeZone(start, timezone, "EEE, MMM d · HH:mm")}–${formatInTimeZone(
+      end,
+      timezone,
+      "HH:mm",
+    )}`,
+    localLabel:
+      viewerTimezone && viewerTimezone !== timezone
+        ? `${formatInTimeZone(start, viewerTimezone, "EEE, MMM d · HH:mm")}–${formatInTimeZone(
+            end,
+            viewerTimezone,
+            "HH:mm",
+          )}`
+        : null,
+  };
+}
+
+function summarizeMeetingWindow({
+  meetingWindow,
+  slotMap,
+  timezone,
+  viewerTimezone,
+}: {
+  meetingWindow: MeetingWindow;
+  slotMap: Map<string, SnapshotSlot>;
+  timezone: string;
+  viewerTimezone?: string | null;
+}): MeetingWindowSummary | null {
+  const windowSlots = meetingWindow.slotStarts
+    .map((slotStart) => slotMap.get(slotStart))
+    .filter(Boolean) as SnapshotSlot[];
+
+  if (windowSlots.length !== meetingWindow.slotStarts.length) {
+    return null;
+  }
+
+  const participantIdSets = windowSlots.map((slot) => new Set(slot.participantIds));
+  const participantIds = participantIdSets.length
+    ? [...participantIdSets[0]].filter((participantId) =>
+        participantIdSets.every((set) => set.has(participantId)),
+      )
+    : [];
+  const availableCount = windowSlots.length
+    ? Math.min(...windowSlots.map((slot) => slot.availabilityCount))
+    : 0;
+  const sumCount = windowSlots.reduce((acc, slot) => acc + slot.availabilityCount, 0);
+  const labels = getMeetingWindowLabels({
+    slotStart: meetingWindow.slotStart,
+    slotEnd: meetingWindow.slotEnd,
+    timezone,
+    viewerTimezone,
+  });
+
+  return {
+    slotStart: meetingWindow.slotStart,
+    slotEnd: meetingWindow.slotEnd,
+    dateKey: meetingWindow.dateKey,
+    label: labels.label,
+    localLabel: labels.localLabel,
+    availableCount,
+    participantIds,
+    sumCount,
+  };
+}
+
+export function buildFinalizedSlot({
+  dates,
+  timezone,
+  dayStartMinutes,
+  dayEndMinutes,
+  slotMinutes,
+  meetingDurationMinutes,
+  slots,
+  finalSlotStart,
+  viewerTimezone,
+}: {
+  dates: string[];
+  timezone: string;
+  dayStartMinutes: number;
+  dayEndMinutes: number;
+  slotMinutes: number;
+  meetingDurationMinutes: number;
+  slots: SnapshotSlot[];
+  finalSlotStart: string;
+  viewerTimezone?: string | null;
+}): FinalizedEventSlot | null {
+  const meetingWindow = buildMeetingWindows({
+    dates,
+    timezone,
+    dayStartMinutes,
+    dayEndMinutes,
+    slotMinutes,
+    meetingDurationMinutes,
+  }).find((candidate) => candidate.slotStart === finalSlotStart);
+
+  if (!meetingWindow) {
+    return null;
+  }
+
+  const slotMap = new Map(slots.map((slot) => [slot.slotStart, slot]));
+
+  const summary = summarizeMeetingWindow({
+    meetingWindow,
+    slotMap,
+    timezone,
+    viewerTimezone,
+  });
+
+  if (!summary) {
+    return null;
+  }
+
+  const { sumCount: _sumCount, ...finalizedSlot } = summary;
+  return finalizedSlot;
+}
+
 export function buildSnapshot({
   id,
   slug,
@@ -91,6 +311,7 @@ export function buildSnapshot({
   dayEndMinutes,
   dates,
   participants,
+  finalSlotStart,
   currentParticipantId,
   viewerTimezone,
 }: BuildSnapshotInput): PublicEventSnapshot {
@@ -99,14 +320,11 @@ export function buildSnapshot({
     dateKey,
     label: formatDateKeyLabel(dateKey, timezone),
   }));
-
-  const timeRows: SnapshotTimeRow[] = [];
-  for (let minutes = dayStartMinutes; minutes < dayEndMinutes; minutes += slotMinutes) {
-    timeRows.push({
-      minutes,
-      label: minutesToLabel(minutes),
-    });
-  }
+  const timeRows = buildTimeRows({
+    slotMinutes,
+    dayStartMinutes,
+    dayEndMinutes,
+  });
 
   const participantSelections = new Map<string, Set<string>>();
   const slotParticipants = new Map<string, Set<string>>();
@@ -151,14 +369,30 @@ export function buildSnapshot({
   }));
 
   const suggestions = rankBestSuggestions({
+    dates: sortedDates,
+    timezone,
+    dayStartMinutes,
+    dayEndMinutes,
     slotMinutes,
     meetingDurationMinutes,
-    timezone,
-    viewerTimezone,
-    timeRows,
-    dates: sortedDates,
     slots,
+    viewerTimezone,
   });
+
+  const finalizedSlot =
+    finalSlotStart && status === "CLOSED"
+      ? buildFinalizedSlot({
+          dates: sortedDates,
+          timezone,
+          dayStartMinutes,
+          dayEndMinutes,
+          slotMinutes,
+          meetingDurationMinutes,
+          slots,
+          finalSlotStart,
+          viewerTimezone,
+        })
+      : null;
 
   const currentParticipant =
     participantEntries.find((participant) => participant.isCurrentUser) ?? null;
@@ -178,92 +412,53 @@ export function buildSnapshot({
     slots,
     participants: participantEntries,
     suggestions,
+    finalizedSlot,
     currentParticipant,
   };
 }
 
 function rankBestSuggestions({
+  dates,
+  timezone,
+  dayStartMinutes,
+  dayEndMinutes,
   slotMinutes,
   meetingDurationMinutes,
-  timezone,
-  viewerTimezone,
-  timeRows,
-  dates,
   slots,
+  viewerTimezone,
 }: {
+  dates: string[];
+  timezone: string;
+  dayStartMinutes: number;
+  dayEndMinutes: number;
   slotMinutes: number;
   meetingDurationMinutes: number;
-  timezone: string;
-  viewerTimezone?: string | null;
-  timeRows: SnapshotTimeRow[];
-  dates: string[];
   slots: SnapshotSlot[];
+  viewerTimezone?: string | null;
 }): BestTimeSuggestion[] {
-  const windowSize = Math.max(1, Math.floor(meetingDurationMinutes / slotMinutes));
-  const slotMap = new Map<string, SnapshotSlot>();
+  const meetingWindows = buildMeetingWindows({
+    dates,
+    timezone,
+    dayStartMinutes,
+    dayEndMinutes,
+    slotMinutes,
+    meetingDurationMinutes,
+  });
+  const slotMap = new Map(slots.map((slot) => [slot.slotStart, slot]));
 
-  for (const slot of slots) {
-    slotMap.set(`${slot.dateKey}-${slot.minutes}`, slot);
-  }
-
-  const ranked: Array<BestTimeSuggestion & { minCount: number; sumCount: number }> = [];
-
-  for (const dateKey of dates) {
-    for (let index = 0; index <= timeRows.length - windowSize; index += 1) {
-      const windowRows = timeRows.slice(index, index + windowSize);
-      const windowSlots = windowRows
-        .map((row) => slotMap.get(`${dateKey}-${row.minutes}`))
-        .filter(Boolean) as SnapshotSlot[];
-
-      if (windowSlots.length !== windowSize) {
-        continue;
-      }
-
-      const participantIdSets = windowSlots.map((slot) => new Set(slot.participantIds));
-      const overlapIds = [...participantIdSets[0]].filter((participantId) =>
-        participantIdSets.every((set) => set.has(participantId)),
-      );
-
-      const minCount = Math.min(...windowSlots.map((slot) => slot.availabilityCount));
-      const sumCount = windowSlots.reduce((acc, slot) => acc + slot.availabilityCount, 0);
-      const start = windowSlots[0].slotStart;
-      const end = new Date(
-        new Date(windowSlots[windowSlots.length - 1].slotStart).getTime() +
-          slotMinutes * 60 * 1000,
-      );
-
-      const label = `${formatInTimeZone(new Date(start), timezone, "EEE, MMM d · HH:mm")}–${formatInTimeZone(
-        end,
+  return meetingWindows
+    .map((meetingWindow) =>
+      summarizeMeetingWindow({
+        meetingWindow,
+        slotMap,
         timezone,
-        "HH:mm",
-      )}`;
-      const localLabel =
-        viewerTimezone && viewerTimezone !== timezone
-          ? `${formatInTimeZone(new Date(start), viewerTimezone, "EEE, MMM d · HH:mm")}–${formatInTimeZone(
-              end,
-              viewerTimezone,
-              "HH:mm",
-            )}`
-          : null;
-
-      ranked.push({
-        slotStart: start,
-        slotEnd: end.toISOString(),
-        dateKey,
-        label,
-        localLabel,
-        availableCount: minCount,
-        participantIds: overlapIds,
-        minCount,
-        sumCount,
-      });
-    }
-  }
-
-  return ranked
+        viewerTimezone,
+      }),
+    )
+    .filter(isMeetingWindowSummary)
     .sort((left, right) => {
-      if (right.minCount !== left.minCount) {
-        return right.minCount - left.minCount;
+      if (right.availableCount !== left.availableCount) {
+        return right.availableCount - left.availableCount;
       }
 
       if (right.sumCount !== left.sumCount) {
@@ -273,15 +468,7 @@ function rankBestSuggestions({
       return left.slotStart.localeCompare(right.slotStart);
     })
     .slice(0, 3)
-    .map((suggestion) => ({
-      slotStart: suggestion.slotStart,
-      slotEnd: suggestion.slotEnd,
-      dateKey: suggestion.dateKey,
-      label: suggestion.label,
-      localLabel: suggestion.localLabel,
-      availableCount: suggestion.availableCount,
-      participantIds: suggestion.participantIds,
-    }));
+    .map(({ sumCount: _sumCount, ...suggestion }) => suggestion);
 }
 
 export function getAllowedSlotStarts({
@@ -298,12 +485,44 @@ export function getAllowedSlotStarts({
   slotMinutes: number;
 }) {
   const allowed = new Set<string>();
+  const timeRows = buildTimeRows({
+    slotMinutes,
+    dayStartMinutes,
+    dayEndMinutes,
+  });
 
   for (const dateKey of dates) {
-    for (let minutes = dayStartMinutes; minutes < dayEndMinutes; minutes += slotMinutes) {
-      allowed.add(buildSlotStart(dateKey, minutes, timezone));
+    for (const timeRow of timeRows) {
+      allowed.add(buildSlotStart(dateKey, timeRow.minutes, timezone));
     }
   }
 
   return allowed;
+}
+
+export function getAllowedFinalSlotStarts({
+  dates,
+  timezone,
+  dayStartMinutes,
+  dayEndMinutes,
+  slotMinutes,
+  meetingDurationMinutes,
+}: {
+  dates: string[];
+  timezone: string;
+  dayStartMinutes: number;
+  dayEndMinutes: number;
+  slotMinutes: number;
+  meetingDurationMinutes: number;
+}) {
+  return new Set(
+    buildMeetingWindows({
+      dates,
+      timezone,
+      dayStartMinutes,
+      dayEndMinutes,
+      slotMinutes,
+      meetingDurationMinutes,
+    }).map((meetingWindow) => meetingWindow.slotStart),
+  );
 }
