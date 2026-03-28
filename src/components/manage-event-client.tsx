@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { buildFinalizedSlot } from "@/lib/availability";
 import type { ManageEventView, PublicEventSnapshot } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 type ManageEventClientProps = {
   initialView: ManageEventView;
@@ -32,6 +33,7 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
   const [finalSlotStart, setFinalSlotStart] = useState<string | null>(
     initialView.snapshot.finalizedSlot?.slotStart ?? null,
   );
+  const [activeParticipantId, setActiveParticipantId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const hasAnyAvailability = snapshot.participants.some(
     (participant) => participant.selectedSlotCount > 0,
@@ -88,6 +90,19 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
 
     return () => eventSource.close();
   }, [initialView.snapshot.slug, refreshSnapshot]);
+
+  useEffect(() => {
+    if (!activeParticipantId) {
+      return;
+    }
+
+    const participantExists = snapshot.participants.some(
+      (participant) => participant.id === activeParticipantId,
+    );
+    if (!participantExists) {
+      setActiveParticipantId(null);
+    }
+  }, [activeParticipantId, snapshot.participants]);
 
   function updateEvent() {
     if (isClosingWithoutFixedDate) {
@@ -180,7 +195,42 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
   const savedFinalSlot = snapshot.status === "CLOSED" ? snapshot.finalizedSlot : null;
   const hasSavedFixedDate =
     Boolean(savedFinalSlot) && savedFinalSlot?.slotStart === draftFinalizedSlot?.slotStart;
-  const bestWindowsCard = hasAnyAvailability ? (
+  const timingCard = draftFinalizedSlot ? (
+    <Card>
+      <CardHeader className="p-4 pb-2">
+        <CardTitle className="text-sm">Fixed date</CardTitle>
+        <CardDescription className="text-xs">
+          {hasSavedFixedDate
+            ? "This is the published fixed date for the closed event."
+            : "This fixed date is selected locally and will be published after saving."}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3 p-4 pt-0">
+        <div className="rounded-md border bg-muted/20 px-3 py-2">
+          <p className="text-sm font-semibold text-foreground">{draftFinalizedSlot.label}</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            {draftFinalizedSlot.availableCount} participants free for the full window
+          </p>
+        </div>
+        <div className="flex flex-col gap-2">
+          {hasSavedFixedDate ? (
+            <Button asChild size="sm" className="w-full">
+              <a href={`/api/events/${snapshot.slug}/ics`}>Add to calendar (.ics)</a>
+            </Button>
+          ) : null}
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="w-full"
+            onClick={() => setFinalSlotStart(null)}
+          >
+            Clear fixed date
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  ) : hasAnyAvailability ? (
     <Card>
       <CardHeader className="p-4 pb-2">
         <CardTitle className="text-sm">Best windows right now</CardTitle>
@@ -201,46 +251,94 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
       </CardContent>
     </Card>
   ) : null;
-  const sidebarTopContent = draftFinalizedSlot ? (
-    <>
-      <Card>
-        <CardHeader className="p-4 pb-2">
-          <CardTitle className="text-sm">Fixed date</CardTitle>
-          <CardDescription className="text-xs">
-            {hasSavedFixedDate
-              ? "This is the published fixed date for the closed event."
-              : "This fixed date is selected locally and will be published after saving."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3 p-4 pt-0">
-          <div className="rounded-md border bg-muted/20 px-3 py-2">
-            <p className="text-sm font-semibold text-foreground">{draftFinalizedSlot.label}</p>
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              {draftFinalizedSlot.availableCount} participants free for the full window
-            </p>
-          </div>
-          <div className="flex flex-col gap-2">
-            {hasSavedFixedDate ? (
-              <Button asChild size="sm" className="w-full">
-                <a href={`/api/events/${snapshot.slug}/ics`}>Add to calendar (.ics)</a>
-              </Button>
-            ) : null}
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="w-full"
-              onClick={() => setFinalSlotStart(null)}
+
+  const participantsCard = (
+    <Card>
+      <CardHeader className="p-4 pb-2">
+        <CardTitle className="text-sm">Participants</CardTitle>
+        <CardDescription className="text-xs">
+          Click a row to highlight availability. Rename participants or remove accidental entries.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3 p-4 pt-0">
+        {snapshot.participants.map((participant) => {
+          const isActive = activeParticipantId === participant.id;
+
+          return (
+            <div
+              key={participant.id}
+              role="button"
+              tabIndex={0}
+              aria-pressed={isActive}
+              className={cn(
+                "rounded-lg border bg-muted/20 p-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                isActive ? "border-foreground/10 bg-background/90 shadow-sm" : "hover:bg-muted/35",
+              )}
+              onClick={() =>
+                setActiveParticipantId((current) =>
+                  current === participant.id ? null : participant.id,
+                )
+              }
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  setActiveParticipantId((current) =>
+                    current === participant.id ? null : participant.id,
+                  );
+                }
+              }}
             >
-              Clear fixed date
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-      {bestWindowsCard}
-    </>
-  ) : (
-    bestWindowsCard
+              <div className="flex items-start gap-3">
+                <span
+                  className="mt-1 size-3 shrink-0 rounded-full shadow-sm"
+                  style={{ background: participant.color }}
+                />
+                <div className="min-w-0 flex-1 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground">{participant.displayName}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {participant.selectedSlotCount} selected slots
+                      </p>
+                    </div>
+                    {isActive ? (
+                      <span className="text-[11px] font-medium text-muted-foreground">
+                        Highlighting
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Input
+                      defaultValue={participant.displayName}
+                      className="min-w-0"
+                      onClick={(event) => event.stopPropagation()}
+                      onKeyDown={(event) => event.stopPropagation()}
+                      onBlur={(event) => {
+                        const nextValue = event.target.value.trim();
+                        if (nextValue && nextValue !== participant.displayName) {
+                          renameParticipant(participant.id, nextValue);
+                        }
+                      }}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        removeParticipant(participant.id);
+                      }}
+                    >
+                      <Trash2Icon className="size-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </CardContent>
+    </Card>
   );
 
   return (
@@ -260,7 +358,10 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
           </div>
           <div className="space-y-2">
             <Label>Status</Label>
-            <Select value={status} onValueChange={(value) => handleStatusChange(value as "OPEN" | "CLOSED")}>
+            <Select
+              value={status}
+              onValueChange={(value) => handleStatusChange(value as "OPEN" | "CLOSED")}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -270,8 +371,12 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
               </SelectContent>
             </Select>
           </div>
-          <div className="md:col-span-2 space-y-3">
-            <Button onClick={updateEvent} disabled={isPending || isClosingWithoutFixedDate} className="h-10">
+          <div className="space-y-3 md:col-span-2">
+            <Button
+              onClick={updateEvent}
+              disabled={isPending || isClosingWithoutFixedDate}
+              className="h-10"
+            >
               {isPending ? <Loader2Icon className="size-4 animate-spin" /> : null}
               Save changes
             </Button>
@@ -284,70 +389,8 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
         </CardContent>
       </Card>
 
-      <EventHeatmap
-        snapshot={snapshot}
-        mode="view"
-        canEdit={false}
-        showModeToggle={false}
-        displayStatus={status}
-        finalSlotStart={status === "CLOSED" ? finalSlotStart : null}
-        allowFinalSlotSelection={status === "CLOSED"}
-        onFinalSlotSelect={setFinalSlotStart}
-        sidebarTopContent={sidebarTopContent}
-        getDescription={({ usesDateWindowing }) =>
-          status === "CLOSED"
-            ? usesDateWindowing
-              ? "Select a slot to inspect overlap and use the button below to set the fixed date. Use the arrows to move through the date range."
-              : "Click any slot to inspect availability and set the fixed date for this closed event."
-            : usesDateWindowing
-              ? "Select a slot to inspect availability. Close the event to choose the fixed date."
-              : "Click any slot to inspect availability. Close the event when you are ready to choose the fixed date."
-        }
-      />
-
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <Card>
-          <CardHeader>
-            <CardTitle>Participants</CardTitle>
-            <CardDescription>
-              Rename participants for clarity or remove accidental entries.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {snapshot.participants.map((participant) => (
-              <div key={participant.id} className="rounded-lg border bg-muted/20 p-4">
-                <div className="flex items-center gap-3">
-                  <span
-                    className="size-3 rounded-full shadow-sm"
-                    style={{ background: participant.color }}
-                  />
-                  <Input
-                    defaultValue={participant.displayName}
-                    onBlur={(event) => {
-                      const nextValue = event.target.value.trim();
-                      if (nextValue && nextValue !== participant.displayName) {
-                        renameParticipant(participant.id, nextValue);
-                      }
-                    }}
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="shrink-0"
-                    onClick={() => removeParticipant(participant.id)}
-                  >
-                    <Trash2Icon className="size-4" />
-                  </Button>
-                </div>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  {participant.selectedSlotCount} selected slots
-                </p>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        <aside className="min-w-0 space-y-6">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-start">
+        <aside className="order-1 min-w-0 space-y-6 xl:order-2">
           <Card>
             <CardHeader>
               <CardTitle>Share links</CardTitle>
@@ -377,7 +420,35 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
               </div>
             </CardContent>
           </Card>
+
+          {timingCard}
+          {participantsCard}
         </aside>
+
+        <div className="order-2 min-w-0 xl:order-1">
+          <EventHeatmap
+            snapshot={snapshot}
+            mode="view"
+            canEdit={false}
+            showModeToggle={false}
+            showSidebar={false}
+            displayStatus={status}
+            finalSlotStart={status === "CLOSED" ? finalSlotStart : null}
+            allowFinalSlotSelection={status === "CLOSED"}
+            onFinalSlotSelect={setFinalSlotStart}
+            activeParticipantId={activeParticipantId}
+            onActiveParticipantChange={setActiveParticipantId}
+            getDescription={({ usesDateWindowing }) =>
+              status === "CLOSED"
+                ? usesDateWindowing
+                  ? "Select a slot to inspect overlap and use the button below to set the fixed date. Use the arrows to move through the date range."
+                  : "Click any slot to inspect availability and set the fixed date for this closed event."
+                : usesDateWindowing
+                  ? "Select a slot to inspect availability. Close the event to choose the fixed date."
+                  : "Click any slot to inspect availability. Close the event when you are ready to choose the fixed date."
+            }
+          />
+        </div>
       </div>
     </div>
   );

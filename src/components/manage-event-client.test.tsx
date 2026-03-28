@@ -100,6 +100,30 @@ describe("ManageEventClient", () => {
     expect(screen.getByText(view.manageUrl).className).toContain("[overflow-wrap:anywhere]");
   });
 
+  it("places share links and the organizer sidebar stack before the heatmap in DOM order", () => {
+    const view = createManageView();
+    render(<ManageEventClient initialView={view} />);
+
+    const shareLinksHeading = screen.getByText("Share links");
+    const bestWindowsHeading = screen.getByText("Best windows right now");
+    const participantsHeading = screen.getByText("Participants");
+    const availabilityHeading = screen.getByText("Availability");
+
+    expect(screen.getAllByText("Participants")).toHaveLength(1);
+    expect(
+      shareLinksHeading.compareDocumentPosition(availabilityHeading) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      bestWindowsHeading.compareDocumentPosition(availabilityHeading) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      participantsHeading.compareDocumentPosition(availabilityHeading) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
   it("renders the heatmap and lets the organizer select a fixed date on closed events", () => {
     const view = createManageView({ status: "CLOSED" });
     render(<ManageEventClient initialView={view} />);
@@ -119,7 +143,7 @@ describe("ManageEventClient", () => {
     fireEvent.click(screen.getByRole("button", { name: "Set fixed date" }));
 
     expect(screen.getByText("Fixed date")).toBeInTheDocument();
-    expect(screen.getByText("Thu, Apr 2 · 09:00-10:00")).toBeInTheDocument();
+    expect(screen.getByText(/Thu, Apr 2.*09:00.*10:00/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
   });
 
@@ -143,6 +167,29 @@ describe("ManageEventClient", () => {
       "href",
       "/api/events/test-event-xeqlxw/ics",
     );
+  });
+
+  it("combines participant management and highlighting in one sidebar card", () => {
+    const view = createManageView();
+    render(<ManageEventClient initialView={view} />);
+
+    const participantRow = screen
+      .getAllByRole("button", {
+        name: /Felix/i,
+      })
+      .find((element) => element.tagName === "DIV");
+
+    expect(participantRow).toBeDefined();
+
+    fireEvent.click(participantRow!);
+
+    expect(participantRow).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("Highlighting")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: /Thu, Apr 2 09:00 · 2\/2 available/i,
+      }),
+    ).toHaveAttribute("data-highlighted-participant-availability", "true");
   });
 
   it("hides best windows before anyone has entered availability", () => {
