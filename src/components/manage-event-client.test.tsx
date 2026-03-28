@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -196,16 +196,21 @@ describe("ManageEventClient", () => {
     expect(screen.getByText(view.manageUrl).className).toContain("[overflow-wrap:anywhere]");
   });
 
-  it("places share links and the organizer sidebar stack before the heatmap in DOM order", () => {
+  it("places the unified organizer sidebar stack before the heatmap in DOM order", () => {
     const view = createManageView();
     renderWithI18n(<ManageEventClient initialView={view} />);
 
+    const eventStatusHeading = screen.getByText("Event status");
     const shareLinksHeading = screen.getByText("Share links");
     const bestWindowsHeading = screen.getByText("Best windows right now");
     const participantsHeading = screen.getByText("Participants");
     const availabilityHeading = screen.getByText("Availability");
 
     expect(screen.getAllByText("Participants")).toHaveLength(1);
+    expect(
+      eventStatusHeading.compareDocumentPosition(shareLinksHeading) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(
       shareLinksHeading.compareDocumentPosition(availabilityHeading) &
         Node.DOCUMENT_POSITION_FOLLOWING,
@@ -220,7 +225,7 @@ describe("ManageEventClient", () => {
     ).toBeTruthy();
   });
 
-  it("renders the heatmap as a single content column when the embedded sidebar is disabled", () => {
+  it("keeps the top manage card compact and renders the heatmap as a single content column", () => {
     const view = createManageView();
     renderWithI18n(<ManageEventClient initialView={view} />);
 
@@ -229,6 +234,7 @@ describe("ManageEventClient", () => {
     expect(heatmapLayout).not.toBeNull();
     expect(heatmapLayout).toHaveClass("grid-cols-1");
     expect(heatmapLayout?.className).not.toContain("xl:grid-cols-[minmax(0,1fr)_250px]");
+    expect(document.body.innerHTML).not.toContain("lg:grid-cols-[minmax(0,1fr)_22rem]");
   });
 
   it("closes the event directly from the selected slot without requiring a separate save", async () => {
@@ -287,15 +293,7 @@ describe("ManageEventClient", () => {
     await user.click(screen.getByRole("button", { name: "Update fixed date" }));
 
     await waitFor(() => {
-      const fixedDateCard = screen
-        .getAllByText("Fixed date")
-        .find((element) => element.closest("[data-slot='card']"))
-        ?.closest("[data-slot='card']");
-
-      expect(fixedDateCard).not.toBeNull();
-      expect(
-        within(fixedDateCard as HTMLElement).getByText(/Thu, Apr 2.*09:30.*10:30/i),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/Thu, Apr 2.*09:30.*10:30/i)).toBeInTheDocument();
     });
 
     const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
@@ -377,11 +375,28 @@ describe("ManageEventClient", () => {
     });
     renderWithI18n(<ManageEventClient initialView={view} />);
 
-    expect(screen.getAllByText("Fixed date").length).toBeGreaterThan(0);
+    expect(screen.getByText("Event status")).toBeInTheDocument();
+    expect(screen.getAllByText("Fixed date")).toHaveLength(1);
+    expect(screen.getAllByText("Closed")).toHaveLength(1);
+    expect(screen.queryByText("Times shown in Europe/Vienna")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Add to calendar (.ics)" })).toHaveAttribute(
       "href",
       "/api/events/test-event-xeqlxw/ics",
     );
+  });
+
+  it("hides duplicate closed-state suggestions when the published fixed date already matches the best slot", () => {
+    const finalizedSlot = buildPublishedFinalizedSlot(
+      createManageView().snapshot,
+      "2026-04-02T07:00:00.000Z",
+    );
+    const view = createManageView({
+      status: "CLOSED",
+      finalizedSlot,
+    });
+    renderWithI18n(<ManageEventClient initialView={view} />);
+
+    expect(screen.queryByText("Best windows right now")).not.toBeInTheDocument();
   });
 
   it("combines participant management and highlighting in one sidebar card", () => {

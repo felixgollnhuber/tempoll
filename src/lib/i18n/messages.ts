@@ -243,6 +243,7 @@ export const en = {
     participantRemoved: "Participant removed",
     titleLabel: "Title",
     saveTitle: "Save title",
+    eventStatusTitle: "Event status",
     statusLabel: "Status",
     statusOpen: "Open for edits",
     statusClosed: "Closed",
@@ -282,13 +283,13 @@ export const en = {
     closeRequiresFixedDateInHeatmap:
       "Pick a fixed date in the heatmap before closing this event.",
     closedHeatmapDescription:
-      "Click any slot to inspect availability and update the published fixed date for this closed event.",
+      "Click a slot to inspect availability and update the published fixed date.",
     closedHeatmapDescriptionWindowed:
-      "Select a slot to inspect overlap and update the fixed date directly below. Use the arrows to move through the date range.",
+      "Select a slot to inspect overlap and update the fixed date below. Use the arrows to move through the date range.",
     openHeatmapDescription:
-      "Click any slot to inspect availability and close the event directly from the slot action.",
+      "Click a slot to inspect availability and close the event from the slot action.",
     openHeatmapDescriptionWindowed:
-      "Select a slot to inspect availability and close the event directly from the slot action. Use the arrows to move through the date range.",
+      "Select a slot to inspect availability and close the event from the slot action. Use the arrows to move through the date range.",
     peopleAvailable: {
       one: "{count} person available",
       other: "{count} people available",
@@ -837,6 +838,7 @@ export const de: Messages = {
     participantRemoved: "Teilnehmende Person entfernt",
     titleLabel: "Titel",
     saveTitle: "Titel speichern",
+    eventStatusTitle: "Eventstatus",
     statusLabel: "Status",
     statusOpen: "Für Änderungen geöffnet",
     statusClosed: "Geschlossen",
@@ -878,13 +880,13 @@ export const de: Messages = {
     closeRequiresFixedDateInHeatmap:
       "Wähle in der Heatmap ein fixes Datum aus, bevor du dieses Event schließt.",
     closedHeatmapDescription:
-      "Klicke auf einen beliebigen Slot, um die Verfügbarkeit zu prüfen und den veröffentlichten fixen Termin für dieses geschlossene Event zu aktualisieren.",
+      "Klicke auf einen Slot, um die Verfügbarkeit zu prüfen und den veröffentlichten fixen Termin zu aktualisieren.",
     closedHeatmapDescriptionWindowed:
-      "Wähle einen Slot aus, um die Überschneidung zu prüfen, und aktualisiere den fixen Termin direkt darunter. Mit den Pfeilen bewegst du dich durch den Datumsbereich.",
+      "Wähle einen Slot aus, um die Überschneidung zu prüfen, und aktualisiere den fixen Termin darunter. Mit den Pfeilen bewegst du dich durch den Datumsbereich.",
     openHeatmapDescription:
-      "Klicke auf einen beliebigen Slot, um die Verfügbarkeit zu prüfen und das Event direkt über die Slot-Aktion zu schließen.",
+      "Klicke auf einen Slot, um die Verfügbarkeit zu prüfen und das Event über die Slot-Aktion zu schließen.",
     openHeatmapDescriptionWindowed:
-      "Wähle einen Slot aus, um die Verfügbarkeit zu prüfen und das Event direkt über die Slot-Aktion zu schließen. Mit den Pfeilen bewegst du dich durch den Datumsbereich.",
+      "Wähle einen Slot aus, um die Verfügbarkeit zu prüfen und das Event über die Slot-Aktion zu schließen. Mit den Pfeilen bewegst du dich durch den Datumsbereich.",
     peopleAvailable: {
       one: "{count} Person verfügbar",
       other: "{count} Personen verfügbar",

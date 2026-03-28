@@ -53,6 +53,8 @@ type EventHeatmapProps = {
   onUpdateCell?: (dateKey: string, minutes: number, nextValue?: boolean) => boolean;
   displayStatus?: PublicEventSnapshot["status"];
   finalSlotStart: string | null;
+  showStatusBadge?: boolean;
+  showTitleBlock?: boolean;
   showFixedDateAction?: boolean;
   onFixedDateAction?: (slotStart: string) => void;
   isFixedDateActionPending?: boolean;
@@ -271,6 +273,8 @@ export function EventHeatmap({
   onUpdateCell,
   displayStatus = snapshot.status,
   finalSlotStart,
+  showStatusBadge = true,
+  showTitleBlock = true,
   showFixedDateAction = false,
   onFixedDateAction,
   isFixedDateActionPending = false,
@@ -757,7 +761,14 @@ export function EventHeatmap({
       <div className="min-w-0 space-y-4">
         <Card className="min-w-0 overflow-hidden">
           <CardHeader className="gap-3 p-4">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div
+              className={cn(
+                "flex flex-col gap-3",
+                showTitleBlock || showStatusBadge
+                  ? "lg:flex-row lg:items-start lg:justify-between"
+                  : undefined,
+              )}
+            >
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center gap-2 text-[10px] font-medium tracking-[0.16em] text-muted-foreground uppercase">
                   <span className="inline-flex items-center gap-1">
@@ -773,16 +784,18 @@ export function EventHeatmap({
                     {plural(messages.publicEvent.participantsSummary, snapshot.participants.length)}
                   </span>
                 </div>
-                <div>
-                  <CardTitle className="text-2xl">{snapshot.title}</CardTitle>
-                  <CardDescription className="mt-1 text-xs">
-                    {format(messages.publicEvent.timesShownIn, {
-                      timezone: snapshot.timezone,
-                    })}
-                  </CardDescription>
-                </div>
+                {showTitleBlock ? (
+                  <div>
+                    <CardTitle className="text-2xl">{snapshot.title}</CardTitle>
+                    <CardDescription className="mt-1 text-xs">
+                      {format(messages.publicEvent.timesShownIn, {
+                        timezone: snapshot.timezone,
+                      })}
+                    </CardDescription>
+                  </div>
+                ) : null}
               </div>
-              {displayStatus === "CLOSED" ? (
+              {showStatusBadge && displayStatus === "CLOSED" ? (
                 <Badge variant="destructive" className="h-7 px-2.5 text-xs">
                   <LockIcon className="size-3.5" />
                   {messages.common.closed}

@@ -66,6 +66,9 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
   const savedFinalSlot = snapshot.status === "CLOSED" ? snapshot.finalizedSlot : null;
   const isTitleDirty = title !== snapshot.title;
   const manageActionUrl = `/api/manage/${initialView.manageKey}`;
+  const visibleSuggestions = savedFinalSlot
+    ? snapshot.suggestions.filter((suggestion) => suggestion.slotStart !== savedFinalSlot.slotStart)
+    : snapshot.suggestions;
 
   const refreshSnapshot = useCallback(
     async ({ preserveDirtyTitle = false }: RefreshSnapshotOptions = {}) => {
@@ -291,7 +294,7 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
     );
   }
 
-  const bestWindowsCard = hasAnyAvailability ? (
+  const bestWindowsCard = hasAnyAvailability && visibleSuggestions.length > 0 ? (
     <Card>
       <CardHeader className="p-4 pb-2">
         <CardTitle className="text-sm">{messages.manageEvent.bestWindowsTitle}</CardTitle>
@@ -302,7 +305,7 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-2 p-4 pt-0">
-        {snapshot.suggestions.map((suggestion, index) => (
+        {visibleSuggestions.map((suggestion, index) => (
           <div key={suggestion.slotStart} className="rounded-md border bg-muted/20 px-3 py-2">
             <p className="text-[11px] font-medium text-muted-foreground">
               {format(messages.common.option, { count: index + 1 })}
@@ -317,35 +320,79 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
     </Card>
   ) : null;
 
-  const fixedDateCard = savedFinalSlot ? (
+  const statusCard = (
     <Card>
       <CardHeader className="p-4 pb-2">
-        <CardTitle className="text-sm">{messages.common.fixedDate}</CardTitle>
-        <CardDescription className="text-xs">
-          {messages.manageEvent.fixedDatePublishedDescription}
-        </CardDescription>
+        <CardTitle className="text-sm">{messages.manageEvent.eventStatusTitle}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 p-4 pt-0">
-        <div className="rounded-md border bg-muted/20 px-3 py-2">
-          <p className="text-sm font-semibold text-foreground">{savedFinalSlot.label}</p>
-          <p className="mt-1 text-[11px] text-muted-foreground">
-            {plural(messages.publicEvent.fullWindowFree, savedFinalSlot.availableCount)}
+        <div className="space-y-2">
+          <Badge
+            variant={snapshot.status === "CLOSED" ? "destructive" : "secondary"}
+            className="h-7 w-fit gap-1.5 px-2.5 text-xs"
+          >
+            {snapshot.status === "CLOSED" ? (
+              <LockIcon className="size-3.5" />
+            ) : (
+              <UnlockIcon className="size-3.5" />
+            )}
+            {snapshot.status === "CLOSED"
+              ? messages.manageEvent.statusClosed
+              : messages.manageEvent.statusOpen}
+          </Badge>
+          <p className="text-sm text-muted-foreground">
+            {snapshot.status === "CLOSED"
+              ? messages.manageEvent.statusClosedDescription
+              : messages.manageEvent.statusOpenDescription}
           </p>
         </div>
-        <Button asChild size="sm" className="w-full">
-          <a href={`/api/events/${snapshot.slug}/ics`}>{messages.common.addToCalendar}</a>
-        </Button>
+
+        {savedFinalSlot ? (
+          <div className="rounded-md border bg-muted/20 px-3 py-2">
+            <p className="text-[11px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
+              {messages.common.fixedDate}
+            </p>
+            <p className="mt-1 text-sm font-semibold text-foreground">{savedFinalSlot.label}</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {plural(messages.publicEvent.fullWindowFree, savedFinalSlot.availableCount)}
+            </p>
+          </div>
+        ) : null}
+
+        {savedFinalSlot ? (
+          <Button asChild size="sm" className="w-full">
+            <a href={`/api/events/${snapshot.slug}/ics`}>{messages.common.addToCalendar}</a>
+          </Button>
+        ) : null}
+
+        {snapshot.status === "CLOSED" ? (
+          <AlertDialog open={isReopenDialogOpen} onOpenChange={setIsReopenDialogOpen}>
+            <AlertDialogTrigger asChild>
+              <Button type="button" variant="outline" disabled={isPending} className="w-full">
+                {messages.manageEvent.reopenEvent}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>{messages.manageEvent.reopenEventConfirmTitle}</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {messages.manageEvent.reopenEventConfirmDescription}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>{messages.common.cancel}</AlertDialogCancel>
+                <AlertDialogAction onClick={reopenEvent} disabled={isPending}>
+                  {pendingAction === "reopenEvent" ? (
+                    <Loader2Icon className="size-4 animate-spin" />
+                  ) : null}
+                  {messages.manageEvent.reopenEventConfirmAction}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        ) : null}
       </CardContent>
     </Card>
-  ) : null;
-
-  const sidebarSummaryCards = fixedDateCard ? (
-    <>
-      {fixedDateCard}
-      {bestWindowsCard}
-    </>
-  ) : (
-    bestWindowsCard
   );
 
   const participantsCard = (
@@ -447,8 +494,8 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
           <CardTitle className="text-3xl">{messages.manageEvent.title}</CardTitle>
           <CardDescription>{messages.manageEvent.description}</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-x-6 gap-y-5 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
-          <div className="space-y-2">
+        <CardContent className="pt-0">
+          <div className="max-w-3xl space-y-2">
             <Label htmlFor="title">{messages.manageEvent.titleLabel}</Label>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
               <Input id="title" value={title} onChange={(event) => setTitle(event.target.value)} />
@@ -467,73 +514,13 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
               ) : null}
             </div>
           </div>
-
-          <div className="space-y-3 rounded-xl border bg-muted/15 p-4">
-            <div className="space-y-2">
-              <Label>{messages.manageEvent.statusLabel}</Label>
-              <Badge
-                variant={snapshot.status === "CLOSED" ? "destructive" : "secondary"}
-                className="h-7 w-fit gap-1.5 px-2.5 text-xs"
-              >
-                {snapshot.status === "CLOSED" ? (
-                  <LockIcon className="size-3.5" />
-                ) : (
-                  <UnlockIcon className="size-3.5" />
-                )}
-                {snapshot.status === "CLOSED"
-                  ? messages.manageEvent.statusClosed
-                  : messages.manageEvent.statusOpen}
-              </Badge>
-              <p className="text-sm text-muted-foreground">
-                {snapshot.status === "CLOSED"
-                  ? messages.manageEvent.statusClosedDescription
-                  : messages.manageEvent.statusOpenDescription}
-              </p>
-            </div>
-
-            {savedFinalSlot ? (
-              <div className="rounded-md border bg-background/80 px-3 py-2">
-                <p className="text-[11px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
-                  {messages.common.fixedDate}
-                </p>
-                <p className="mt-1 text-sm font-semibold text-foreground">{savedFinalSlot.label}</p>
-              </div>
-            ) : null}
-
-            {snapshot.status === "CLOSED" ? (
-              <AlertDialog open={isReopenDialogOpen} onOpenChange={setIsReopenDialogOpen}>
-                <AlertDialogTrigger asChild>
-                  <Button type="button" variant="outline" disabled={isPending}>
-                    {messages.manageEvent.reopenEvent}
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>
-                      {messages.manageEvent.reopenEventConfirmTitle}
-                    </AlertDialogTitle>
-                    <AlertDialogDescription>
-                      {messages.manageEvent.reopenEventConfirmDescription}
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>{messages.common.cancel}</AlertDialogCancel>
-                    <AlertDialogAction onClick={reopenEvent} disabled={isPending}>
-                      {pendingAction === "reopenEvent" ? (
-                        <Loader2Icon className="size-4 animate-spin" />
-                      ) : null}
-                      {messages.manageEvent.reopenEventConfirmAction}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            ) : null}
-          </div>
         </CardContent>
       </Card>
 
       <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start">
         <aside className="order-1 min-w-0 space-y-5 xl:order-2">
+          {statusCard}
+
           <Card>
             <CardHeader>
               <CardTitle>{messages.manageEvent.shareLinksTitle}</CardTitle>
@@ -562,7 +549,7 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
             </CardContent>
           </Card>
 
-          {sidebarSummaryCards}
+          {bestWindowsCard}
           {participantsCard}
         </aside>
 
@@ -575,6 +562,8 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
             showSidebar={false}
             displayStatus={snapshot.status}
             finalSlotStart={savedFinalSlot?.slotStart ?? null}
+            showStatusBadge={false}
+            showTitleBlock={false}
             showFixedDateAction
             isFixedDateActionPending={
               pendingAction === "closeEvent" || pendingAction === "updateFixedDate"
