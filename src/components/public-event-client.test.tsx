@@ -124,6 +124,7 @@ describe("PublicEventClient", () => {
     renderWithI18n(
       <PublicEventClient
         slug="test-event"
+        shareUrl="https://tempoll.app/e/test-event"
         initialSnapshot={createSnapshot()}
         initialSession={{
           participantId: "p1",
@@ -136,6 +137,9 @@ describe("PublicEventClient", () => {
     expect(screen.getByRole("button", { name: "Bearbeiten" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Ansehen" })).toBeInTheDocument();
     expect(screen.getByText("Verfügbarkeit")).toBeInTheDocument();
+    expect(screen.getByText("Board teilen")).toBeInTheDocument();
+    expect(screen.getByText("https://tempoll.app/e/test-event")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Öffentliche URL kopieren" })).toBeInTheDocument();
   });
 
   it("hides best matching windows before anyone has selected availability", () => {

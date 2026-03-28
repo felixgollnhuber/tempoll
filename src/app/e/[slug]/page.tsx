@@ -5,7 +5,7 @@ import { PublicEventClient } from "@/components/public-event-client";
 import { RecentEventTracker } from "@/components/recent-event-tracker";
 import { getPublicEventSnapshot } from "@/lib/event-service";
 import { getServerI18n } from "@/lib/i18n/server";
-import { getParticipantCookieName } from "@/lib/tokens";
+import { buildPublicEventUrl, getParticipantCookieName } from "@/lib/tokens";
 
 type EventPageProps = {
   params: Promise<{
@@ -35,6 +35,7 @@ export default async function EventPage({ params }: EventPageProps) {
       />
       <PublicEventClient
         slug={slug}
+        shareUrl={buildPublicEventUrl(slug)}
         initialSnapshot={event.snapshot}
         initialSession={
           event.participant

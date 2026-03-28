@@ -185,6 +185,10 @@ export const en = {
     yourNamePlaceholder: "Alex, Nora, Product team...",
     joinButton: "Join event",
     joined: "You joined the event",
+    shareTitle: "Share this board",
+    shareDescription: "Copy the public event URL and send it to participants.",
+    shareUrlLabel: "Public event URL",
+    copyShareUrl: "Copy public URL",
     availabilityTitle: "Availability",
     availabilityDescriptionEditWindowed:
       "Tap or drag to paint your availability. Use the arrows to move day by day.",
@@ -750,6 +754,11 @@ export const de: Messages = {
     yourNamePlaceholder: "Alex, Nora, Produktteam...",
     joinButton: "Event beitreten",
     joined: "Du bist dem Event beigetreten",
+    shareTitle: "Board teilen",
+    shareDescription:
+      "Kopiere die öffentliche Event-URL und teile sie mit den Teilnehmenden.",
+    shareUrlLabel: "Öffentliche Event-URL",
+    copyShareUrl: "Öffentliche URL kopieren",
     availabilityTitle: "Verfügbarkeit",
     availabilityDescriptionEditWindowed:
       "Tippe oder ziehe, um deine Verfügbarkeit zu markieren. Mit den Pfeilen bewegst du dich tageweise weiter.",
