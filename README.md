@@ -1,43 +1,73 @@
 # tempoll
 
-A modern, self-hosted When2Meet-style scheduler built with `Next.js 16`, `shadcn/ui`, `Prisma 7`, and `Postgres`.
+An account-free, self-hosted When2Meet alternative for modern teams.
 
+> Create the board. Share the link. Find the overlap.
 The repository is ready for GitHub-based deployment with Coolify using the included [`docker-compose.yaml`](./docker-compose.yaml).
 
-## What is included
+tempoll lets an organizer create a scheduling board, share one public link, and collect availability on a live heatmap. Participants join with just a name. The organizer gets a private manage URL to rename or remove participants and open or close the event.
 
-- First-run setup wizard gated by `APP_SETUP_COMPLETE`
-- Landing page and event creation flow
-- Global app chrome with home, new-event and recent-event navigation
-- Browser-local recent event history for public and organizer links
-- Public event board with drag-to-select availability heatmap
-- Live updates via `Server-Sent Events` + `Postgres LISTEN/NOTIFY`
-- Organizer management page with public/private links, rename/remove participant controls and open/closed status
-- English `/imprint` and `/privacy` pages rendered from env-backed operator config
-- Prisma schema, initial SQL migration, Dockerfile and healthcheck for Coolify deployments
+The project is built for two audiences:
 
-## Local setup
+- operators who want to self-host a polished scheduling app with a simple Postgres stack
+- maintainers who want a clean foundation for a hosted version without losing the product's current UX contract
 
-1. Copy `.env.example` to `.env`.
-2. Start a local Postgres instance or point `DATABASE_URL` to an existing one.
-3. Run:
+## Highlights
+
+- No required login. Public participants join with a name only.
+- Private organizer management URL, separate from the public event URL.
+- Realtime collaborative heatmap powered by Postgres `LISTEN/NOTIFY` and Server-Sent Events.
+- Ranked best meeting windows based on shared overlap.
+- Date-range based event creation. One range expands into concrete event dates internally.
+- Browser-local recent events history, including private organizer links clearly marked as sensitive.
+- First-run setup wizard that generates only non-secret app and legal env values.
+- Optional legal pages rendered from environment variables.
+- Docker Compose and Coolify ready.
+
+## How tempoll works
+
+1. Create an event with a title, timezone, one date range, a daily time window, slot size, and meeting duration.
+2. tempoll expands the date range into actual dates and creates:
+   - a public event URL
+   - a private organizer manage URL
+3. Participants open the public page, enter their name, and paint availability directly on the heatmap.
+4. Everyone sees updates in real time.
+5. The organizer uses the private manage page to share links, rename or remove participants, and close the board when scheduling is done.
+
+## Stack
+
+- `Next.js 16`
+- `React 19`
+- `Tailwind CSS 4`
+- `shadcn/ui` and `Radix UI`
+- `Prisma 7`
+- `PostgreSQL 16`
+- `pg` listener for realtime fan-out
+- `Vitest` and `Testing Library`
+
+## Quick Start
+
+### Local development
+
+Recommended local toolchain:
+
+- Node.js 24+
+- `pnpm`
+- PostgreSQL 16
+
+The local default database URL is:
 
 ```bash
-pnpm install
-pnpm dev
+postgresql://postgres:postgres@localhost:55432/tempoll?schema=public
 ```
 
-If `APP_SETUP_COMPLETE=false` or the variable is missing, the app redirects to `/setup` and generates a non-secret app config snippet for you to copy into your deployment environment.
+That non-default `55432` port is intentional to avoid common Postgres collisions.
 
-Once your final `.env` is in place and `APP_SETUP_COMPLETE=true`, run:
+1. Copy the example env file:
 
 ```bash
-pnpm prisma migrate deploy
-pnpm dev
+cp .env.example .env
 ```
-
-The app will be available at `http://localhost:3000`.
-
 ### Open-source safety notes
 
 - `.env.example` and `.env.coolify.example` intentionally contain placeholders and local-only example values. Do not commit your real `.env`.
@@ -47,7 +77,7 @@ The app will be available at `http://localhost:3000`.
 
 ### Local Postgres example
 
-This repository defaults to a non-standard local Postgres port to avoid common clashes:
+2. Start a local Postgres instance however you prefer. Example with Docker:
 
 ```bash
 docker run -d \
@@ -56,72 +86,301 @@ docker run -d \
   -e POSTGRES_USER=postgres \
   -e POSTGRES_PASSWORD=postgres \
   -p 55432:5432 \
-  -v tempoll-pgdata:/var/lib/postgresql/data \
   postgres:16
 ```
 
-### Local Docker Compose
+3. Install dependencies and start the app:
 
-You can also boot the bundled stack directly:
+```bash
+pnpm install
+pnpm dev
+```
+
+4. Open [http://localhost:3000/setup](http://localhost:3000/setup).
+
+By default, `.env.example` starts with `APP_SETUP_COMPLETE=false`, so normal routes redirect to `/setup`. That is expected.
+
+5. Either:
+
+- use the setup wizard to generate your non-secret app config and copy the values into `.env`, or
+- edit `.env` manually if you already know your final configuration
+
+6. Set `APP_SETUP_COMPLETE=true`, then apply migrations and restart the app:
+
+```bash
+pnpm prisma:migrate
+pnpm dev
+```
+
+### Run the bundled Docker Compose stack
+
+If you want a production-like local stack:
 
 ```bash
 cp .env.coolify.example .env.coolify
-SERVICE_PASSWORD_TEMPOLL_DB=local-dev-password docker compose --env-file .env.coolify up -d
+export SERVICE_PASSWORD_TEMPOLL_DB=change-me
+docker compose --env-file .env.coolify up -d --build
 ```
 
-## Scripts
+Then open `/setup`, copy the generated non-secret app config into your env file or deployment settings, switch `APP_SETUP_COMPLETE=true`, and redeploy or restart.
 
-- `pnpm dev` starts the app in development
-- `pnpm build` creates the production build
-- `pnpm start` runs the production server
-- `pnpm lint` runs ESLint
-- `pnpm typecheck` runs TypeScript checks
-- `pnpm test:run` runs the Vitest test suite
-- `pnpm prisma:generate` regenerates Prisma Client
-- `pnpm prisma:migrate` applies Prisma migrations
+## Self-hosting
 
-## Realtime architecture
+### Docker Compose
 
-- All write operations use Prisma.
-- After a relevant change, the server calls `pg_notify('event_updates', eventId)`.
-- A dedicated `pg` listener keeps a `LISTEN event_updates` connection open.
-- Event pages subscribe to `/api/events/[slug]/stream` and refetch their snapshot on updates.
+The repository ships with a root-level [`docker-compose.yaml`](./docker-compose.yaml) that defines:
 
-## Setup and configuration
+- `app`
+- `db`
 
-- `APP_SETUP_COMPLETE` controls whether the app is considered configured.
-- `LEGAL_PAGES_ENABLED` controls whether `/imprint` and `/privacy` are exposed at all.
-- While setup is incomplete, normal routes redirect to `/setup` and most API routes return a setup-required response.
-- The setup wizard generates a non-secret app config snippet containing:
-  - app basics such as `APP_NAME` and `APP_URL`
-  - optional operator/imprint fields
-  - optional privacy and hosting disclosure fields
-- The setup wizard never shows or exports:
-  - `DATABASE_URL`
-  - the database password
-  - Coolify infrastructure secrets
-- Operator-specific data is intentionally read from env-backed config so the project can be open-sourced without hard-coded personal details.
-- If you keep `LEGAL_PAGES_ENABLED=false`, the footer hides legal links and both legal routes return `404`.
+The compose setup derives `DATABASE_URL` internally from:
 
-## Coolify notes
+- `TEMPOLL_DB_NAME`
+- `TEMPOLL_DB_USER`
+- `SERVICE_PASSWORD_TEMPOLL_DB`
 
-- The repository ships with a Git-ready [`docker-compose.yaml`](./docker-compose.yaml) that includes both the app and a Postgres database.
-- Coolify's Docker Compose mode treats the compose file as the source of truth for services, storage, and environment variables.
-- Add the repository in Coolify as an `Application` using the `Docker Compose` build pack.
-- Use [`.env.coolify.example`](./.env.coolify.example) as the starting point for the Coolify environment variables.
-- In Coolify, assign your domain to the `app` service and set the internal service port to `3000`.
-- Set `APP_URL` to the final public URL of the app.
-- Keep `TEMPOLL_DB_NAME` and `TEMPOLL_DB_USER` as the non-secret database metadata.
-- The database password is derived from the Coolify-managed `SERVICE_PASSWORD_TEMPOLL_DB` secret and is never shown by `/setup`.
-- `DATABASE_URL` is built inside Docker Compose from `TEMPOLL_DB_NAME`, `TEMPOLL_DB_USER`, and `SERVICE_PASSWORD_TEMPOLL_DB`.
-- On first deployment you can keep `APP_SETUP_COMPLETE=false`, open `/setup`, copy the generated app config, merge it into Coolify, and redeploy.
-- While `APP_SETUP_COMPLETE=false`, the container skips `prisma migrate deploy` so `/setup` can load without a migration boot loop.
-- For existing persistent Postgres volumes, make sure `SERVICE_PASSWORD_TEMPOLL_DB` matches the current live database password before redeploying. Changing DB credentials after first initialization is an infrastructure migration or volume-reset task.
-- The healthcheck endpoint is `/api/health`.
+Use [`.env.coolify.example`](./.env.coolify.example) as the operator-facing starting point. Do not ask operators to paste a full `DATABASE_URL` when they use the bundled database service.
 
-## Data model
+### Coolify
 
-- `Event`: metadata, timezone, slot size, meeting duration and organizer secret
-- `EventDate`: selected concrete dates for an event
-- `Participant`: participant profile and edit token hash
-- `AvailabilitySlot`: discrete availability slots stored in UTC
+tempoll targets Coolify via Docker Compose, not Nixpacks.
+
+Recommended Coolify settings:
+
+- Build Pack: `Docker Compose`
+- Base Directory: `/`
+- Assign your public domain to the `app` service
+- Internal app port: `3000`
+
+Suggested first deploy flow:
+
+1. Add the repository as a Docker Compose application.
+2. Seed the environment from [`.env.coolify.example`](./.env.coolify.example).
+3. Keep `APP_SETUP_COMPLETE=false` for the first deploy.
+4. Let Coolify generate `SERVICE_PASSWORD_TEMPOLL_DB` for a fresh stack.
+5. Open `/setup` on the deployed app.
+6. Copy only the generated non-secret app config values into Coolify.
+7. Set `APP_SETUP_COMPLETE=true`.
+8. Redeploy.
+
+Important operational note:
+
+- Postgres credentials only initialize a fresh volume.
+- If you already have a persistent database volume, `SERVICE_PASSWORD_TEMPOLL_DB` must match the current live password before redeploying.
+- If credentials drift, either align env vars with the existing database or reset the database volume deliberately.
+
+Health checks stay available at `/api/health`, even while setup is incomplete.
+
+## Configuration
+
+### Core variables
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `APP_SETUP_COMPLETE` | Yes | Gates the whole app. Only the setup wizard and `/api/health` stay open when this is not exactly `true`. |
+| `APP_NAME` | Yes | Product name shown in the UI. Defaults to `tempoll`. |
+| `APP_URL` | Yes | Canonical public base URL used for generated links. |
+| `LEGAL_PAGES_ENABLED` | No | Enables `/imprint` and `/privacy`. Defaults to `false`. |
+| `DATABASE_URL` | Local dev or external DB only | Direct database connection string. |
+| `TEMPOLL_DB_NAME` | Compose/Coolify | Bundled Postgres database name. |
+| `TEMPOLL_DB_USER` | Compose/Coolify | Bundled Postgres database user. |
+| `SERVICE_PASSWORD_TEMPOLL_DB` | Compose/Coolify | Bundled Postgres password secret. Use an underscore, not a hyphen. |
+
+### Optional legal and privacy variables
+
+These fields are intentionally optional:
+
+- `OPERATOR_LEGAL_NAME`
+- `OPERATOR_DISPLAY_NAME`
+- `OPERATOR_STREET_ADDRESS`
+- `OPERATOR_POSTAL_CODE`
+- `OPERATOR_CITY`
+- `OPERATOR_COUNTRY`
+- `OPERATOR_EMAIL`
+- `OPERATOR_PHONE`
+- `OPERATOR_WEBSITE`
+- `OPERATOR_BUSINESS_PURPOSE`
+- `MEDIA_OWNER`
+- `EDITORIAL_LINE`
+- `PRIVACY_CONTACT_EMAIL`
+- `HOSTING_DESCRIPTION`
+- `PRIVACY_PROCESSORS`
+
+If legal pages are enabled and some of these fields are empty, tempoll falls back to softer wording such as "available on request" instead of hard-failing.
+
+### Setup wizard rules
+
+The setup wizard is deliberately narrow in scope:
+
+- it generates app and legal config only
+- it does not write files on the server
+- it never renders or exports `DATABASE_URL`
+- it never asks for database passwords in the browser
+- it treats infrastructure as informational only
+
+## Product model
+
+tempoll's current UX is intentionally opinionated:
+
+- public flow: organizer creates an event, participants join with only a name, availability is edited directly on the heatmap
+- organizer flow: private manage URL, no mandatory account system
+- calendar: Monday-first, compact popover calendar, no special "today" highlight
+- event creation: one contiguous date range, expanded internally into `dates: string[]`
+- legal pages: opt-in
+- language: English-only for now
+
+If you are building a hosted version, these constraints are worth preserving unless you intentionally want to change the product.
+
+## Architecture
+
+### Data model
+
+The Prisma schema is intentionally small:
+
+- `Event`: metadata, timezone, slot size, meeting duration, organizer manage secret, status
+- `EventDate`: concrete expanded dates for the event
+- `Participant`: participant identity, color, normalized name, edit token hash
+- `AvailabilitySlot`: selected slot rows stored in UTC
+
+### Security model
+
+- Organizer access is controlled by a private bearer-style manage URL.
+- Participant editing is tied to an HTTP-only cookie scoped to that event.
+- Recent event history is stored only in the browser, never synced to the server.
+- Organizer URLs are stored locally on purpose and should always be treated as sensitive.
+
+### Realtime model
+
+Realtime updates are built on:
+
+- PostgreSQL `LISTEN/NOTIFY`
+- a server-side `pg` listener
+- SSE at `/api/events/[slug]/stream`
+
+Current behavior:
+
+- the client that saves availability applies the returned snapshot directly
+- other connected clients react to the SSE event and refetch the latest snapshot
+
+The cleanup logic in [`src/lib/realtime.ts`](./src/lib/realtime.ts) matters. Closed streams must be removed carefully to avoid listener leaks or broken heartbeats.
+
+### API surface
+
+| Route | Purpose |
+| --- | --- |
+| `POST /api/events` | Create a new event |
+| `GET /api/events/[slug]` | Fetch the public event snapshot |
+| `POST /api/events/[slug]/participants` | Join an event with a name and establish an edit session |
+| `PUT /api/events/[slug]/availability` | Save availability for the current participant |
+| `GET /api/events/[slug]/stream` | Subscribe to realtime event updates via SSE |
+| `PATCH /api/manage/[token]` | Update event status/title or rename a participant |
+| `DELETE /api/manage/[token]/participants/[participantId]` | Remove a participant |
+| `GET /api/health` | Health check that remains available before setup completes |
+
+## Repository layout
+
+```text
+.
+├── docker-compose.yaml
+├── Dockerfile
+├── prisma/
+│   ├── schema.prisma
+│   └── migrations/
+├── public/
+├── src/
+│   ├── app/            # Next.js routes and API endpoints
+│   ├── components/     # UI and feature components
+│   ├── lib/            # domain logic, realtime, setup, tokens, utilities
+│   └── test/           # test setup
+├── .env.example
+└── .env.coolify.example
+```
+
+## Development workflow
+
+### Scripts
+
+```bash
+pnpm dev
+pnpm build
+pnpm start
+pnpm lint
+pnpm typecheck
+pnpm test:run
+pnpm prisma:generate
+pnpm prisma:migrate
+pnpm prisma:studio
+```
+
+### Contributor checklist
+
+Before opening a PR or cutting a release, the usual minimum is:
+
+```bash
+pnpm lint
+pnpm typecheck
+pnpm test:run
+```
+
+If you touch deployment-related files, Prisma wiring, or dependency boundaries, also run:
+
+```bash
+pnpm build
+docker build -t tempoll-debug .
+```
+
+If you change the Prisma schema or Prisma-related setup, also run:
+
+```bash
+pnpm prisma:generate
+```
+
+### Important maintainer notes
+
+- This repo targets `Next.js 16`. Do not assume older Next.js conventions. Read the relevant guide in `node_modules/next/dist/docs/` before making framework-level changes.
+- Runtime imports must live in `dependencies`, not only in your local dev tree.
+- The Docker image intentionally copies `prisma/` and `prisma.config.ts` into both build and runtime stages.
+- The runtime container skips `pnpm prisma migrate deploy` unless `APP_SETUP_COMPLETE=true` so `/setup` can work on first deploys.
+
+## Guardrails for a hosted version
+
+If you continue building a managed or hosted tempoll service, these are the current product and ops guardrails:
+
+- Keep the product name `tempoll` everywhere.
+- Do not reintroduce old `Terminfinder` branding in UI copy, env names, storage keys, cookies, docs, or deployment files.
+- Keep the public flow account-free unless you intentionally redesign it.
+- Keep organizer access based on a private manage URL unless you intentionally add a real auth system.
+- Keep recent-event history local-only in the browser.
+- Keep private organizer links visibly marked as sensitive.
+- Keep setup bootstrap non-secret. Do not render database passwords or a bundled `DATABASE_URL` in the browser.
+- Keep legal pages opt-in via env config.
+- Keep the Coolify story centered on `TEMPOLL_DB_*` plus `SERVICE_PASSWORD_TEMPOLL_DB`, not operator-managed `POSTGRES_*`.
+- Keep the scheduling grid compact and practical rather than turning it into oversized dashboard UI.
+
+## Troubleshooting
+
+### Everything redirects to `/setup`
+
+`APP_SETUP_COMPLETE` is missing or not exactly `true`. That is expected during first-run setup, but not after deployment is finalized.
+
+### Coolify or Docker boot loop after changing DB credentials
+
+The database volume was already initialized with older credentials. Either restore the correct password in `SERVICE_PASSWORD_TEMPOLL_DB` or reset the Postgres volume on purpose.
+
+### Prisma migrate fails in the container
+
+Make sure the runtime image still contains `prisma.config.ts` and that `DATABASE_URL` is available at runtime.
+
+### Realtime updates do not reach other browsers
+
+Check all three layers:
+
+- Postgres `LISTEN/NOTIFY`
+- the long-lived `pg` listener in [`src/lib/realtime.ts`](./src/lib/realtime.ts)
+- the SSE endpoint at `/api/events/[slug]/stream`
+
+## License
+
+tempoll is licensed under the `GNU Affero General Public License v3.0`. This is intentional: tempoll is a self-hosted web app, and AGPL helps ensure that hosted or network-facing modifications remain open as well.
+
+Copyright (c) 2026 Felix Gollnhuber.
