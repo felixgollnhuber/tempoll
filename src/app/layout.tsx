@@ -24,6 +24,7 @@ const headingFont = Space_Grotesk({
 });
 
 const defaultLogoSrc = "/tempoll-logo.png";
+const browserTitleBrand = "tempoll.app";
 const hasDefaultLogo = existsSync(
   path.join(process.cwd(), "public", "tempoll-logo.png"),
 );
@@ -33,8 +34,8 @@ export async function generateMetadata(): Promise<Metadata> {
 
   return {
     title: {
-      default: appConfig.appName,
-      template: `%s · ${appConfig.appName}`,
+      default: browserTitleBrand,
+      template: `%s · ${browserTitleBrand}`,
     },
     description: messages.metadata.description,
     icons: {
