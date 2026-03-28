@@ -36,7 +36,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const { messages } = await getServerI18n();
 
   return {
-    title: `${messages.metadata.homeTitle} · tempoll.app`,
+    title: messages.metadata.homeTitle,
     description: messages.metadata.description,
   };
 }

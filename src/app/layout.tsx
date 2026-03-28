@@ -8,6 +8,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { appConfig } from "@/lib/config";
 import { I18nProvider } from "@/lib/i18n/context";
 import { getServerI18n } from "@/lib/i18n/server";
+import { buildDefaultMetadata } from "@/lib/site-metadata";
 import { areLegalPagesEnabled } from "@/lib/site-config";
 import { isAppSetupComplete } from "@/lib/setup-state";
 
@@ -24,7 +25,6 @@ const headingFont = Space_Grotesk({
 });
 
 const defaultLogoSrc = "/tempoll-logo.png";
-const browserTitleBrand = "tempoll.app";
 const hasDefaultLogo = existsSync(
   path.join(process.cwd(), "public", "tempoll-logo.png"),
 );
@@ -32,24 +32,7 @@ const hasDefaultLogo = existsSync(
 export async function generateMetadata(): Promise<Metadata> {
   const { messages } = await getServerI18n();
 
-  return {
-    title: {
-      default: browserTitleBrand,
-      template: `%s · ${browserTitleBrand}`,
-    },
-    description: messages.metadata.description,
-    icons: {
-      icon: [
-        { url: "/favicon.ico", sizes: "any", type: "image/x-icon" },
-        { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
-        { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
-        { url: "/icon-192x192.png", sizes: "192x192", type: "image/png" },
-        { url: "/icon-512x512.png", sizes: "512x512", type: "image/png" },
-      ],
-      shortcut: [{ url: "/favicon.ico", type: "image/x-icon" }],
-      apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
-    },
-  };
+  return buildDefaultMetadata(messages);
 }
 
 export default async function RootLayout({

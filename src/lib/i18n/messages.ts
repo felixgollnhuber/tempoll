@@ -2,14 +2,22 @@ import type { AppLocale } from "@/lib/i18n/locale";
 
 export const en = {
   metadata: {
-    description: "A modern, self-hosted When2Meet alternative built with Next.js.",
-    homeTitle: "Home",
+    description:
+      "Free scheduling with live availability heatmaps. Create an event, share a link, and let people join with just a name.",
+    homeTitle: "Free scheduling",
     newEventTitle: "New event",
     setupTitle: "Setup",
     imprintTitle: "Imprint",
     privacyTitle: "Privacy",
     notFoundTitle: "Not found",
     manageTitle: "Manage event",
+    shareTitle: "tempoll | Free scheduling without accounts",
+    shareImageAlt:
+      "tempoll share card highlighting free scheduling, no accounts, and live availability heatmaps.",
+    eventShareDescription: "Join {title} on tempoll. Free to use, no account needed.",
+    managePrivateTitle: "Private organizer page",
+    managePrivateDescription:
+      "This is a private tempoll organizer link. Keep it safe and do not share it publicly.",
   },
   languageSwitcher: {
     label: "Language",
@@ -44,16 +52,16 @@ export const en = {
     newEvent: "New event",
     recentEvents: "Recent events",
     footerDescription:
-      "{appName} is a self-hostable, realtime scheduling board for modern teams.",
+      "{appName} is a free scheduling board with live availability heatmaps, and self-hostable if you want it.",
     featureRequest: "Feature request or suggestion",
     imprint: "Imprint",
     privacy: "Privacy",
   },
   home: {
-    badge: "Self-hosted, realtime, account-free",
-    title: "The clearer alternative to When2Meet.",
+    badge: "Free to use, no account required",
+    title: "The free, no-account alternative to When2Meet.",
     description:
-      "Create an event, share the link, and let people paint their availability on a live heatmap. The organizer gets a private manage page and everyone else can join with just a name.",
+      "Create an event, share the link, and let everyone paint availability on a live heatmap. Organizers get a private manage page, participants join with just a name, and tempoll stays free to use.",
     primaryCta: "Create an event",
     secondaryCta: "Recent events",
     features: {
@@ -80,19 +88,19 @@ export const en = {
     },
     highlights: {
       asyncCollaboration: {
-        title: "Designed for async collaboration",
+        title: "Free to use",
         description:
-          "Participants can join in seconds, paint over their free time, and see the shared shape emerge in real time.",
+          "Create boards, share links, and coordinate without paywalls, seats, or setup friction.",
       },
       selfHosting: {
-        title: "Built for self-hosting",
+        title: "Join with just a name",
         description:
-          "Prisma, Postgres and a Docker or Coolify deployment path keep the stack operationally simple and fully yours.",
+          "Participants can jump straight into the heatmap while organizers keep a separate private manage link.",
       },
       modernTeams: {
-        title: "Made for modern teams",
+        title: "Live heatmap, clearer picks",
         description:
-          "Clear hierarchy, strong mobile behavior and ranked time windows keep the decision process compact.",
+          "Watch overlap build in real time and let the strongest meeting windows rise to the top automatically.",
       },
     },
   },
@@ -563,14 +571,22 @@ export type Messages = WidenMessages<typeof en>;
 
 export const de: Messages = {
   metadata: {
-    description: "Eine moderne, selbst gehostete When2Meet-Alternative auf Basis von Next.js.",
-    homeTitle: "Startseite",
+    description:
+      "Kostenlose Terminfindung mit Live-Heatmaps. Erstelle ein Event, teile einen Link und lass Menschen nur mit einem Namen beitreten.",
+    homeTitle: "Kostenlose Terminfindung",
     newEventTitle: "Neues Event",
     setupTitle: "Setup",
     imprintTitle: "Impressum",
     privacyTitle: "Datenschutz",
     notFoundTitle: "Nicht gefunden",
     manageTitle: "Event verwalten",
+    shareTitle: "tempoll | Kostenlose Terminfindung ohne Konto",
+    shareImageAlt:
+      "tempoll Share-Card mit Fokus auf kostenlose Terminfindung ohne Konto und Live-Heatmaps.",
+    eventShareDescription: "Tritt {title} auf tempoll bei. Kostenlos nutzbar, ohne Konto.",
+    managePrivateTitle: "Private Verwaltungsseite",
+    managePrivateDescription:
+      "Dies ist ein privater tempoll-Verwaltungslink. Bitte nicht öffentlich teilen.",
   },
   languageSwitcher: {
     label: "Sprache",
@@ -605,16 +621,16 @@ export const de: Messages = {
     newEvent: "Neues Event",
     recentEvents: "Letzte Events",
     footerDescription:
-      "{appName} ist ein selbst hostbares Echtzeit-Planungsboard für moderne Teams.",
+      "{appName} ist ein kostenloses Planungsboard mit Live-Heatmaps und bei Bedarf auch selbst hostbar.",
     featureRequest: "Feature-Wunsch oder Vorschlag",
     imprint: "Impressum",
     privacy: "Datenschutz",
   },
   home: {
-    badge: "Self-hosted, in Echtzeit, ohne Konto",
-    title: "Die übersichtliche Alternative zu When2Meet.",
+    badge: "Kostenlos nutzbar, ohne Konto",
+    title: "Die kostenlose Alternative zu When2Meet ohne Konto.",
     description:
-      "Erstelle ein Event, teile den Link und lass alle ihre Verfügbarkeit direkt auf einer Live-Heatmap markieren. Die organisierende Person erhält eine private Verwaltungsseite, alle anderen steigen nur mit einem Namen ein.",
+      "Erstelle ein Event, teile den Link und lass alle ihre Verfügbarkeit direkt auf einer Live-Heatmap markieren. Die organisierende Person erhält eine private Verwaltungsseite, alle anderen steigen nur mit einem Namen ein, und tempoll bleibt kostenlos nutzbar.",
     primaryCta: "Event erstellen",
     secondaryCta: "Letzte Events",
     features: {
@@ -641,19 +657,19 @@ export const de: Messages = {
     },
     highlights: {
       asyncCollaboration: {
-        title: "Für asynchrone Zusammenarbeit gebaut",
+        title: "Kostenlos nutzbar",
         description:
-          "Teilnehmende können in Sekunden beitreten, freie Zeiten markieren und live sehen, wie sich die gemeinsame Verfügbarkeit entwickelt.",
+          "Erstelle Boards, teile Links und koordiniere ohne Paywall, Lizenzen oder Setup-Hürden.",
       },
       selfHosting: {
-        title: "Für Self-Hosting gemacht",
+        title: "Beitritt nur mit Namen",
         description:
-          "Prisma, Postgres sowie Deployment über Docker oder Coolify halten den Stack operativ einfach und vollständig in deiner Hand.",
+          "Teilnehmende springen direkt in die Heatmap, während die organisierende Person einen separaten privaten Verwaltungslink behält.",
       },
       modernTeams: {
-        title: "Für moderne Teams gemacht",
+        title: "Live-Heatmap, klarere Auswahl",
         description:
-          "Klare Hierarchie, gutes mobiles Verhalten und gerankte Zeitfenster halten die Entscheidungsfindung kompakt.",
+          "Sieh live, wo Überschneidungen entstehen, und lass die besten Meeting-Zeitfenster automatisch nach oben rutschen.",
       },
     },
   },
