@@ -360,15 +360,15 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
   );
 
   return (
-    <div className="space-y-6">
-      <Card>
+    <div className="space-y-8">
+      <Card className="overflow-hidden">
         <CardHeader>
           <CardTitle className="text-3xl">{messages.manageEvent.title}</CardTitle>
           <CardDescription>
             {messages.manageEvent.description}
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-6 md:grid-cols-2">
+        <CardContent className="grid gap-x-6 gap-y-5 lg:grid-cols-2 lg:items-end">
           <div className="space-y-2">
             <Label htmlFor="title">{messages.manageEvent.titleLabel}</Label>
             <Input id="title" value={title} onChange={(event) => setTitle(event.target.value)} />
@@ -388,7 +388,7 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-3 md:col-span-2">
+          <div className="space-y-3 lg:col-span-2">
             <Button
               onClick={updateEvent}
               disabled={isPending || isClosingWithoutFixedDate}
@@ -406,8 +406,8 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-start">
-        <aside className="order-1 min-w-0 space-y-6 xl:order-2">
+      <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start">
+        <aside className="order-1 min-w-0 space-y-5 xl:order-2">
           <Card>
             <CardHeader>
               <CardTitle>{messages.manageEvent.shareLinksTitle}</CardTitle>
