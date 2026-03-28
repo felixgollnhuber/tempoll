@@ -387,6 +387,12 @@ If you change the Prisma schema or Prisma-related setup, also run:
 pnpm prisma:generate
 ```
 
+### Community and security
+
+- Contribution policy: [CONTRIBUTING.md](./CONTRIBUTING.md) (currently issues-first)
+- Community conduct: [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)
+- Security reporting: [SECURITY.md](./SECURITY.md)
+
 ### Important maintainer notes
 
 - This repo targets `Next.js 16`. Do not assume older Next.js conventions. Read the relevant guide in `node_modules/next/dist/docs/` before making framework-level changes.
