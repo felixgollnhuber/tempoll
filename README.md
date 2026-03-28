@@ -3,6 +3,7 @@
 An account-free, self-hosted When2Meet alternative for modern teams.
 
 > Create the board. Share the link. Find the overlap.
+The repository is ready for GitHub-based deployment with Coolify using the included [`docker-compose.yaml`](./docker-compose.yaml).
 
 tempoll lets an organizer create a scheduling board, share one public link, and collect availability on a live heatmap. Participants join with just a name. The organizer gets a private manage URL to rename or remove participants and open or close the event.
 
@@ -67,6 +68,14 @@ That non-default `55432` port is intentional to avoid common Postgres collisions
 ```bash
 cp .env.example .env
 ```
+### Open-source safety notes
+
+- `.env.example` and `.env.coolify.example` intentionally contain placeholders and local-only example values. Do not commit your real `.env`.
+- Participant edit links are consumed server-side and immediately redirected to the canonical event URL, so raw participant tokens do not remain in the rendered page URL.
+- Organizer links are bearer secrets. They are stored only in browser-local recent history and are visibly marked as private in the UI.
+- Run `pnpm security:scan-secrets` and `pnpm security:audit` before publishing changes.
+
+### Local Postgres example
 
 2. Start a local Postgres instance however you prefer. Example with Docker:
 

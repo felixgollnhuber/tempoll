@@ -65,7 +65,18 @@ export function parseParticipantCookieValue(value: string | undefined) {
 }
 
 export function getParticipantCookieName(slug: string) {
-  return `tempoll_session_${slug}`;
+  const prefix = process.env.NODE_ENV === "production" ? "__Host-" : "";
+  return `${prefix}tempoll_session_${slug}`;
+}
+
+export function getParticipantCookieOptions(maxAge: number) {
+  return {
+    httpOnly: true,
+    maxAge,
+    path: "/",
+    sameSite: "strict" as const,
+    secure: process.env.NODE_ENV === "production",
+  };
 }
 
 export function pickParticipantColor(index: number) {
@@ -78,11 +89,4 @@ export function buildPublicEventUrl(slug: string) {
 
 export function buildManageUrl(manageKey: string) {
   return `${appConfig.appUrl}/manage/${manageKey}`;
-}
-
-export function buildParticipantEditUrl(slug: string, participantId: string, token: string) {
-  const url = new URL(`/e/${slug}`, appConfig.appUrl);
-  url.searchParams.set("participantId", participantId);
-  url.searchParams.set("token", token);
-  return url.toString();
 }
