@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -27,13 +27,9 @@ export function AppChrome({
 }: AppChromeProps) {
   const pathname = usePathname();
   const hideChrome = !setupComplete && pathname === "/setup";
-  const [logoFailed, setLogoFailed] = useState(false);
+  const [failedLogoSrc, setFailedLogoSrc] = useState<string | null>(null);
 
-  useEffect(() => {
-    setLogoFailed(false);
-  }, [logoSrc]);
-
-  const showLogo = Boolean(logoSrc) && !logoFailed;
+  const showLogo = Boolean(logoSrc) && failedLogoSrc !== logoSrc;
 
   if (hideChrome) {
     return <>{children}</>;
@@ -52,7 +48,7 @@ export function AppChrome({
                 src={logoSrc}
                 alt={appName}
                 className="h-7 w-auto shrink-0"
-                onError={() => setLogoFailed(true)}
+                onError={() => setFailedLogoSrc(logoSrc)}
               />
             ) : (
               appName
