@@ -396,5 +396,8 @@ describe("PublicEventClient", () => {
     expect(firstCell).toHaveAttribute("data-final-slot-start", "true");
     expect(firstCell).toHaveAttribute("data-final-slot-window", "true");
     expect(secondCell).toHaveAttribute("data-final-slot-window", "true");
+    expect(firstCell.className).toContain("bg-amber-100");
+    expect(secondCell.className).toContain("bg-amber-100");
+    expect(firstCell.className).toBe(secondCell.className);
   });
 });

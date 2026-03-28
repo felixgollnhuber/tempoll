@@ -55,7 +55,10 @@ type EventHeatmapProps = {
   onFinalSlotSelect?: (slotStart: string) => void;
   sessionBadgeLabel?: string | null;
   showModeToggle?: boolean;
+  showSidebar?: boolean;
   sidebarTopContent?: ReactNode;
+  activeParticipantId?: string | null;
+  onActiveParticipantChange?: (participantId: string | null) => void;
   getDescription?: (options: DescriptionOptions) => string;
 };
 
@@ -110,14 +113,12 @@ function getActiveViewSelectionClass(isActive: boolean) {
   return "ring-2 ring-inset ring-foreground/20";
 }
 
-function getFinalizedSlotClass(options: { isInFinalSlotWindow: boolean; isFinalSlotStart: boolean }) {
-  if (!options.isInFinalSlotWindow) {
+function getFinalizedSlotClass(isInFinalSlotWindow: boolean) {
+  if (!isInFinalSlotWindow) {
     return "";
   }
 
-  return options.isFinalSlotStart
-    ? "shadow-[inset_0_0_0_9999px_rgba(245,158,11,0.38)] ring-2 ring-inset ring-amber-600"
-    : "shadow-[inset_0_0_0_9999px_rgba(245,158,11,0.18)] ring-1 ring-inset ring-amber-500/70";
+  return "bg-amber-100 ring-1 ring-inset ring-amber-600/80";
 }
 
 function getParticipantHighlightStyle({
@@ -266,11 +267,16 @@ export function EventHeatmap({
   onFinalSlotSelect,
   sessionBadgeLabel = null,
   showModeToggle = true,
+  showSidebar = true,
   sidebarTopContent,
+  activeParticipantId: activeParticipantIdProp,
+  onActiveParticipantChange,
   getDescription,
 }: EventHeatmapProps) {
   const [activeSlotKey, setActiveSlotKey] = useState<string | null>(null);
-  const [activeParticipantId, setActiveParticipantId] = useState<string | null>(null);
+  const [internalActiveParticipantId, setInternalActiveParticipantId] = useState<string | null>(
+    null,
+  );
   const [gridContainerWidth, setGridContainerWidth] = useState(0);
   const [visibleDateStartIndex, setVisibleDateStartIndex] = useState(0);
   const gridContainerRef = useRef<HTMLDivElement | null>(null);
@@ -278,6 +284,8 @@ export function EventHeatmap({
   const effectiveSelectedMap = selectedMap ?? getSelectedMap(snapshot);
   const supportsPainting = canEdit && Boolean(onUpdateCell);
   const currentParticipantId = snapshot.currentParticipant?.id ?? null;
+  const activeParticipantId =
+    activeParticipantIdProp === undefined ? internalActiveParticipantId : activeParticipantIdProp;
   const cellHeightClass = getCellHeightClass(snapshot.slotMinutes);
   const slotStartSelections = useMemo(
     () =>
@@ -343,9 +351,12 @@ export function EventHeatmap({
       (participant) => participant.id === activeParticipantId,
     );
     if (!participantExists) {
-      setActiveParticipantId(null);
+      if (activeParticipantIdProp === undefined) {
+        setInternalActiveParticipantId(null);
+      }
+      onActiveParticipantChange?.(null);
     }
-  }, [activeParticipantId, snapshot.participants]);
+  }, [activeParticipantId, activeParticipantIdProp, onActiveParticipantChange, snapshot.participants]);
 
   const slotMap = useMemo(
     () =>
@@ -639,7 +650,13 @@ export function EventHeatmap({
   );
 
   function toggleParticipantHighlight(participantId: string) {
-    setActiveParticipantId((current) => (current === participantId ? null : participantId));
+    const nextParticipantId = activeParticipantId === participantId ? null : participantId;
+
+    if (activeParticipantIdProp === undefined) {
+      setInternalActiveParticipantId(nextParticipantId);
+    }
+
+    onActiveParticipantChange?.(nextParticipantId);
   }
 
   function participantList() {
@@ -747,7 +764,7 @@ export function EventHeatmap({
                 ) : null}
                 {finalizedSlot ? (
                   <span className="inline-flex items-center gap-1">
-                    <span className="size-3 rounded-[3px] shadow-[inset_0_0_0_9999px_rgba(245,158,11,0.24)] ring-1 ring-inset ring-amber-500/70" />
+                    <span className="size-3 rounded-[3px] bg-amber-100 ring-1 ring-inset ring-amber-600/80" />
                     fixed date
                   </span>
                 ) : null}
@@ -770,19 +787,21 @@ export function EventHeatmap({
                     {sessionBadgeLabel}
                   </Badge>
                 ) : null}
-                <Sheet>
-                  <SheetTrigger asChild>
-                    <Button variant="outline" size="sm" className="xl:hidden">
-                      Participants
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent side="bottom" className="max-h-[80vh] rounded-t-xl">
-                    <SheetHeader>
-                      <SheetTitle>Participants</SheetTitle>
-                    </SheetHeader>
-                    <div className="pb-6">{participantList()}</div>
-                  </SheetContent>
-                </Sheet>
+                {showSidebar ? (
+                  <Sheet>
+                    <SheetTrigger asChild>
+                      <Button variant="outline" size="sm" className="xl:hidden">
+                        Participants
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent side="bottom" className="max-h-[80vh] rounded-t-xl">
+                      <SheetHeader>
+                        <SheetTitle>Participants</SheetTitle>
+                      </SheetHeader>
+                      <div className="pb-6">{participantList()}</div>
+                    </SheetContent>
+                  </Sheet>
+                ) : null}
               </div>
             </div>
           </CardHeader>
@@ -939,13 +958,10 @@ export function EventHeatmap({
                               mode === "edit" && supportsPainting
                                 ? "cursor-crosshair touch-none hover:brightness-[0.98]"
                                 : "cursor-pointer hover:brightness-[0.99]",
-                              getHeatColor(slot.availabilityCount),
+                              isInFinalSlotWindow ? "" : getHeatColor(slot.availabilityCount),
                               getCurrentUserSelectionClass(showCurrentUserSelection),
                               getActiveViewSelectionClass(isActiveViewSlot),
-                              getFinalizedSlotClass({
-                                isInFinalSlotWindow,
-                                isFinalSlotStart,
-                              }),
+                              getFinalizedSlotClass(isInFinalSlotWindow),
                             )}
                             style={getParticipantHighlightStyle({
                               isHighlighted: isHighlightedParticipantAvailable,
@@ -1102,19 +1118,21 @@ export function EventHeatmap({
         </Card>
       </div>
 
-      <aside className="hidden min-w-0 space-y-4 xl:block">
-        {sidebarTopContent}
+      {showSidebar ? (
+        <aside className="hidden min-w-0 space-y-4 xl:block">
+          {sidebarTopContent}
 
-        <Card>
-          <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-sm">Participants</CardTitle>
-            <CardDescription className="text-xs">
-              Click a participant to highlight their availability on the grid.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-4 pt-0">{participantList()}</CardContent>
-        </Card>
-      </aside>
+          <Card>
+            <CardHeader className="p-4 pb-2">
+              <CardTitle className="text-sm">Participants</CardTitle>
+              <CardDescription className="text-xs">
+                Click a participant to highlight their availability on the grid.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-4 pt-0">{participantList()}</CardContent>
+          </Card>
+        </aside>
+      ) : null}
     </div>
   );
 }
