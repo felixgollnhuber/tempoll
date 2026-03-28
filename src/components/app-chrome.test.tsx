@@ -50,4 +50,32 @@ describe("AppChrome", () => {
     expect(screen.queryByAltText("tempoll")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "tempoll" })).toHaveTextContent("tempoll");
   });
+
+  it("shows a new logo again after a previous logo failed", () => {
+    const { rerender } = render(
+      <AppChrome
+        appName="tempoll"
+        logoSrc="/tempoll-logo.png"
+        setupComplete
+        legalPagesEnabled={false}
+      >
+        <div>content</div>
+      </AppChrome>,
+    );
+
+    fireEvent.error(screen.getByAltText("tempoll"));
+
+    rerender(
+      <AppChrome
+        appName="tempoll"
+        logoSrc="/tempoll-logo-2.png"
+        setupComplete
+        legalPagesEnabled={false}
+      >
+        <div>content</div>
+      </AppChrome>,
+    );
+
+    expect(screen.getByAltText("tempoll")).toHaveAttribute("src", "/tempoll-logo-2.png");
+  });
 });
