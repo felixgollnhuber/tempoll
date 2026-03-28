@@ -41,36 +41,57 @@ export function AppChrome({
   return (
     <>
       <header className="border-b bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-        <div className="app-shell flex h-16 items-center justify-between gap-4">
+        <div className="app-shell flex min-h-16 flex-wrap items-center justify-between gap-x-2 gap-y-3 py-3 sm:flex-nowrap sm:gap-4">
           <Link
             href="/"
-            className="inline-flex items-center text-lg font-semibold tracking-tight"
+            className="inline-flex shrink-0 items-center text-base font-semibold tracking-tight sm:text-lg"
           >
             {showLogo && logoSrc ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={logoSrc}
                 alt={appName}
-                className="h-7 w-auto shrink-0"
+                className="block h-7 w-auto shrink-0"
                 onError={() => setFailedLogoSrc(logoSrc)}
               />
             ) : (
               appName
             )}
           </Link>
-          <nav className="flex items-center gap-2">
-            <LanguageSwitcher className="h-9 min-w-28" />
+          <nav className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1.5 sm:flex-nowrap sm:gap-2">
+            <LanguageSwitcher
+              className="h-9 min-w-16 px-2.5 text-xs sm:min-w-28 sm:px-3 sm:text-sm"
+              compactLabel
+            />
             <Link
               href="/new"
-              className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
+              aria-label={messages.appChrome.newEvent}
+              className={cn(
+                buttonVariants({ variant: "ghost" }),
+                "h-9 px-3 text-xs sm:px-4 sm:text-sm",
+              )}
             >
-              {messages.appChrome.newEvent}
+              <span aria-hidden="true" className="sm:hidden">
+                {messages.appChrome.newEventCompact}
+              </span>
+              <span aria-hidden="true" className="hidden sm:inline">
+                {messages.appChrome.newEvent}
+              </span>
             </Link>
             <Link
               href="/#recent-events"
-              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+              aria-label={messages.appChrome.recentEvents}
+              className={cn(
+                buttonVariants({ variant: "outline" }),
+                "h-9 px-3 text-xs sm:px-4 sm:text-sm",
+              )}
             >
-              {messages.appChrome.recentEvents}
+              <span aria-hidden="true" className="sm:hidden">
+                {messages.appChrome.recentEventsCompact}
+              </span>
+              <span aria-hidden="true" className="hidden sm:inline">
+                {messages.appChrome.recentEvents}
+              </span>
             </Link>
           </nav>
         </div>

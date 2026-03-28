@@ -17,12 +17,17 @@ const oneYearInSeconds = 60 * 60 * 24 * 365;
 
 type LanguageSwitcherProps = {
   className?: string;
+  compactLabel?: boolean;
 };
 
-export function LanguageSwitcher({ className }: LanguageSwitcherProps) {
+export function LanguageSwitcher({
+  className,
+  compactLabel = false,
+}: LanguageSwitcherProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const { locale, messages } = useI18n();
+  const currentLocaleLabel = getLocaleLabel(messages.languageSwitcher, locale);
 
   function handleValueChange(nextLocale: string) {
     if (nextLocale === locale) {
@@ -42,7 +47,18 @@ export function LanguageSwitcher({ className }: LanguageSwitcherProps) {
         className={className}
         disabled={isPending}
       >
-        <SelectValue />
+        {compactLabel ? (
+          <>
+            <span aria-hidden="true" className="sm:hidden">
+              {getCompactLocaleLabel(locale)}
+            </span>
+            <span aria-hidden="true" className="hidden sm:inline">
+              {currentLocaleLabel}
+            </span>
+          </>
+        ) : (
+          <SelectValue />
+        )}
       </SelectTrigger>
       <SelectContent>
         {supportedLocales.map((supportedLocale) => (
@@ -63,4 +79,8 @@ function getLocaleLabel(
   locale: AppLocale,
 ) {
   return locale === "de" ? labels.de : labels.en;
+}
+
+function getCompactLocaleLabel(locale: AppLocale) {
+  return locale.toUpperCase();
 }
