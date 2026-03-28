@@ -144,9 +144,33 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## Practical workflow reminders
 
+- CI parity matters here:
+  - the GitHub `verify` job currently runs, in order:
+    - `pnpm lint`
+    - `pnpm typecheck`
+    - `pnpm test:run`
+    - `pnpm prisma:generate`
+    - `pnpm build`
+    - `docker build -t tempoll-debug .`
+  - do not assume `pnpm build` or targeted tests are enough; ESLint can still fail on React hook rules that typecheck and tests will not catch
+- A real recent failure came from exactly that pattern:
+  - a UI/layout change passed targeted tests, typecheck, and build
+  - but CI still failed because `pnpm lint` caught `react-hooks/set-state-in-effect`
+  - lesson: when touching React components, hooks, effects, or state synchronization, always run `pnpm lint` before considering the task done
+- Local verification commands:
+  - `pnpm verify` mirrors the non-Docker part of the GitHub `verify` workflow and should be the default pre-PR / pre-review check for substantive changes
+  - `pnpm verify:ci` adds the Docker build and is the closest local equivalent to the full `verify` job
 - If Codex creates a new git branch, the branch name must be English-only.
   - use English slugs even when the user writes in German
   - do not create German branch names like `codex/passe-viewmodemarkierung-an`
+- If changing React UI logic, hooks, effects, or organizer/public flows, re-run at minimum:
+  - `pnpm lint`
+  - `pnpm typecheck`
+  - the most relevant `pnpm test:run ...` slice for the touched area
+- Before opening a PR or declaring the work ready for review, prefer:
+  - `pnpm verify`
+- Before opening a PR for deployment-sensitive changes, or when touching Docker / Prisma / build pipeline behavior, prefer:
+  - `pnpm verify:ci`
 - If changing deployment-related files, re-run at minimum:
   - `pnpm build`
   - `docker build -t tempoll-debug .`

@@ -239,7 +239,7 @@ export const en = {
     statusClosed: "Closed",
     participantsTitle: "Participants",
     participantsDescription:
-      "Rename participants for clarity or remove accidental entries.",
+      "Click a row to highlight availability. Rename participants or remove accidental entries.",
     shareLinksTitle: "Share links",
     shareLinksDescription:
       "Keep the organizer link private. The public link is safe to share.",
@@ -807,7 +807,7 @@ export const de: Messages = {
     statusClosed: "Geschlossen",
     participantsTitle: "Teilnehmende",
     participantsDescription:
-      "Benenne Teilnehmende zur besseren Übersicht um oder entferne versehentliche Einträge.",
+      "Klicke auf eine Zeile, um die Verfügbarkeit hervorzuheben. Benenne Teilnehmende zur besseren Übersicht um oder entferne versehentliche Einträge.",
     shareLinksTitle: "Links teilen",
     shareLinksDescription:
       "Halte den Organizer-Link privat. Der öffentliche Link kann sicher geteilt werden.",
