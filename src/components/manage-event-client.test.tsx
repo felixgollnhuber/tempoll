@@ -1,7 +1,8 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { ManageEventClient } from "./manage-event-client";
+import { renderWithI18n } from "@/test/render-with-i18n";
 import type { ManageEventView } from "@/lib/types";
 
 function createManageView(options?: {
@@ -94,7 +95,7 @@ function createManageView(options?: {
 describe("ManageEventClient", () => {
   it("keeps long share links wrappable inside the sidebar cards", () => {
     const view = createManageView();
-    render(<ManageEventClient initialView={view} />);
+    renderWithI18n(<ManageEventClient initialView={view} />);
 
     expect(screen.getByText(view.shareUrl).className).toContain("[overflow-wrap:anywhere]");
     expect(screen.getByText(view.manageUrl).className).toContain("[overflow-wrap:anywhere]");
@@ -102,7 +103,7 @@ describe("ManageEventClient", () => {
 
   it("places share links and the organizer sidebar stack before the heatmap in DOM order", () => {
     const view = createManageView();
-    render(<ManageEventClient initialView={view} />);
+    renderWithI18n(<ManageEventClient initialView={view} />);
 
     const shareLinksHeading = screen.getByText("Share links");
     const bestWindowsHeading = screen.getByText("Best windows right now");
@@ -126,7 +127,7 @@ describe("ManageEventClient", () => {
 
   it("renders the heatmap and lets the organizer select a fixed date on closed events", () => {
     const view = createManageView({ status: "CLOSED" });
-    render(<ManageEventClient initialView={view} />);
+    renderWithI18n(<ManageEventClient initialView={view} />);
 
     expect(screen.getByText("Availability")).toBeInTheDocument();
 
@@ -142,8 +143,10 @@ describe("ManageEventClient", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Set fixed date" }));
 
-    expect(screen.getByText("Fixed date")).toBeInTheDocument();
-    expect(screen.getByText(/Thu, Apr 2.*09:00.*10:00/i)).toBeInTheDocument();
+    const fixedDateCard = screen.getByText("Fixed date").closest("[data-slot='card']");
+
+    expect(fixedDateCard).not.toBeNull();
+    expect(within(fixedDateCard as HTMLElement).getByText(/Thu, Apr 2.*09:00.*10:00/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
   });
 
@@ -160,7 +163,7 @@ describe("ManageEventClient", () => {
         participantIds: ["participant_1", "participant_2"],
       },
     });
-    render(<ManageEventClient initialView={view} />);
+    renderWithI18n(<ManageEventClient initialView={view} />);
 
     expect(screen.getByText("Fixed date")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Add to calendar (.ics)" })).toHaveAttribute(
@@ -171,7 +174,7 @@ describe("ManageEventClient", () => {
 
   it("combines participant management and highlighting in one sidebar card", () => {
     const view = createManageView();
-    render(<ManageEventClient initialView={view} />);
+    renderWithI18n(<ManageEventClient initialView={view} />);
 
     const participantRow = screen
       .getAllByRole("button", {
@@ -204,7 +207,7 @@ describe("ManageEventClient", () => {
       participantIds: [],
     }));
 
-    render(<ManageEventClient initialView={view} />);
+    renderWithI18n(<ManageEventClient initialView={view} />);
 
     expect(screen.queryByText("Best windows right now")).not.toBeInTheDocument();
   });

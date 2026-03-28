@@ -31,11 +31,18 @@ describe("GET /api/events/[slug]/ics", () => {
     });
 
     const { GET } = await import("./route");
-    const response = await GET(new Request("https://tempoll.example.com/api/events/team-sync/ics"), {
-      params: Promise.resolve({
-        slug: "team-sync",
+    const response = await GET(
+      new Request("https://tempoll.example.com/api/events/team-sync/ics", {
+        headers: {
+          "Accept-Language": "en-US",
+        },
       }),
-    });
+      {
+        params: Promise.resolve({
+          slug: "team-sync",
+        }),
+      },
+    );
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/calendar");
@@ -60,11 +67,18 @@ describe("GET /api/events/[slug]/ics", () => {
     });
 
     const { GET } = await import("./route");
-    const response = await GET(new Request("https://tempoll.example.com/api/events/team-sync/ics"), {
-      params: Promise.resolve({
-        slug: "team-sync",
+    const response = await GET(
+      new Request("https://tempoll.example.com/api/events/team-sync/ics", {
+        headers: {
+          "Accept-Language": "en-US",
+        },
       }),
-    });
+      {
+        params: Promise.resolve({
+          slug: "team-sync",
+        }),
+      },
+    );
 
     expect(response.status).toBe(404);
     await expect(response.json()).resolves.toEqual({

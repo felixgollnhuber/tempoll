@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ManageEventClient } from "@/components/manage-event-client";
 import { RecentEventTracker } from "@/components/recent-event-tracker";
 import { getManageEventView } from "@/lib/event-service";
+import { getServerI18n } from "@/lib/i18n/server";
 
 type ManagePageProps = {
   params: Promise<{
@@ -14,7 +15,8 @@ export const dynamic = "force-dynamic";
 
 export default async function ManagePage({ params }: ManagePageProps) {
   const { token } = await params;
-  const view = await getManageEventView(token);
+  const { locale } = await getServerI18n();
+  const view = await getManageEventView(token, locale);
 
   if (!view) {
     notFound();

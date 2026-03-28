@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { deleteParticipant } from "@/lib/event-service";
+import { createI18n, getLocaleFromRequest } from "@/lib/i18n/server";
 import { handleRouteError, MANAGE_RESPONSE_HEADERS } from "@/lib/security";
 import { getClientIp } from "@/lib/request";
 import { enforceRateLimit } from "@/lib/rate-limit";
@@ -13,6 +14,8 @@ type Context = {
 };
 
 export async function DELETE(_request: Request, { params }: Context) {
+  const i18n = createI18n(getLocaleFromRequest(_request));
+
   try {
     const { token, participantId } = await params;
     const ip = getClientIp(_request);
@@ -20,7 +23,7 @@ export async function DELETE(_request: Request, { params }: Context) {
     enforceRateLimit(`manage-mutation:${token}:${ip}`, {
       limit: 60,
       windowMs: 10 * 60 * 1000,
-      message: "Too many organizer actions. Please wait a bit and try again.",
+      code: "organizer_action_rate_limited",
     });
 
     await deleteParticipant(token, participantId);
@@ -32,7 +35,8 @@ export async function DELETE(_request: Request, { params }: Context) {
     );
   } catch (error) {
     return handleRouteError(error, {
-      fallbackMessage: "Unable to remove participant.",
+      fallbackMessage: i18n.messages.errors.routeFallbacks.removeParticipant,
+      messages: i18n.messages,
       route: "api/manage/[token]/participants/[participantId]",
       headers: MANAGE_RESPONSE_HEADERS,
     });

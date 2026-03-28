@@ -1,4 +1,5 @@
 import { isAppSetupComplete } from "@/lib/setup-state";
+import { isSupportedLocale, type AppLocale } from "@/lib/i18n/locale";
 
 function getEnv(name: string) {
   const value = process.env[name]?.trim();
@@ -15,9 +16,24 @@ function getRequiredConfiguredEnv(name: string, fallback?: string) {
   return value ?? "";
 }
 
+function getConfiguredLocaleEnv(name: string, fallback: AppLocale) {
+  const value = getEnv(name);
+
+  if (!value) {
+    return fallback;
+  }
+
+  if (!isSupportedLocale(value)) {
+    throw new Error(`${name} must be one of: de, en.`);
+  }
+
+  return value;
+}
+
 export const appConfig = {
   appName: getRequiredConfiguredEnv("APP_NAME", "tempoll"),
   appUrl: getRequiredConfiguredEnv("APP_URL", "http://localhost:3000"),
+  defaultLocale: getConfiguredLocaleEnv("APP_DEFAULT_LOCALE", "de"),
   defaultSlotMinutes: 30,
   defaultMeetingDurationMinutes: 60,
   defaultDayStartMinutes: 9 * 60,

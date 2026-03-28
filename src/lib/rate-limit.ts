@@ -40,7 +40,7 @@ export function enforceRateLimit(
   options: {
     limit: number;
     windowMs: number;
-    message: string;
+    code: string;
   },
 ) {
   const now = Date.now();
@@ -59,7 +59,7 @@ export function enforceRateLimit(
 
   if (bucket.count >= options.limit) {
     const retryAfterSeconds = Math.max(1, Math.ceil((bucket.resetAt - now) / 1000));
-    throw tooManyRequests(options.message, retryAfterSeconds);
+    throw tooManyRequests(options.code, retryAfterSeconds);
   }
 
   bucket.count += 1;
@@ -69,7 +69,7 @@ export function acquireConcurrencySlot(
   key: string,
   options: {
     limit: number;
-    message: string;
+    code: string;
     retryAfterSeconds?: number;
   },
 ) {
@@ -77,7 +77,7 @@ export function acquireConcurrencySlot(
   const current = counters.get(key) ?? 0;
 
   if (current >= options.limit) {
-    throw tooManyRequests(options.message, options.retryAfterSeconds ?? 30);
+    throw tooManyRequests(options.code, options.retryAfterSeconds ?? 30);
   }
 
   counters.set(key, current + 1);

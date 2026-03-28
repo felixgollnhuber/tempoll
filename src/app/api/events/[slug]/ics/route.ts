@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getPublicEventSnapshot } from "@/lib/event-service";
+import { createI18n, getLocaleFromRequest } from "@/lib/i18n/server";
 import { buildEventCalendarFile } from "@/lib/ics";
 import { PUBLIC_NO_STORE_HEADERS, mergeHeaders } from "@/lib/security";
 import { buildPublicEventUrl } from "@/lib/tokens";
@@ -13,13 +14,14 @@ type Context = {
 
 export const dynamic = "force-dynamic";
 
-export async function GET(_request: Request, { params }: Context) {
+export async function GET(request: Request, { params }: Context) {
+  const i18n = createI18n(getLocaleFromRequest(request));
   const { slug } = await params;
-  const event = await getPublicEventSnapshot(slug);
+  const event = await getPublicEventSnapshot(slug, i18n.locale);
 
   if (!event || event.snapshot.status !== "CLOSED" || !event.snapshot.finalizedSlot) {
     return NextResponse.json(
-      { error: "Event not found." },
+      { error: i18n.messages.errors.routeFallbacks.eventNotFound },
       {
         status: 404,
         headers: mergeHeaders(PUBLIC_NO_STORE_HEADERS),

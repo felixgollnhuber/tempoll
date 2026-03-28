@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 
 import { appConfig } from "@/lib/config";
+import type { AppLocale } from "@/lib/i18n/locale";
 import { prisma } from "@/lib/prisma";
 import {
   buildSnapshot,
@@ -107,12 +108,14 @@ async function getEventWithRelationsById(id: string) {
 
 function toSnapshot(
   event: EventWithRelations,
+  locale: AppLocale,
   currentParticipantId?: string | null,
 ): PublicEventSnapshot {
   return buildSnapshot({
     id: event.id,
     slug: event.slug,
     title: event.title,
+    locale,
     timezone: event.timezone,
     status: event.status,
     slotMinutes: event.slotMinutes,
@@ -215,7 +218,11 @@ export async function createEvent(input: EventCreateInput): Promise<CreateEventR
   };
 }
 
-export async function getPublicEventSnapshot(slug: string, cookieValue?: string) {
+export async function getPublicEventSnapshot(
+  slug: string,
+  locale: AppLocale,
+  cookieValue?: string,
+) {
   const [event, participant] = await Promise.all([
     getEventWithRelationsBySlug(slug),
     getParticipantForSession(slug, cookieValue),
@@ -226,7 +233,7 @@ export async function getPublicEventSnapshot(slug: string, cookieValue?: string)
   }
 
   return {
-    snapshot: toSnapshot(event, participant?.id),
+    snapshot: toSnapshot(event, locale, participant?.id),
     participant: participant
       ? {
           id: participant.id,
@@ -253,11 +260,11 @@ export async function joinParticipant(slug: string, displayName: string) {
   });
 
   if (!event) {
-    throw notFound("Event not found.");
+    throw notFound("event_not_found");
   }
 
   if (event.status === "CLOSED") {
-    throw conflict("This event is closed.", "event_closed");
+    throw conflict("event_closed");
   }
 
   const normalizedName = normalizeName(displayName);
@@ -284,7 +291,7 @@ export async function joinParticipant(slug: string, displayName: string) {
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      throw conflict("That name is already taken for this event.", "participant_name_taken");
+      throw conflict("participant_name_taken");
     }
 
     throw error;
@@ -313,10 +320,7 @@ async function verifyParticipantMutation(slug: string, cookieValue?: string) {
   const participant = await getParticipantForSession(slug, cookieValue);
 
   if (!participant) {
-    throw unauthorized(
-      "Your editing session is no longer valid. Reopen your participant link or join the event again.",
-      "participant_session_missing",
-    );
+    throw unauthorized("participant_session_missing");
   }
 
   const participantWithDates = await prisma.participant.findUnique({
@@ -335,11 +339,11 @@ async function verifyParticipantMutation(slug: string, cookieValue?: string) {
   });
 
   if (!participantWithDates || participantWithDates.event.slug !== slug) {
-    throw notFound("Participant not found.");
+    throw notFound("participant_not_found");
   }
 
   if (participantWithDates.event.status === "CLOSED") {
-    throw conflict("This event is closed.", "event_closed");
+    throw conflict("event_closed");
   }
 
   return participantWithDates;
@@ -347,6 +351,7 @@ async function verifyParticipantMutation(slug: string, cookieValue?: string) {
 
 export async function saveAvailability(
   slug: string,
+  locale: AppLocale,
   mutation: AvailabilityBatchMutation,
   cookieValue?: string,
 ) {
@@ -362,7 +367,7 @@ export async function saveAvailability(
   const uniqueSlotStarts = Array.from(new Set(mutation.selectedSlotStarts));
   const invalidSlot = uniqueSlotStarts.find((slotStart) => !allowedSlots.has(slotStart));
   if (invalidSlot) {
-    throw conflict("One or more selected slots are outside the event window.", "invalid_slots");
+    throw conflict("invalid_slots");
   }
 
   await prisma.$transaction([
@@ -394,7 +399,7 @@ export async function saveAvailability(
 
   const event = await getEventWithRelationsById(participant.eventId);
   if (!event) {
-    throw notFound("Event not found.");
+    throw notFound("event_not_found");
   }
 
   await publishEventUpdate({
@@ -404,32 +409,35 @@ export async function saveAvailability(
   });
 
   return {
-    snapshot: toSnapshot(event, participant.id),
+    snapshot: toSnapshot(event, locale, participant.id),
   };
 }
 
 async function verifyManageKey(manageKey: string) {
   const parsed = parseManageKey(manageKey);
   if (!parsed) {
-    throw notFound("Event not found.", "manage_key_invalid");
+    throw notFound("manage_key_invalid");
   }
 
   const event = await getEventWithRelationsById(parsed.eventId);
   if (!event) {
-    throw notFound("Event not found.", "manage_key_invalid");
+    throw notFound("manage_key_invalid");
   }
 
   if (event.manageTokenHash !== hashSecret(parsed.token)) {
-    throw notFound("Event not found.", "manage_key_invalid");
+    throw notFound("manage_key_invalid");
   }
 
   return event;
 }
 
-export async function getManageEventView(manageKey: string): Promise<ManageEventView | null> {
+export async function getManageEventView(
+  manageKey: string,
+  locale: AppLocale,
+): Promise<ManageEventView | null> {
   try {
     const event = await verifyManageKey(manageKey);
-    const snapshot = toSnapshot(event);
+    const snapshot = toSnapshot(event, locale);
 
     return {
       manageKey,
@@ -464,10 +472,7 @@ export async function updateManagedEvent(
 
     if (input.status === "CLOSED") {
       if (!input.finalSlotStart) {
-        throw conflict(
-          "Pick a fixed date before closing this event.",
-          "final_slot_required",
-        );
+        throw conflict("final_slot_required");
       }
 
       const allowedFinalSlotStarts = getAllowedFinalSlotStarts({
@@ -480,10 +485,7 @@ export async function updateManagedEvent(
       });
 
       if (!allowedFinalSlotStarts.has(input.finalSlotStart)) {
-        throw conflict(
-          "Pick a valid fixed date that fits the full meeting duration.",
-          "final_slot_invalid",
-        );
+        throw conflict("final_slot_invalid");
       }
 
       finalSlotStartAt = new Date(input.finalSlotStart);
@@ -512,7 +514,7 @@ export async function updateManagedEvent(
     });
 
     if (!participant || participant.eventId !== event.id) {
-      throw notFound("Participant not found.");
+      throw notFound("participant_not_found");
     }
 
     try {
@@ -527,7 +529,7 @@ export async function updateManagedEvent(
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-        throw conflict("That name is already taken for this event.", "participant_name_taken");
+        throw conflict("participant_name_taken");
       }
 
       throw error;
@@ -552,7 +554,7 @@ export async function deleteParticipant(manageKey: string, participantId: string
   });
 
   if (deleted.count === 0) {
-    throw notFound("Participant not found.");
+    throw notFound("participant_not_found");
   }
 
   await publishEventUpdate({

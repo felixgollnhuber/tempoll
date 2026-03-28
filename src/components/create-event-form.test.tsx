@@ -1,8 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { readCreateEventDefaults } from "@/lib/create-event-defaults";
+import type { AppLocale } from "@/lib/i18n/locale";
+import { renderWithI18n } from "@/test/render-with-i18n";
 import { CreateEventForm } from "./create-event-form";
 
 const push = vi.fn();
@@ -28,9 +30,10 @@ const defaultTimeOptions = [
   { value: 18 * 60, label: "18:00" },
 ];
 
-function renderCreateEventForm() {
-  return render(
+function renderCreateEventForm(locale: AppLocale = "en") {
+  return renderWithI18n(
     <CreateEventForm timezones={defaultTimezones} timeOptions={defaultTimeOptions} />,
+    { locale },
   );
 }
 
@@ -40,6 +43,13 @@ beforeEach(() => {
 });
 
 describe("CreateEventForm", () => {
+  it("renders localized German labels when requested", () => {
+    renderCreateEventForm("de");
+
+    expect(screen.getByLabelText("Event-Titel")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Event erstellen" })).toBeInTheDocument();
+  });
+
   it("shows a friendly inline title validation message before submitting", () => {
     const fetchMock = vi.fn();
     global.fetch = fetchMock as typeof fetch;

@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 
 import { updateManagedEvent } from "@/lib/event-service";
+import { createI18n, getLocaleFromRequest } from "@/lib/i18n/server";
 import { handleRouteError, MANAGE_RESPONSE_HEADERS } from "@/lib/security";
 import { getClientIp } from "@/lib/request";
 import { enforceRateLimit } from "@/lib/rate-limit";
-import { manageUpdateSchema } from "@/lib/validators";
+import { createManageUpdateSchema } from "@/lib/validators";
 
 type Context = {
   params: Promise<{
@@ -13,6 +14,8 @@ type Context = {
 };
 
 export async function PATCH(request: Request, { params }: Context) {
+  const i18n = createI18n(getLocaleFromRequest(request));
+
   try {
     const { token } = await params;
     const ip = getClientIp(request);
@@ -20,11 +23,11 @@ export async function PATCH(request: Request, { params }: Context) {
     enforceRateLimit(`manage-mutation:${token}:${ip}`, {
       limit: 60,
       windowMs: 10 * 60 * 1000,
-      message: "Too many organizer actions. Please wait a bit and try again.",
+      code: "organizer_action_rate_limited",
     });
 
     const json = await request.json();
-    const input = manageUpdateSchema.parse(json);
+    const input = createManageUpdateSchema(i18n.messages).parse(json);
 
     await updateManagedEvent(token, input);
 
@@ -36,7 +39,8 @@ export async function PATCH(request: Request, { params }: Context) {
     );
   } catch (error) {
     return handleRouteError(error, {
-      fallbackMessage: "Unable to update event.",
+      fallbackMessage: i18n.messages.errors.routeFallbacks.updateEvent,
+      messages: i18n.messages,
       route: "api/manage/[token]",
       headers: MANAGE_RESPONSE_HEADERS,
     });

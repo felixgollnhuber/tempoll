@@ -23,20 +23,15 @@ import {
   type SetupWizardValues,
   validateSetupValues,
 } from "@/lib/setup";
+import { useI18n } from "@/lib/i18n/context";
 
 type SetupWizardProps = {
   initialValues: SetupWizardValues;
 };
 
-const stepLabels = [
-  "App basics",
-  "Infrastructure",
-  "Operator details",
-  "Legal and privacy",
-  "Review and export",
-];
-
 export function SetupWizard({ initialValues }: SetupWizardProps) {
+  const { messages, format } = useI18n();
+  const stepLabels = messages.setupWizard.steps;
   const [step, setStep] = useState(0);
   const [values, setValues] = useState(initialValues);
   const [errors, setErrors] = useState<SetupWizardErrors>({});
@@ -55,7 +50,7 @@ export function SetupWizard({ initialValues }: SetupWizardProps) {
 
   function validateCurrentStep() {
     const fields = getStepFieldNames(step);
-    const nextErrors = validateSetupValues(values, fields);
+    const nextErrors = validateSetupValues(values, fields, messages.validation.setup);
     setErrors((current) => ({
       ...current,
       ...nextErrors,
@@ -66,7 +61,7 @@ export function SetupWizard({ initialValues }: SetupWizardProps) {
 
   async function copyEnv() {
     await navigator.clipboard.writeText(envPreview);
-    toast.success("Copied app config");
+    toast.success(messages.setupWizard.copiedAppConfig);
   }
 
   function renderInput(
@@ -88,7 +83,9 @@ export function SetupWizard({ initialValues }: SetupWizardProps) {
       <div className="space-y-2">
         <Label htmlFor={name}>
           {label}
-          {options?.optional ? <span className="ml-2 text-xs text-muted-foreground">Optional</span> : null}
+          {options?.optional ? (
+            <span className="ml-2 text-xs text-muted-foreground">{messages.common.optional}</span>
+          ) : null}
         </Label>
         {options?.multiline ? (
           <Textarea {...sharedProps} className="min-h-28" />
@@ -106,12 +103,32 @@ export function SetupWizard({ initialValues }: SetupWizardProps) {
     if (step === 0) {
       return (
         <div className="grid gap-4">
-          {renderInput("appName", "App name", {
+          {renderInput("appName", messages.setupWizard.appName, {
             placeholder: "tempoll",
           })}
-          {renderInput("appUrl", "Public app URL", {
-            placeholder: "https://meet.example.com",
+          {renderInput("appUrl", messages.setupWizard.publicAppUrl, {
+            placeholder: messages.setupWizard.placeholders.appUrl,
           })}
+          <div className="space-y-2">
+            <Label htmlFor="appDefaultLocale">{messages.setupWizard.defaultLanguage}</Label>
+            <Select
+              value={values.appDefaultLocale}
+              onValueChange={(value) =>
+                updateValue("appDefaultLocale", value as SetupWizardValues["appDefaultLocale"])
+              }
+            >
+              <SelectTrigger id="appDefaultLocale">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="de">{messages.languageSwitcher.de}</SelectItem>
+                <SelectItem value="en">{messages.languageSwitcher.en}</SelectItem>
+              </SelectContent>
+            </Select>
+            {errors.appDefaultLocale ? (
+              <p className="text-sm text-destructive">{errors.appDefaultLocale}</p>
+            ) : null}
+          </div>
         </div>
       );
     }
@@ -120,43 +137,47 @@ export function SetupWizard({ initialValues }: SetupWizardProps) {
       return (
         <div className="grid gap-4">
           <div className="rounded-lg border bg-muted/20 p-4">
-            <h3 className="text-sm font-medium text-foreground">Bundled Postgres infrastructure</h3>
+            <h3 className="text-sm font-medium text-foreground">
+              {messages.setupWizard.infrastructure.title}
+            </h3>
             <p className="mt-2 text-sm text-muted-foreground">
-              tempoll uses the bundled Postgres service from the Docker Compose stack. The database
-              password is managed by Coolify and is never entered, shown, or exported by this
-              browser wizard. On a fresh stack, Coolify generates the password before the first
-              Postgres initialization.
+              {messages.setupWizard.infrastructure.description}
             </p>
           </div>
 
           <div className="grid gap-3 md:grid-cols-3">
             <div className="rounded-lg border bg-muted/15 px-4 py-3 text-sm text-muted-foreground">
-              <div className="font-medium text-foreground">Database name</div>
+              <div className="font-medium text-foreground">
+                {messages.setupWizard.infrastructure.databaseName}
+              </div>
               <div className="mt-1 font-mono text-xs">TEMPOLL_DB_NAME</div>
             </div>
             <div className="rounded-lg border bg-muted/15 px-4 py-3 text-sm text-muted-foreground">
-              <div className="font-medium text-foreground">Database user</div>
+              <div className="font-medium text-foreground">
+                {messages.setupWizard.infrastructure.databaseUser}
+              </div>
               <div className="mt-1 font-mono text-xs">TEMPOLL_DB_USER</div>
             </div>
             <div className="rounded-lg border bg-muted/15 px-4 py-3 text-sm text-muted-foreground">
-              <div className="font-medium text-foreground">Generated password</div>
+              <div className="font-medium text-foreground">
+                {messages.setupWizard.infrastructure.generatedPassword}
+              </div>
               <div className="mt-1 font-mono text-xs">SERVICE_PASSWORD_TEMPOLL_DB</div>
             </div>
           </div>
 
           <div className="rounded-lg border border-dashed bg-muted/15 px-4 py-3 text-sm text-muted-foreground">
-            Keep these infrastructure variables in Coolify. This setup wizard only exports
-            non-secret app and legal configuration, and the Docker Compose stack derives
+            {messages.setupWizard.infrastructure.keepInCoolifyPrefix}{" "}
             <code className="mx-1 rounded bg-muted px-1 py-0.5 text-xs">DATABASE_URL</code>
-            internally.
+            {messages.setupWizard.infrastructure.keepInCoolifySuffix}
           </div>
 
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-100">
-            If you already have a persistent Postgres volume, make sure
+            {messages.setupWizard.infrastructure.volumeWarningPrefix}{" "}
             <code className="mx-1 rounded bg-amber-100 px-1 py-0.5 text-xs dark:bg-amber-950/40">
               SERVICE_PASSWORD_TEMPOLL_DB
             </code>
-            matches the current live database password before redeploying.
+            {messages.setupWizard.infrastructure.volumeWarningSuffix}
           </div>
         </div>
       );
@@ -167,10 +188,9 @@ export function SetupWizard({ initialValues }: SetupWizardProps) {
         <div className="grid gap-4 md:grid-cols-2">
           <div className="md:col-span-2 space-y-3 rounded-lg border bg-muted/20 p-4">
             <div className="space-y-1">
-              <Label htmlFor="legalPagesEnabled">Legal pages</Label>
+              <Label htmlFor="legalPagesEnabled">{messages.setupWizard.operator.legalPages}</Label>
               <p className="text-sm text-muted-foreground">
-                Keep imprint and privacy pages disabled if you do not want to publish legal details
-                directly on the site. You can still share sensitive details on request.
+                {messages.setupWizard.operator.legalPagesDescription}
               </p>
             </div>
             <Select
@@ -181,30 +201,31 @@ export function SetupWizard({ initialValues }: SetupWizardProps) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="false">Disabled</SelectItem>
-                <SelectItem value="true">Enabled</SelectItem>
+                <SelectItem value="false">{messages.setupWizard.operator.disabled}</SelectItem>
+                <SelectItem value="true">{messages.setupWizard.operator.enabled}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          {renderInput("operatorLegalName", "Legal name", { optional: true })}
-          {renderInput("operatorDisplayName", "Display name", { optional: true })}
+          {renderInput("operatorLegalName", messages.setupWizard.operator.legalName, { optional: true })}
+          {renderInput("operatorDisplayName", messages.setupWizard.operator.displayName, { optional: true })}
           <div className="md:col-span-2">
-            {renderInput("operatorStreetAddress", "Street address", { optional: true })}
+            {renderInput("operatorStreetAddress", messages.setupWizard.operator.streetAddress, {
+              optional: true,
+            })}
           </div>
-          {renderInput("operatorPostalCode", "Postal code", { optional: true })}
-          {renderInput("operatorCity", "City", { optional: true })}
-          {renderInput("operatorCountry", "Country", { optional: true })}
-          {renderInput("operatorEmail", "Contact email", { optional: true })}
-          {renderInput("operatorPhone", "Phone", { optional: true })}
-          {renderInput("operatorWebsite", "Website", {
-            placeholder: "https://example.com",
+          {renderInput("operatorPostalCode", messages.setupWizard.operator.postalCode, { optional: true })}
+          {renderInput("operatorCity", messages.setupWizard.operator.city, { optional: true })}
+          {renderInput("operatorCountry", messages.setupWizard.operator.country, { optional: true })}
+          {renderInput("operatorEmail", messages.setupWizard.operator.contactEmail, { optional: true })}
+          {renderInput("operatorPhone", messages.setupWizard.operator.phone, { optional: true })}
+          {renderInput("operatorWebsite", messages.setupWizard.operator.website, {
+            placeholder: messages.setupWizard.placeholders.website,
             optional: true,
           })}
           {!legalPagesEnabled ? (
             <div className="md:col-span-2 rounded-lg border border-dashed bg-muted/15 px-4 py-3 text-sm text-muted-foreground">
-              Legal pages are currently disabled. All details on this step are optional and can be
-              left blank.
+              {messages.setupWizard.operator.detailsOptional}
             </div>
           ) : null}
         </div>
@@ -215,32 +236,30 @@ export function SetupWizard({ initialValues }: SetupWizardProps) {
       return (
         <div className="grid gap-4">
           <div className="rounded-lg border bg-muted/20 p-4 text-sm text-muted-foreground">
-            Everything on this step is optional. If you leave fields empty, the public legal pages
-            will either omit them or use a generic “available on request” note.
+            {messages.setupWizard.privacy.optionalDescription}
           </div>
-          {renderInput("operatorBusinessPurpose", "Business purpose", {
-            placeholder: "Operation of a self-hosted scheduling web application.",
+          {renderInput("operatorBusinessPurpose", messages.setupWizard.privacy.businessPurpose, {
+            placeholder: messages.setupWizard.placeholders.businessPurpose,
             optional: true,
           })}
-          {renderInput("mediaOwner", "Media owner", { optional: true })}
-          {renderInput("editorialLine", "Editorial line", {
-            placeholder: "Information about the software project and scheduling boards operated via this service.",
+          {renderInput("mediaOwner", messages.setupWizard.privacy.mediaOwner, { optional: true })}
+          {renderInput("editorialLine", messages.setupWizard.privacy.editorialLine, {
+            placeholder: messages.setupWizard.placeholders.editorialLine,
             optional: true,
           })}
-          {renderInput("privacyContactEmail", "Privacy contact email", {
+          {renderInput("privacyContactEmail", messages.setupWizard.privacy.privacyContactEmail, {
             optional: true,
-            placeholder: "Leave empty to reuse the main contact email",
+            placeholder: messages.setupWizard.privacy.leaveEmptyToReuse,
           })}
-          {renderInput("hostingDescription", "Hosting description", {
+          {renderInput("hostingDescription", messages.setupWizard.privacy.hostingDescription, {
             multiline: true,
-            placeholder:
-              "Self-hosted via Coolify on infrastructure operated by the controller and selected hosting providers.",
+            placeholder: messages.setupWizard.placeholders.hostingDescription,
             optional: true,
           })}
-          {renderInput("privacyProcessors", "Processors / infrastructure partners", {
+          {renderInput("privacyProcessors", messages.setupWizard.privacy.processors, {
             multiline: true,
             optional: true,
-            placeholder: "One entry per line, e.g.\nCoolify\nHetzner\nCloudflare",
+            placeholder: messages.setupWizard.placeholders.processors,
           })}
         </div>
       );
@@ -249,24 +268,25 @@ export function SetupWizard({ initialValues }: SetupWizardProps) {
     return (
       <div className="space-y-4">
         <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
-          Copy this app configuration into Coolify, keep the infrastructure database variables
-          unchanged, and redeploy the app. The setup wizard will disappear automatically afterwards.
+          {messages.setupWizard.review.descriptionPrefix}
           {values.legalPagesEnabled === "true"
-            ? " Imprint and privacy pages are enabled."
-            : " Imprint and privacy pages will stay disabled until you opt in."}
+            ? messages.setupWizard.review.descriptionEnabled
+            : messages.setupWizard.review.descriptionDisabled}
         </div>
         <div className="rounded-lg border border-dashed bg-muted/15 p-4 text-sm text-muted-foreground">
-          This export intentionally does not contain
+          {messages.setupWizard.review.exportWarningPrefix}{" "}
           <code className="mx-1 rounded bg-muted px-1 py-0.5 text-xs">DATABASE_URL</code>
-          or any database password. Keep
+          {messages.setupWizard.review.exportWarningMiddle}{" "}
           <code className="mx-1 rounded bg-muted px-1 py-0.5 text-xs">TEMPOLL_DB_NAME</code>,
           <code className="mx-1 rounded bg-muted px-1 py-0.5 text-xs">TEMPOLL_DB_USER</code>,
-          and
+          {" "}
+          {messages.common.and ?? "and"}{" "}
           <code className="mx-1 rounded bg-muted px-1 py-0.5 text-xs">SERVICE_PASSWORD_TEMPOLL_DB</code>
-          managed separately in Coolify.
+          {" "}
+          {messages.setupWizard.review.exportWarningSuffix}
         </div>
         <div className="space-y-2">
-          <Label htmlFor="envPreview">Generated app config</Label>
+          <Label htmlFor="envPreview">{messages.setupWizard.review.generatedAppConfig}</Label>
           <Textarea
             id="envPreview"
             readOnly
@@ -282,9 +302,9 @@ export function SetupWizard({ initialValues }: SetupWizardProps) {
     <div className="grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
       <Card>
         <CardHeader>
-          <CardTitle>Setup steps</CardTitle>
+          <CardTitle>{messages.setupWizard.setupStepsTitle}</CardTitle>
           <CardDescription>
-            This wizard generates the non-secret app configuration for your self-hosted deployment.
+            {messages.setupWizard.setupStepsDescription}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
@@ -315,20 +335,24 @@ export function SetupWizard({ initialValues }: SetupWizardProps) {
             {stepLabels[step]}
           </CardTitle>
           <CardDescription>
-            Fill in the fields below. All values stay in your browser until you copy the generated
-            app config snippet.
+            {messages.setupWizard.fillFieldsDescription}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {renderStep()}
 
           <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="text-sm text-muted-foreground">Step {step + 1} of {stepLabels.length}</div>
+            <div className="text-sm text-muted-foreground">
+              {format(messages.setupWizard.stepProgress, {
+                current: step + 1,
+                total: stepLabels.length,
+              })}
+            </div>
             <div className="flex items-center gap-2">
               {step > 0 ? (
                 <Button variant="outline" onClick={() => setStep((current) => current - 1)}>
                   <ArrowLeftIcon className="size-4" />
-                  Back
+                  {messages.common.back}
                 </Button>
               ) : null}
 
@@ -340,13 +364,13 @@ export function SetupWizard({ initialValues }: SetupWizardProps) {
                     }
                   }}
                 >
-                  Next
+                  {messages.common.next}
                   <ArrowRightIcon className="size-4" />
                 </Button>
               ) : (
                 <Button onClick={() => void copyEnv()}>
                   <CopyIcon className="size-4" />
-                  Copy .env
+                  {messages.setupWizard.review.copyEnv}
                 </Button>
               )}
             </div>

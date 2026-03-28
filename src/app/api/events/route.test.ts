@@ -26,7 +26,7 @@ describe("POST /api/events", () => {
 
   it("returns a 429 with Retry-After when the create-event limit is exceeded", async () => {
     enforceRateLimit.mockImplementation(() => {
-      throw tooManyRequests("Too many event creation attempts. Please wait a few minutes and try again.", 900);
+      throw tooManyRequests("event_create_rate_limited", 900);
     });
 
     const { POST } = await import("./route");
@@ -43,6 +43,7 @@ describe("POST /api/events", () => {
           meetingDurationMinutes: 60,
         }),
         headers: {
+          "Accept-Language": "en-US",
           "Content-Type": "application/json",
         },
       }),
