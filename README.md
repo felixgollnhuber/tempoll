@@ -221,10 +221,29 @@ Health checks stay available at `/api/health`, even while setup is incomplete.
 | `APP_NAME` | Yes | Product name shown in the UI. Defaults to `tempoll`. |
 | `APP_URL` | Yes | Canonical public base URL used for generated links. |
 | `LEGAL_PAGES_ENABLED` | No | Enables `/imprint` and `/privacy`. Defaults to `false`. |
+| `DATAFAST_WEBSITE_ID` | No | Enables optional DataFast tracking when set together with `DATAFAST_DOMAIN`. |
+| `DATAFAST_DOMAIN` | No | Domain sent to DataFast when optional tracking is enabled. |
 | `DATABASE_URL` | Local dev or external DB only | Direct database connection string. |
 | `TEMPOLL_DB_NAME` | Compose/Coolify | Bundled Postgres database name. |
 | `TEMPOLL_DB_USER` | Compose/Coolify | Bundled Postgres database user. |
 | `SERVICE_PASSWORD_TEMPOLL_DB` | Compose/Coolify | Bundled Postgres password secret. Use an underscore, not a hyphen. |
+
+### Optional DataFast analytics (cookieless)
+
+DataFast tracking is disabled by default. It is enabled only when **both** variables are set:
+
+```env
+DATAFAST_WEBSITE_ID=dfid_8DiCXWOXKydljn0usEGZE
+DATAFAST_DOMAIN=tempoll.app
+```
+
+Implementation details in this repository:
+
+- Script source: `https://datafa.st/js/script.cookieless.js`
+- Loaded globally from the root layout via `next/script` (`afterInteractive`)
+- Event endpoint proxied through `POST /api/datafast/events`
+- Organizer routes (`/manage/[token]`) are filtered and not forwarded to DataFast
+- CSP already allows `https://datafa.st` in `script-src` and `connect-src`
 
 ### Optional legal and privacy variables
 
@@ -313,6 +332,7 @@ The cleanup logic in [`src/lib/realtime.ts`](./src/lib/realtime.ts) matters. Clo
 | `POST /api/events/[slug]/participants` | Join an event with a name and establish an edit session |
 | `PUT /api/events/[slug]/availability` | Save availability for the current participant |
 | `GET /api/events/[slug]/stream` | Subscribe to realtime event updates via SSE |
+| `POST /api/datafast/events` | Proxy/filter optional DataFast analytics events |
 | `PATCH /api/manage/[token]` | Update event status/title or rename a participant |
 | `DELETE /api/manage/[token]/participants/[participantId]` | Remove a participant |
 | `GET /api/health` | Health check that remains available before setup completes |

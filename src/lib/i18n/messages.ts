@@ -463,7 +463,7 @@ export const en = {
     controller: "Controller",
     whatDataIsProcessed: "What data is processed",
     whatDataIsProcessedDescription:
-      "The service is intentionally small and avoids account creation or marketing tracking.",
+      "The service is intentionally small, does not require user accounts, and avoids advertising technologies.",
     purposesAndLegalBases: "Purposes and legal bases",
     cookiesAndLocalStorage: "Cookies and local storage",
     recipientsAndHosting: "Recipients and hosting",
@@ -505,7 +505,7 @@ export const en = {
     cookiesParagraph1:
       "The application uses technically necessary browser storage only. This includes a participant session cookie or equivalent token handling to allow availability editing, and local browser storage for the optional recent-events list on the home page.",
     cookiesParagraph2:
-      "No analytics, advertising, or other non-essential tracking technologies are included in the current version of the app.",
+      "No advertising or third-party marketing trackers are used. If the operator enables optional privacy-friendly analytics, it is limited to product usage measurement.",
     retentionParagraph1:
       "Event data is stored for as long as the controller keeps the corresponding scheduling boards available. Request logs and operational logs are retained only for as long as needed for security, diagnostics, and infrastructure management.",
     retentionParagraph2:
@@ -1077,7 +1077,7 @@ export const de: Messages = {
     controller: "Verantwortliche Stelle",
     whatDataIsProcessed: "Welche Daten verarbeitet werden",
     whatDataIsProcessedDescription:
-      "Der Dienst ist bewusst schlank gehalten und verzichtet auf Konten und Marketing-Tracking.",
+      "Der Dienst ist bewusst schlank gehalten, benötigt keine Benutzerkonten und verzichtet auf Werbetechnologien.",
     purposesAndLegalBases: "Zwecke und Rechtsgrundlagen",
     cookiesAndLocalStorage: "Cookies und lokaler Speicher",
     recipientsAndHosting: "Empfänger und Hosting",
@@ -1121,7 +1121,7 @@ export const de: Messages = {
     cookiesParagraph1:
       "Die Anwendung verwendet ausschließlich technisch notwendige Browser-Speichermechanismen. Dazu gehören ein Sitzungscookie oder eine vergleichbare Token-Verwaltung für die Bearbeitung von Verfügbarkeiten sowie lokaler Browser-Speicher für die optionale Liste zuletzt besuchter Events auf der Startseite.",
     cookiesParagraph2:
-      "In der aktuellen Version der App sind keine Analyse-, Werbe- oder sonstigen nicht erforderlichen Tracking-Technologien enthalten.",
+      "Es werden keine Werbe- oder sonstigen Drittanbieter-Marketing-Tracker eingesetzt. Falls optional datenschutzfreundliche Analytics vom Betreiber aktiviert werden, dienen sie ausschließlich der Nutzungsanalyse des Produkts.",
     retentionParagraph1:
       "Event-Daten werden so lange gespeichert, wie die verantwortliche Stelle die jeweiligen Planungsboards verfügbar hält. Request-Logs und betriebliche Protokolle werden nur so lange aufbewahrt, wie sie für Sicherheit, Diagnose und Infrastrukturverwaltung benötigt werden.",
     retentionParagraph2:
