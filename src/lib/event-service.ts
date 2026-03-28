@@ -454,10 +454,19 @@ export async function updateManagedEvent(
   manageKey: string,
   input:
     | {
-        action: "updateEvent";
+        action: "updateTitle";
         title: string;
-        status: "OPEN" | "CLOSED";
-        finalSlotStart: string | null;
+      }
+    | {
+        action: "closeEvent";
+        finalSlotStart: string;
+      }
+    | {
+        action: "updateFixedDate";
+        finalSlotStart: string;
+      }
+    | {
+        action: "reopenEvent";
       }
     | {
         action: "renameParticipant";
@@ -467,38 +476,54 @@ export async function updateManagedEvent(
 ) {
   const event = await verifyManageKey(manageKey);
 
-  if (input.action === "updateEvent") {
-    let finalSlotStartAt: Date | null = null;
+  function parseFinalSlotStart(finalSlotStart: string) {
+    const allowedFinalSlotStarts = getAllowedFinalSlotStarts({
+      dates: event.dates.map((date) => date.dateKey),
+      timezone: event.timezone,
+      dayStartMinutes: event.dayStartMinutes,
+      dayEndMinutes: event.dayEndMinutes,
+      slotMinutes: event.slotMinutes,
+      meetingDurationMinutes: event.meetingDurationMinutes,
+    });
 
-    if (input.status === "CLOSED") {
-      if (!input.finalSlotStart) {
-        throw conflict("final_slot_required");
-      }
-
-      const allowedFinalSlotStarts = getAllowedFinalSlotStarts({
-        dates: event.dates.map((date) => date.dateKey),
-        timezone: event.timezone,
-        dayStartMinutes: event.dayStartMinutes,
-        dayEndMinutes: event.dayEndMinutes,
-        slotMinutes: event.slotMinutes,
-        meetingDurationMinutes: event.meetingDurationMinutes,
-      });
-
-      if (!allowedFinalSlotStarts.has(input.finalSlotStart)) {
-        throw conflict("final_slot_invalid");
-      }
-
-      finalSlotStartAt = new Date(input.finalSlotStart);
+    if (!allowedFinalSlotStarts.has(finalSlotStart)) {
+      throw conflict("final_slot_invalid");
     }
 
+    return new Date(finalSlotStart);
+  }
+
+  if (input.action === "updateTitle") {
     await prisma.event.update({
       where: {
         id: event.id,
       },
       data: {
         title: input.title,
-        status: input.status,
-        finalSlotStartAt,
+      },
+    });
+  }
+
+  if (input.action === "closeEvent" || input.action === "updateFixedDate") {
+    await prisma.event.update({
+      where: {
+        id: event.id,
+      },
+      data: {
+        status: "CLOSED",
+        finalSlotStartAt: parseFinalSlotStart(input.finalSlotStart),
+      },
+    });
+  }
+
+  if (input.action === "reopenEvent") {
+    await prisma.event.update({
+      where: {
+        id: event.id,
+      },
+      data: {
+        status: "OPEN",
+        finalSlotStartAt: null,
       },
     });
   }

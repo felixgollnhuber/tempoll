@@ -77,14 +77,23 @@ export function createAvailabilityMutationSchema() {
 export function createManageUpdateSchema(messages: Messages) {
   return z.discriminatedUnion("action", [
     z.object({
-      action: z.literal("updateEvent"),
+      action: z.literal("updateTitle"),
       title: z
         .string()
         .trim()
         .min(3, messages.validation.eventCreate.titleMin)
         .max(80, messages.validation.eventCreate.titleMax),
-      status: z.enum(["OPEN", "CLOSED"]),
-      finalSlotStart: z.string().datetime().nullable(),
+    }),
+    z.object({
+      action: z.literal("closeEvent"),
+      finalSlotStart: z.string().datetime(),
+    }),
+    z.object({
+      action: z.literal("updateFixedDate"),
+      finalSlotStart: z.string().datetime(),
+    }),
+    z.object({
+      action: z.literal("reopenEvent"),
     }),
     z.object({
       action: z.literal("renameParticipant"),

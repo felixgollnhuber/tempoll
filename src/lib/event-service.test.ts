@@ -61,31 +61,12 @@ describe("updateManagedEvent", () => {
     publishEventUpdate.mockResolvedValue(undefined);
   });
 
-  it("requires a fixed date before closing an event", async () => {
-    const { updateManagedEvent } = await import("./event-service");
-
-    await expect(
-      updateManagedEvent("event_1.secret", {
-        action: "updateEvent",
-        title: "Closed title",
-        status: "CLOSED",
-        finalSlotStart: null,
-      }),
-    ).rejects.toMatchObject({
-      code: "final_slot_required",
-    });
-
-    expect(prisma.event.update).not.toHaveBeenCalled();
-  });
-
   it("stores a valid fixed date when closing an event", async () => {
     const { updateManagedEvent } = await import("./event-service");
     const finalSlotStart = buildSlotStart("2026-04-02", 9 * 60, "Europe/Vienna");
 
     await updateManagedEvent("event_1.secret", {
-      action: "updateEvent",
-      title: "Closed title",
-      status: "CLOSED",
+      action: "closeEvent",
       finalSlotStart,
     });
 
@@ -94,22 +75,33 @@ describe("updateManagedEvent", () => {
         id: "event_1",
       },
       data: {
-        title: "Closed title",
         status: "CLOSED",
         finalSlotStartAt: new Date(finalSlotStart),
       },
     });
   });
 
+  it("rejects invalid fixed date updates", async () => {
+    const { updateManagedEvent } = await import("./event-service");
+    const invalidFinalSlotStart = buildSlotStart("2026-04-02", 10 * 60 + 30, "Europe/Vienna");
+
+    await expect(
+      updateManagedEvent("event_1.secret", {
+        action: "updateFixedDate",
+        finalSlotStart: invalidFinalSlotStart,
+      }),
+    ).rejects.toMatchObject({
+      code: "final_slot_invalid",
+    });
+
+    expect(prisma.event.update).not.toHaveBeenCalled();
+  });
+
   it("clears the fixed date when reopening an event", async () => {
     const { updateManagedEvent } = await import("./event-service");
-    const finalSlotStart = buildSlotStart("2026-04-02", 9 * 60, "Europe/Vienna");
 
     await updateManagedEvent("event_1.secret", {
-      action: "updateEvent",
-      title: "Open title",
-      status: "OPEN",
-      finalSlotStart,
+      action: "reopenEvent",
     });
 
     expect(prisma.event.update).toHaveBeenCalledWith({
@@ -117,9 +109,26 @@ describe("updateManagedEvent", () => {
         id: "event_1",
       },
       data: {
-        title: "Open title",
         status: "OPEN",
         finalSlotStartAt: null,
+      },
+    });
+  });
+
+  it("updates only the title when requested", async () => {
+    const { updateManagedEvent } = await import("./event-service");
+
+    await updateManagedEvent("event_1.secret", {
+      action: "updateTitle",
+      title: "Renamed sync",
+    });
+
+    expect(prisma.event.update).toHaveBeenCalledWith({
+      where: {
+        id: "event_1",
+      },
+      data: {
+        title: "Renamed sync",
       },
     });
   });

@@ -5,6 +5,7 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   Clock3Icon,
+  Loader2Icon,
   LockIcon,
   UsersIcon,
 } from "lucide-react";
@@ -52,8 +53,9 @@ type EventHeatmapProps = {
   onUpdateCell?: (dateKey: string, minutes: number, nextValue?: boolean) => boolean;
   displayStatus?: PublicEventSnapshot["status"];
   finalSlotStart: string | null;
-  allowFinalSlotSelection?: boolean;
-  onFinalSlotSelect?: (slotStart: string) => void;
+  showFixedDateAction?: boolean;
+  onFixedDateAction?: (slotStart: string) => void;
+  isFixedDateActionPending?: boolean;
   sessionBadgeLabel?: string | null;
   showModeToggle?: boolean;
   showSidebar?: boolean;
@@ -269,8 +271,9 @@ export function EventHeatmap({
   onUpdateCell,
   displayStatus = snapshot.status,
   finalSlotStart,
-  allowFinalSlotSelection = false,
-  onFinalSlotSelect,
+  showFixedDateAction = false,
+  onFixedDateAction,
+  isFixedDateActionPending = false,
   sessionBadgeLabel = null,
   showModeToggle = true,
   showSidebar = true,
@@ -741,6 +744,7 @@ export function EventHeatmap({
         },
         messages,
       );
+  const shouldShowFixedDateAction = showFixedDateAction && Boolean(onFixedDateAction);
 
   return (
     <div
@@ -1147,7 +1151,7 @@ export function EventHeatmap({
                       </div>
                     </div>
 
-                    {allowFinalSlotSelection ? (
+                    {shouldShowFixedDateAction ? (
                       <div className="rounded-md border bg-background/70 p-3">
                         {activeSlotDetails.isValidFinalSlotStart ? (
                           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1158,18 +1162,30 @@ export function EventHeatmap({
                                 })}
                               </p>
                               <p className="text-xs text-muted-foreground">
-                                {messages.publicEvent.finalSlotFitsDescription}
+                                {displayStatus === "OPEN"
+                                  ? messages.manageEvent.fixedDateActionCloseDescription
+                                  : activeSlotDetails.isFinalSlotStart
+                                    ? messages.manageEvent.fixedDateActionSelectedDescription
+                                    : messages.manageEvent.fixedDateActionUpdateDescription}
                               </p>
                             </div>
                             <Button
                               type="button"
                               size="sm"
                               variant={activeSlotDetails.isFinalSlotStart ? "secondary" : "default"}
-                              onClick={() => onFinalSlotSelect?.(activeSlotDetails.slot.slotStart)}
+                              disabled={
+                                isFixedDateActionPending || activeSlotDetails.isFinalSlotStart
+                              }
+                              onClick={() => onFixedDateAction?.(activeSlotDetails.slot.slotStart)}
                             >
-                              {activeSlotDetails.isFinalSlotStart
-                                ? messages.common.fixedDateSelected
-                                : messages.common.setFixedDate}
+                              {isFixedDateActionPending ? (
+                                <Loader2Icon className="size-4 animate-spin" />
+                              ) : null}
+                              {displayStatus === "OPEN"
+                                ? messages.manageEvent.setFixedDateAndCloseEvent
+                                : activeSlotDetails.isFinalSlotStart
+                                  ? messages.common.fixedDateSelected
+                                  : messages.manageEvent.updateFixedDate}
                             </Button>
                           </div>
                         ) : (
