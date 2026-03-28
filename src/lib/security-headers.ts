@@ -22,11 +22,11 @@ export function buildContentSecurityPolicy(options?: {
 
   return [
     "default-src 'self'",
-    `script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ""}`,
+    `script-src 'self' 'unsafe-inline' https://datafa.st${isDevelopment ? " 'unsafe-eval'" : ""}`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
-    "connect-src 'self'",
+    "connect-src 'self' https://datafa.st",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
