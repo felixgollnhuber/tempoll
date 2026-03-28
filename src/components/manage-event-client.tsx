@@ -33,10 +33,19 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
   const [finalSlotStart, setFinalSlotStart] = useState<string | null>(
     initialView.snapshot.finalizedSlot?.slotStart ?? null,
   );
-  const [activeParticipantId, setActiveParticipantId] = useState<string | null>(null);
+  const [requestedActiveParticipantId, setRequestedActiveParticipantId] = useState<string | null>(
+    null,
+  );
   const [isPending, startTransition] = useTransition();
   const hasAnyAvailability = snapshot.participants.some(
     (participant) => participant.selectedSlotCount > 0,
+  );
+  const activeParticipantId = useMemo(
+    () =>
+      snapshot.participants.some((participant) => participant.id === requestedActiveParticipantId)
+        ? requestedActiveParticipantId
+        : null,
+    [requestedActiveParticipantId, snapshot.participants],
   );
   const draftFinalizedSlot = useMemo(() => {
     if (status !== "CLOSED" || !finalSlotStart) {
@@ -90,19 +99,6 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
 
     return () => eventSource.close();
   }, [initialView.snapshot.slug, refreshSnapshot]);
-
-  useEffect(() => {
-    if (!activeParticipantId) {
-      return;
-    }
-
-    const participantExists = snapshot.participants.some(
-      (participant) => participant.id === activeParticipantId,
-    );
-    if (!participantExists) {
-      setActiveParticipantId(null);
-    }
-  }, [activeParticipantId, snapshot.participants]);
 
   function updateEvent() {
     if (isClosingWithoutFixedDate) {
@@ -181,6 +177,9 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
       }
 
       toast.success("Participant removed");
+      if (participantId === requestedActiveParticipantId) {
+        setRequestedActiveParticipantId(null);
+      }
       await refreshSnapshot();
     });
   }
@@ -275,14 +274,14 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
                 isActive ? "border-foreground/10 bg-background/90 shadow-sm" : "hover:bg-muted/35",
               )}
               onClick={() =>
-                setActiveParticipantId((current) =>
+                setRequestedActiveParticipantId((current) =>
                   current === participant.id ? null : participant.id,
                 )
               }
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
-                  setActiveParticipantId((current) =>
+                  setRequestedActiveParticipantId((current) =>
                     current === participant.id ? null : participant.id,
                   );
                 }
@@ -437,7 +436,7 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
             allowFinalSlotSelection={status === "CLOSED"}
             onFinalSlotSelect={setFinalSlotStart}
             activeParticipantId={activeParticipantId}
-            onActiveParticipantChange={setActiveParticipantId}
+            onActiveParticipantChange={setRequestedActiveParticipantId}
             getDescription={({ usesDateWindowing }) =>
               status === "CLOSED"
                 ? usesDateWindowing
