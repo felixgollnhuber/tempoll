@@ -221,6 +221,7 @@ describe("PublicEventClient", () => {
 
     expect(cell).toHaveAttribute("data-current-user-selected", "true");
     expect(cell.className).toContain("bg-primary/80");
+    expect(cell.className).toContain("outline-primary");
     expect(screen.queryByText("Slot details")).not.toBeInTheDocument();
   });
 
@@ -310,7 +311,7 @@ describe("PublicEventClient", () => {
 
     expect(screen.queryByText("your availability")).not.toBeInTheDocument();
     expect(cell).not.toHaveAttribute("data-current-user-selected");
-    expect(cell.className).not.toContain("outline-primary/85");
+    expect(cell.className).not.toContain("outline-primary");
 
     fireEvent.click(cell);
 

@@ -105,7 +105,7 @@ function getCurrentUserSelectionClass(isSelected: boolean) {
     return "";
   }
 
-  return "outline outline-2 -outline-offset-2 outline-primary/85 ring-2 ring-inset ring-background";
+  return "outline outline-2 -outline-offset-2 outline-primary ring-2 ring-inset ring-background";
 }
 
 function getActiveViewSelectionClass(isActive: boolean) {
@@ -803,7 +803,7 @@ export function EventHeatmap({
                 </span>
                 {supportsPainting && mode === "edit" ? (
                   <span className="inline-flex items-center gap-1">
-                    <span className="size-3 rounded-[3px] bg-primary/24 outline outline-2 -outline-offset-2 outline-primary/85 ring-1 ring-inset ring-background" />
+                    <span className="size-3 rounded-[3px] bg-primary/24 outline outline-2 -outline-offset-2 outline-primary ring-1 ring-inset ring-background" />
                     {messages.publicEvent.legendYourAvailability}
                   </span>
                 ) : null}
