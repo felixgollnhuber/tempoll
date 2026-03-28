@@ -1,24 +1,28 @@
 "use client";
 
 import Link from "next/link";
-import { Loader2Icon, Trash2Icon } from "lucide-react";
+import { Loader2Icon, LockIcon, Trash2Icon, UnlockIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { EventHeatmap } from "@/components/event-heatmap";
 import { CopyButton } from "@/components/copy-button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { buildFinalizedSlot } from "@/lib/availability";
 import { useI18n } from "@/lib/i18n/context";
 import type { ManageEventView, PublicEventSnapshot } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -27,17 +31,27 @@ type ManageEventClientProps = {
   initialView: ManageEventView;
 };
 
+type PendingAction =
+  | "updateTitle"
+  | "closeEvent"
+  | "updateFixedDate"
+  | "reopenEvent"
+  | "renameParticipant"
+  | "removeParticipant";
+
+type RefreshSnapshotOptions = {
+  preserveDirtyTitle?: boolean;
+};
+
 export function ManageEventClient({ initialView }: ManageEventClientProps) {
-  const { messages, format, plural, locale } = useI18n();
+  const { messages, format, plural } = useI18n();
   const [snapshot, setSnapshot] = useState<PublicEventSnapshot>(initialView.snapshot);
   const [title, setTitle] = useState(initialView.snapshot.title);
-  const [status, setStatus] = useState(initialView.snapshot.status);
-  const [finalSlotStart, setFinalSlotStart] = useState<string | null>(
-    initialView.snapshot.finalizedSlot?.slotStart ?? null,
-  );
   const [requestedActiveParticipantId, setRequestedActiveParticipantId] = useState<string | null>(
     null,
   );
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
+  const [isReopenDialogOpen, setIsReopenDialogOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const hasAnyAvailability = snapshot.participants.some(
     (participant) => participant.selectedSlotCount > 0,
@@ -49,156 +63,238 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
         : null,
     [requestedActiveParticipantId, snapshot.participants],
   );
-  const draftFinalizedSlot = useMemo(() => {
-    if (status !== "CLOSED" || !finalSlotStart) {
-      return null;
-    }
+  const savedFinalSlot = snapshot.status === "CLOSED" ? snapshot.finalizedSlot : null;
+  const isTitleDirty = title !== snapshot.title;
+  const manageActionUrl = `/api/manage/${initialView.manageKey}`;
+  const visibleSuggestions = savedFinalSlot
+    ? snapshot.suggestions.filter((suggestion) => suggestion.slotStart !== savedFinalSlot.slotStart)
+    : snapshot.suggestions;
 
-    return buildFinalizedSlot({
-      dates: snapshot.dates.map((date) => date.dateKey),
-      locale,
-      timezone: snapshot.timezone,
-      dayStartMinutes: snapshot.dayStartMinutes,
-      dayEndMinutes: snapshot.dayEndMinutes,
-      slotMinutes: snapshot.slotMinutes,
-      meetingDurationMinutes: snapshot.meetingDurationMinutes,
-      slots: snapshot.slots,
-      finalSlotStart,
-    });
-  }, [
-    finalSlotStart,
-    locale,
-    snapshot.dates,
-    snapshot.dayEndMinutes,
-    snapshot.dayStartMinutes,
-    snapshot.meetingDurationMinutes,
-    snapshot.slotMinutes,
-    snapshot.slots,
-    snapshot.timezone,
-    status,
-  ]);
-  const isClosingWithoutFixedDate = status === "CLOSED" && !draftFinalizedSlot;
+  const refreshSnapshot = useCallback(
+    async ({ preserveDirtyTitle = false }: RefreshSnapshotOptions = {}) => {
+      const response = await fetch(`/api/events/${initialView.snapshot.slug}`, {
+        cache: "no-store",
+      });
 
-  const refreshSnapshot = useCallback(async () => {
-    const response = await fetch(`/api/events/${initialView.snapshot.slug}`, {
-      cache: "no-store",
-    });
+      if (!response.ok) {
+        return;
+      }
 
-    if (!response.ok) {
-      return;
-    }
-
-    const payload = (await response.json()) as { snapshot: PublicEventSnapshot };
-    setSnapshot(payload.snapshot);
-    setTitle(payload.snapshot.title);
-    setStatus(payload.snapshot.status);
-    setFinalSlotStart(payload.snapshot.finalizedSlot?.slotStart ?? null);
-  }, [initialView.snapshot.slug]);
+      const payload = (await response.json()) as { snapshot: PublicEventSnapshot };
+      setSnapshot(payload.snapshot);
+      setTitle((currentTitle) =>
+        preserveDirtyTitle && currentTitle !== snapshot.title ? currentTitle : payload.snapshot.title,
+      );
+    },
+    [initialView.snapshot.slug, snapshot.title],
+  );
 
   useEffect(() => {
     const eventSource = new EventSource(`/api/events/${initialView.snapshot.slug}/stream`);
     eventSource.addEventListener("event-update", () => {
-      void refreshSnapshot();
+      void refreshSnapshot({ preserveDirtyTitle: true });
     });
 
     return () => eventSource.close();
   }, [initialView.snapshot.slug, refreshSnapshot]);
 
-  function updateEvent() {
-    if (isClosingWithoutFixedDate) {
-      toast.error(messages.manageEvent.closeRequiresFixedDate);
+  function performManageAction(
+    action: PendingAction,
+    request: () => Promise<Response>,
+    {
+      errorMessage,
+      onSuccess,
+      preserveDirtyTitleOnRefresh = true,
+      successMessage,
+    }: {
+      successMessage: string;
+      errorMessage: string;
+      preserveDirtyTitleOnRefresh?: boolean;
+      onSuccess?: () => Promise<void> | void;
+    },
+  ) {
+    setPendingAction(action);
+
+    startTransition(async () => {
+      try {
+        const response = await request();
+        const payload = (await response.json()) as { error?: string };
+        if (!response.ok) {
+          toast.error(payload.error ?? errorMessage);
+          return;
+        }
+
+        toast.success(successMessage);
+
+        if (onSuccess) {
+          await onSuccess();
+          return;
+        }
+
+        await refreshSnapshot({
+          preserveDirtyTitle: preserveDirtyTitleOnRefresh,
+        });
+      } finally {
+        setPendingAction(null);
+      }
+    });
+  }
+
+  function saveTitle() {
+    performManageAction(
+      "updateTitle",
+      () =>
+        fetch(manageActionUrl, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            action: "updateTitle",
+            title,
+          }),
+        }),
+      {
+        successMessage: messages.manageEvent.titleSaved,
+        errorMessage: messages.errors.routeFallbacks.updateEvent,
+        preserveDirtyTitleOnRefresh: false,
+      },
+    );
+  }
+
+  function closeEvent(finalSlotStart: string) {
+    performManageAction(
+      "closeEvent",
+      () =>
+        fetch(manageActionUrl, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            action: "closeEvent",
+            finalSlotStart,
+          }),
+        }),
+      {
+        successMessage: messages.manageEvent.eventClosed,
+        errorMessage: messages.errors.routeFallbacks.updateEvent,
+      },
+    );
+  }
+
+  function updateFixedDate(finalSlotStart: string) {
+    performManageAction(
+      "updateFixedDate",
+      () =>
+        fetch(manageActionUrl, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            action: "updateFixedDate",
+            finalSlotStart,
+          }),
+        }),
+      {
+        successMessage: messages.manageEvent.fixedDateUpdated,
+        errorMessage: messages.errors.routeFallbacks.updateEvent,
+      },
+    );
+  }
+
+  function reopenEvent() {
+    performManageAction(
+      "reopenEvent",
+      () =>
+        fetch(manageActionUrl, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            action: "reopenEvent",
+          }),
+        }),
+      {
+        successMessage: messages.manageEvent.eventReopened,
+        errorMessage: messages.errors.routeFallbacks.updateEvent,
+        onSuccess: async () => {
+          setIsReopenDialogOpen(false);
+          await refreshSnapshot({
+            preserveDirtyTitle: true,
+          });
+        },
+      },
+    );
+  }
+
+  function handleFixedDateAction(slotStart: string) {
+    if (snapshot.status === "OPEN") {
+      closeEvent(slotStart);
       return;
     }
 
-    startTransition(async () => {
-      const response = await fetch(`/api/manage/${initialView.manageKey}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          action: "updateEvent",
-          title,
-          status,
-          finalSlotStart: status === "CLOSED" ? finalSlotStart : null,
-        }),
-      });
-
-      const payload = (await response.json()) as { error?: string };
-      if (!response.ok) {
-        toast.error(payload.error ?? messages.errors.routeFallbacks.updateEvent);
-        return;
-      }
-
-      toast.success(messages.manageEvent.eventUpdated);
-      await refreshSnapshot();
-    });
-  }
-
-  function renameParticipant(participantId: string, displayName: string) {
-    startTransition(async () => {
-      const response = await fetch(`/api/manage/${initialView.manageKey}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          action: "renameParticipant",
-          participantId,
-          displayName,
-        }),
-      });
-
-      const payload = (await response.json()) as { error?: string };
-      if (!response.ok) {
-        toast.error(payload.error ?? messages.errors.routeFallbacks.updateEvent);
-        return;
-      }
-
-      toast.success(messages.manageEvent.participantRenamed);
-      setSnapshot((current) => ({
-        ...current,
-        participants: current.participants.map((participant) =>
-          participant.id === participantId ? { ...participant, displayName } : participant,
-        ),
-      }));
-    });
-  }
-
-  function removeParticipant(participantId: string) {
-    startTransition(async () => {
-      const response = await fetch(
-        `/api/manage/${initialView.manageKey}/participants/${participantId}`,
-        {
-          method: "DELETE",
-        },
-      );
-
-      const payload = (await response.json()) as { error?: string };
-      if (!response.ok) {
-        toast.error(payload.error ?? messages.errors.routeFallbacks.removeParticipant);
-        return;
-      }
-
-      toast.success(messages.manageEvent.participantRemoved);
-      if (participantId === requestedActiveParticipantId) {
-        setRequestedActiveParticipantId(null);
-      }
-      await refreshSnapshot();
-    });
-  }
-
-  function handleStatusChange(nextStatus: "OPEN" | "CLOSED") {
-    setStatus(nextStatus);
-    if (nextStatus === "OPEN") {
-      setFinalSlotStart(null);
+    if (savedFinalSlot?.slotStart !== slotStart) {
+      updateFixedDate(slotStart);
     }
   }
 
-  const savedFinalSlot = snapshot.status === "CLOSED" ? snapshot.finalizedSlot : null;
-  const hasSavedFixedDate =
-    Boolean(savedFinalSlot) && savedFinalSlot?.slotStart === draftFinalizedSlot?.slotStart;
-  const bestWindowsCard = hasAnyAvailability ? (
+  function renameParticipant(participantId: string, displayName: string) {
+    performManageAction(
+      "renameParticipant",
+      () =>
+        fetch(manageActionUrl, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            action: "renameParticipant",
+            participantId,
+            displayName,
+          }),
+        }),
+      {
+        successMessage: messages.manageEvent.participantRenamed,
+        errorMessage: messages.errors.routeFallbacks.updateEvent,
+        onSuccess: () => {
+          setSnapshot((current) => ({
+            ...current,
+            participants: current.participants.map((participant) =>
+              participant.id === participantId ? { ...participant, displayName } : participant,
+            ),
+          }));
+        },
+      },
+    );
+  }
+
+  function removeParticipant(participantId: string) {
+    performManageAction(
+      "removeParticipant",
+      () =>
+        fetch(`/api/manage/${initialView.manageKey}/participants/${participantId}`, {
+          method: "DELETE",
+        }),
+      {
+        successMessage: messages.manageEvent.participantRemoved,
+        errorMessage: messages.errors.routeFallbacks.removeParticipant,
+        onSuccess: async () => {
+          if (participantId === requestedActiveParticipantId) {
+            setRequestedActiveParticipantId(null);
+          }
+
+          await refreshSnapshot({
+            preserveDirtyTitle: true,
+          });
+        },
+      },
+    );
+  }
+
+  const bestWindowsCard = hasAnyAvailability && visibleSuggestions.length > 0 ? (
     <Card>
       <CardHeader className="p-4 pb-2">
         <CardTitle className="text-sm">{messages.manageEvent.bestWindowsTitle}</CardTitle>
@@ -209,7 +305,7 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-2 p-4 pt-0">
-        {snapshot.suggestions.map((suggestion, index) => (
+        {visibleSuggestions.map((suggestion, index) => (
           <div key={suggestion.slotStart} className="rounded-md border bg-muted/20 px-3 py-2">
             <p className="text-[11px] font-medium text-muted-foreground">
               {format(messages.common.option, { count: index + 1 })}
@@ -223,50 +319,82 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
       </CardContent>
     </Card>
   ) : null;
-  const fixedDateCard = draftFinalizedSlot ? (
+
+  const statusCard = (
     <Card>
       <CardHeader className="p-4 pb-2">
-        <CardTitle className="text-sm">{messages.common.fixedDate}</CardTitle>
-        <CardDescription className="text-xs">
-          {hasSavedFixedDate
-            ? messages.manageEvent.fixedDatePublishedDescription
-            : messages.manageEvent.fixedDateDraftDescription}
-        </CardDescription>
+        <CardTitle className="text-sm">{messages.manageEvent.eventStatusTitle}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 p-4 pt-0">
-        <div className="rounded-md border bg-muted/20 px-3 py-2">
-          <p className="text-sm font-semibold text-foreground">{draftFinalizedSlot.label}</p>
-          <p className="mt-1 text-[11px] text-muted-foreground">
-            {plural(messages.publicEvent.fullWindowFree, draftFinalizedSlot.availableCount)}
+        <div className="space-y-2">
+          <Badge
+            variant={snapshot.status === "CLOSED" ? "destructive" : "secondary"}
+            className="h-7 w-fit gap-1.5 px-2.5 text-xs"
+          >
+            {snapshot.status === "CLOSED" ? (
+              <LockIcon className="size-3.5" />
+            ) : (
+              <UnlockIcon className="size-3.5" />
+            )}
+            {snapshot.status === "CLOSED"
+              ? messages.manageEvent.statusClosed
+              : messages.manageEvent.statusOpen}
+          </Badge>
+          <p className="text-sm text-muted-foreground">
+            {snapshot.status === "CLOSED"
+              ? messages.manageEvent.statusClosedDescription
+              : messages.manageEvent.statusOpenDescription}
           </p>
         </div>
-        <div className="flex flex-col gap-2">
-          {hasSavedFixedDate ? (
-            <Button asChild size="sm" className="w-full">
-              <a href={`/api/events/${snapshot.slug}/ics`}>{messages.common.addToCalendar}</a>
-            </Button>
-          ) : null}
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="w-full"
-            onClick={() => setFinalSlotStart(null)}
-          >
-            {messages.common.clearFixedDate}
+
+        {savedFinalSlot ? (
+          <div className="rounded-md border bg-muted/20 px-3 py-2">
+            <p className="text-[11px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
+              {messages.common.fixedDate}
+            </p>
+            <p className="mt-1 text-sm font-semibold text-foreground">{savedFinalSlot.label}</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {plural(messages.publicEvent.fullWindowFree, savedFinalSlot.availableCount)}
+            </p>
+          </div>
+        ) : null}
+
+        {savedFinalSlot ? (
+          <Button asChild size="sm" className="w-full">
+            <a href={`/api/events/${snapshot.slug}/ics`}>{messages.common.addToCalendar}</a>
           </Button>
-        </div>
+        ) : null}
+
+        {snapshot.status === "CLOSED" ? (
+          <AlertDialog open={isReopenDialogOpen} onOpenChange={setIsReopenDialogOpen}>
+            <AlertDialogTrigger asChild>
+              <Button type="button" variant="outline" disabled={isPending} className="w-full">
+                {messages.manageEvent.reopenEvent}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>{messages.manageEvent.reopenEventConfirmTitle}</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {messages.manageEvent.reopenEventConfirmDescription}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>{messages.common.cancel}</AlertDialogCancel>
+                <AlertDialogAction onClick={reopenEvent} disabled={isPending}>
+                  {pendingAction === "reopenEvent" ? (
+                    <Loader2Icon className="size-4 animate-spin" />
+                  ) : null}
+                  {messages.manageEvent.reopenEventConfirmAction}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        ) : null}
       </CardContent>
     </Card>
-  ) : null;
-  const sidebarSummaryCards = fixedDateCard ? (
-    <>
-      {fixedDateCard}
-      {bestWindowsCard}
-    </>
-  ) : (
-    bestWindowsCard
   );
+
   const participantsCard = (
     <Card>
       <CardHeader className="p-4 pb-2">
@@ -364,56 +492,39 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
       <Card className="overflow-hidden">
         <CardHeader>
           <CardTitle className="text-3xl">{messages.manageEvent.title}</CardTitle>
-          <CardDescription>
-            {messages.manageEvent.description}
-          </CardDescription>
+          <CardDescription>{messages.manageEvent.description}</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-x-6 gap-y-5 lg:grid-cols-2 lg:items-end">
-          <div className="space-y-2">
+        <CardContent className="pt-0">
+          <div className="max-w-3xl space-y-2">
             <Label htmlFor="title">{messages.manageEvent.titleLabel}</Label>
-            <Input id="title" value={title} onChange={(event) => setTitle(event.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label>{messages.manageEvent.statusLabel}</Label>
-            <Select
-              value={status}
-              onValueChange={(value) => handleStatusChange(value as "OPEN" | "CLOSED")}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="OPEN">{messages.manageEvent.statusOpen}</SelectItem>
-                <SelectItem value="CLOSED">{messages.manageEvent.statusClosed}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-3 lg:col-span-2">
-            <Button
-              onClick={updateEvent}
-              disabled={isPending || isClosingWithoutFixedDate}
-              className="h-10"
-            >
-              {isPending ? <Loader2Icon className="size-4 animate-spin" /> : null}
-              {messages.common.saveChanges}
-            </Button>
-            {isClosingWithoutFixedDate ? (
-              <p className="text-sm text-destructive">
-                {messages.manageEvent.closeRequiresFixedDateInHeatmap}
-              </p>
-            ) : null}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <Input id="title" value={title} onChange={(event) => setTitle(event.target.value)} />
+              {isTitleDirty ? (
+                <Button
+                  type="button"
+                  onClick={saveTitle}
+                  disabled={isPending}
+                  className="sm:shrink-0"
+                >
+                  {pendingAction === "updateTitle" ? (
+                    <Loader2Icon className="size-4 animate-spin" />
+                  ) : null}
+                  {messages.manageEvent.saveTitle}
+                </Button>
+              ) : null}
+            </div>
           </div>
         </CardContent>
       </Card>
 
       <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start">
         <aside className="order-1 min-w-0 space-y-5 xl:order-2">
+          {statusCard}
+
           <Card>
             <CardHeader>
               <CardTitle>{messages.manageEvent.shareLinksTitle}</CardTitle>
-              <CardDescription>
-                {messages.manageEvent.shareLinksDescription}
-              </CardDescription>
+              <CardDescription>{messages.manageEvent.shareLinksDescription}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -438,7 +549,7 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
             </CardContent>
           </Card>
 
-          {sidebarSummaryCards}
+          {bestWindowsCard}
           {participantsCard}
         </aside>
 
@@ -449,14 +560,19 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
             canEdit={false}
             showModeToggle={false}
             showSidebar={false}
-            displayStatus={status}
-            finalSlotStart={status === "CLOSED" ? finalSlotStart : null}
-            allowFinalSlotSelection={status === "CLOSED"}
-            onFinalSlotSelect={setFinalSlotStart}
+            displayStatus={snapshot.status}
+            finalSlotStart={savedFinalSlot?.slotStart ?? null}
+            showStatusBadge={false}
+            showTitleBlock={false}
+            showFixedDateAction
+            isFixedDateActionPending={
+              pendingAction === "closeEvent" || pendingAction === "updateFixedDate"
+            }
+            onFixedDateAction={handleFixedDateAction}
             activeParticipantId={activeParticipantId}
             onActiveParticipantChange={setRequestedActiveParticipantId}
             getDescription={({ usesDateWindowing }) =>
-              status === "CLOSED"
+              snapshot.status === "CLOSED"
                 ? usesDateWindowing
                   ? messages.manageEvent.closedHeatmapDescriptionWindowed
                   : messages.manageEvent.closedHeatmapDescription

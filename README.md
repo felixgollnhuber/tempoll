@@ -1,11 +1,43 @@
-# tempoll
+<p align="center">
+  <img src="./.github/assets/tempoll-readme-hero.png" alt="tempoll.app" width="920" />
+</p>
 
-An account-free, self-hosted When2Meet alternative for modern teams.
+<h1 align="center">tempoll</h1>
 
-> Create the board. Share the link. Find the overlap.
-The repository is ready for GitHub-based deployment with Coolify using the included [`docker-compose.yaml`](./docker-compose.yaml).
+<p align="center">
+  An account-free, self-hosted When2Meet alternative for modern teams.
+</p>
+
+<p align="center">
+  Create the board. Share the link. Find the overlap.
+</p>
+
+<p align="center">
+  <a href="#quick-start"><strong>Quick start</strong></a>
+  ·
+  <a href="#how-tempoll-works"><strong>How it works</strong></a>
+  ·
+  <a href="#self-hosting"><strong>Self-hosting</strong></a>
+  ·
+  <a href="#configuration"><strong>Configuration</strong></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/felixgollnhuber/tempoll/actions/workflows/ci.yml">
+    <img src="https://img.shields.io/github/actions/workflow/status/felixgollnhuber/tempoll/ci.yml?branch=main&label=verify" alt="Verify workflow status" />
+  </a>
+  <a href="https://github.com/felixgollnhuber/tempoll/actions/workflows/security.yml">
+    <img src="https://img.shields.io/github/actions/workflow/status/felixgollnhuber/tempoll/security.yml?branch=main&label=security" alt="Security workflow status" />
+  </a>
+  <img src="https://img.shields.io/badge/license-AGPL--3.0--only-black" alt="License: AGPL-3.0-only" />
+  <img src="https://img.shields.io/badge/deploy-Docker%20Compose%20%2B%20Coolify-1f6feb" alt="Deploy with Docker Compose and Coolify" />
+</p>
+
+---
 
 tempoll lets an organizer create a scheduling board, share one public link, and collect availability on a live heatmap. Participants join with just a name. The organizer gets a private manage URL to rename or remove participants and open or close the event.
+
+> GitHub-ready for self-hosting with the included [`docker-compose.yaml`](./docker-compose.yaml) and a first-run setup flow built for Coolify.
 
 The project is built for two audiences:
 

@@ -32,10 +32,8 @@ describe("PATCH /api/manage/[token]", () => {
       new Request("https://tempoll.example.com/api/manage/invalid-token", {
         method: "PATCH",
         body: JSON.stringify({
-          action: "updateEvent",
+          action: "updateTitle",
           title: "Updated title",
-          status: "OPEN",
-          finalSlotStart: null,
         }),
         headers: {
           "Accept-Language": "en-US",
@@ -64,10 +62,8 @@ describe("PATCH /api/manage/[token]", () => {
       new Request("https://tempoll.example.com/api/manage/invalid-token", {
         method: "PATCH",
         body: JSON.stringify({
-          action: "updateEvent",
+          action: "updateTitle",
           title: "Updated title",
-          status: "OPEN",
-          finalSlotStart: null,
         }),
         headers: {
           "Accept-Language": "en-US",

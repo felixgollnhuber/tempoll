@@ -1,9 +1,18 @@
-import { fireEvent, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ManageEventClient } from "./manage-event-client";
+import { buildFinalizedSlot } from "@/lib/availability";
+import type { ManageEventView, PublicEventSnapshot } from "@/lib/types";
 import { renderWithI18n } from "@/test/render-with-i18n";
-import type { ManageEventView } from "@/lib/types";
+import { ManageEventClient } from "./manage-event-client";
+
+vi.mock("sonner", () => ({
+  toast: {
+    error: vi.fn(),
+    success: vi.fn(),
+  },
+}));
 
 function createManageView(options?: {
   status?: "OPEN" | "CLOSED";
@@ -92,6 +101,92 @@ function createManageView(options?: {
   };
 }
 
+function buildPublishedFinalizedSlot(
+  snapshot: PublicEventSnapshot,
+  finalSlotStart: string,
+): NonNullable<PublicEventSnapshot["finalizedSlot"]> {
+  const finalizedSlot = buildFinalizedSlot({
+    dates: snapshot.dates.map((date) => date.dateKey),
+    locale: "en",
+    timezone: snapshot.timezone,
+    dayStartMinutes: snapshot.dayStartMinutes,
+    dayEndMinutes: snapshot.dayEndMinutes,
+    slotMinutes: snapshot.slotMinutes,
+    meetingDurationMinutes: snapshot.meetingDurationMinutes,
+    slots: snapshot.slots,
+    finalSlotStart,
+  });
+
+  if (!finalizedSlot) {
+    throw new Error(`Could not build finalized slot for ${finalSlotStart}`);
+  }
+
+  return finalizedSlot;
+}
+
+function installManageFetchMock(view: ManageEventView) {
+  let currentSnapshot = structuredClone(view.snapshot) as PublicEventSnapshot;
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+
+    if (url === `/api/events/${view.snapshot.slug}`) {
+      return {
+        ok: true,
+        json: async () => ({
+          snapshot: currentSnapshot,
+        }),
+      };
+    }
+
+    if (url === `/api/manage/${view.manageKey}` && init?.method === "PATCH") {
+      const payload = JSON.parse(String(init.body)) as
+        | { action: "updateTitle"; title: string }
+        | { action: "closeEvent"; finalSlotStart: string }
+        | { action: "updateFixedDate"; finalSlotStart: string }
+        | { action: "reopenEvent" };
+
+      switch (payload.action) {
+        case "updateTitle":
+          currentSnapshot = {
+            ...currentSnapshot,
+            title: payload.title.trim(),
+          };
+          break;
+        case "closeEvent":
+        case "updateFixedDate":
+          currentSnapshot = {
+            ...currentSnapshot,
+            status: "CLOSED",
+            finalizedSlot: buildPublishedFinalizedSlot(currentSnapshot, payload.finalSlotStart),
+          };
+          break;
+        case "reopenEvent":
+          currentSnapshot = {
+            ...currentSnapshot,
+            status: "OPEN",
+            finalizedSlot: null,
+          };
+          break;
+      }
+
+      return {
+        ok: true,
+        json: async () => ({ ok: true }),
+      };
+    }
+
+    throw new Error(`Unhandled fetch call: ${url}`);
+  });
+
+  global.fetch = fetchMock as unknown as typeof fetch;
+
+  return fetchMock;
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
 describe("ManageEventClient", () => {
   it("keeps long share links wrappable inside the sidebar cards", () => {
     const view = createManageView();
@@ -101,16 +196,21 @@ describe("ManageEventClient", () => {
     expect(screen.getByText(view.manageUrl).className).toContain("[overflow-wrap:anywhere]");
   });
 
-  it("places share links and the organizer sidebar stack before the heatmap in DOM order", () => {
+  it("places the unified organizer sidebar stack before the heatmap in DOM order", () => {
     const view = createManageView();
     renderWithI18n(<ManageEventClient initialView={view} />);
 
+    const eventStatusHeading = screen.getByText("Event status");
     const shareLinksHeading = screen.getByText("Share links");
     const bestWindowsHeading = screen.getByText("Best windows right now");
     const participantsHeading = screen.getByText("Participants");
     const availabilityHeading = screen.getByText("Availability");
 
     expect(screen.getAllByText("Participants")).toHaveLength(1);
+    expect(
+      eventStatusHeading.compareDocumentPosition(shareLinksHeading) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(
       shareLinksHeading.compareDocumentPosition(availabilityHeading) &
         Node.DOCUMENT_POSITION_FOLLOWING,
@@ -125,7 +225,7 @@ describe("ManageEventClient", () => {
     ).toBeTruthy();
   });
 
-  it("renders the heatmap as a single content column when the embedded sidebar is disabled", () => {
+  it("keeps the top manage card compact and renders the heatmap as a single content column", () => {
     const view = createManageView();
     renderWithI18n(<ManageEventClient initialView={view} />);
 
@@ -134,31 +234,130 @@ describe("ManageEventClient", () => {
     expect(heatmapLayout).not.toBeNull();
     expect(heatmapLayout).toHaveClass("grid-cols-1");
     expect(heatmapLayout?.className).not.toContain("xl:grid-cols-[minmax(0,1fr)_250px]");
+    expect(document.body.innerHTML).not.toContain("lg:grid-cols-[minmax(0,1fr)_22rem]");
   });
 
-  it("renders the heatmap and lets the organizer select a fixed date on closed events", () => {
-    const view = createManageView({ status: "CLOSED" });
+  it("closes the event directly from the selected slot without requiring a separate save", async () => {
+    const user = userEvent.setup();
+    const view = createManageView();
+    const fetchMock = installManageFetchMock(view);
     renderWithI18n(<ManageEventClient initialView={view} />);
 
-    expect(screen.getByText("Availability")).toBeInTheDocument();
-
-    fireEvent.click(
+    await user.click(
       screen.getByRole("button", {
         name: /Thu, Apr 2 09:00 · 2\/2 available/i,
       }),
     );
 
+    expect(screen.getByText("This slot fits the full 60-minute meeting.")).toBeInTheDocument();
     expect(
-      screen.getByText("This slot fits the full 60-minute meeting."),
+      screen.getByRole("button", { name: "Set fixed date and close event" }),
     ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save title" })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Set fixed date" }));
+    await user.click(screen.getByRole("button", { name: "Set fixed date and close event" }));
 
-    const fixedDateCard = screen.getByText("Fixed date").closest("[data-slot='card']");
+    await waitFor(() => {
+      expect(screen.getAllByText("Closed").length).toBeGreaterThan(0);
+      expect(screen.getByRole("link", { name: "Add to calendar (.ics)" })).toBeInTheDocument();
+    });
 
-    expect(fixedDateCard).not.toBeNull();
-    expect(within(fixedDateCard as HTMLElement).getByText(/Thu, Apr 2.*09:00.*10:00/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
+    const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(requestInit.body))).toMatchObject({
+      action: "closeEvent",
+      finalSlotStart: "2026-04-02T07:00:00.000Z",
+    });
+  });
+
+  it("updates the published fixed date directly on closed events", async () => {
+    const user = userEvent.setup();
+    const initialFinalizedSlot = buildPublishedFinalizedSlot(
+      createManageView().snapshot,
+      "2026-04-02T07:00:00.000Z",
+    );
+    const view = createManageView({
+      status: "CLOSED",
+      finalizedSlot: initialFinalizedSlot,
+    });
+    const fetchMock = installManageFetchMock(view);
+    renderWithI18n(<ManageEventClient initialView={view} />);
+
+    await user.click(
+      screen.getByRole("button", {
+        name: /Thu, Apr 2 09:30 · 2\/2 available/i,
+      }),
+    );
+
+    expect(screen.getByRole("button", { name: "Update fixed date" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Update fixed date" }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Thu, Apr 2.*09:30.*10:30/i)).toBeInTheDocument();
+    });
+
+    const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(requestInit.body))).toMatchObject({
+      action: "updateFixedDate",
+      finalSlotStart: "2026-04-02T07:30:00.000Z",
+    });
+  });
+
+  it("requires confirmation before reopening a closed event", async () => {
+    const user = userEvent.setup();
+    const initialFinalizedSlot = buildPublishedFinalizedSlot(
+      createManageView().snapshot,
+      "2026-04-02T07:00:00.000Z",
+    );
+    const view = createManageView({
+      status: "CLOSED",
+      finalizedSlot: initialFinalizedSlot,
+    });
+    const fetchMock = installManageFetchMock(view);
+    renderWithI18n(<ManageEventClient initialView={view} />);
+
+    await user.click(screen.getByRole("button", { name: "Reopen event" }));
+
+    expect(screen.getByText("Reopen this event?")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Reopen and clear fixed date" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Open for edits")).toBeInTheDocument();
+      expect(screen.queryByText("Reopen this event?")).not.toBeInTheDocument();
+      expect(screen.queryAllByText("Fixed date")).toHaveLength(0);
+    });
+
+    const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(requestInit.body))).toMatchObject({
+      action: "reopenEvent",
+    });
+  });
+
+  it("saves the title independently from closing and reopening actions", async () => {
+    const user = userEvent.setup();
+    const view = createManageView();
+    const fetchMock = installManageFetchMock(view);
+    renderWithI18n(<ManageEventClient initialView={view} />);
+
+    await user.clear(screen.getByLabelText("Title"));
+    await user.type(screen.getByLabelText("Title"), "Updated team sync");
+
+    const saveTitleButton = screen.getByRole("button", { name: "Save title" });
+    expect(saveTitleButton).toBeInTheDocument();
+
+    await user.click(saveTitleButton);
+
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "Save title" })).not.toBeInTheDocument();
+      expect(screen.getByDisplayValue("Updated team sync")).toBeInTheDocument();
+    });
+
+    const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(requestInit.body))).toMatchObject({
+      action: "updateTitle",
+      title: "Updated team sync",
+    });
   });
 
   it("shows the saved fixed date with an .ics export link", () => {
@@ -176,11 +375,28 @@ describe("ManageEventClient", () => {
     });
     renderWithI18n(<ManageEventClient initialView={view} />);
 
-    expect(screen.getByText("Fixed date")).toBeInTheDocument();
+    expect(screen.getByText("Event status")).toBeInTheDocument();
+    expect(screen.getAllByText("Fixed date")).toHaveLength(1);
+    expect(screen.getAllByText("Closed")).toHaveLength(1);
+    expect(screen.queryByText("Times shown in Europe/Vienna")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Add to calendar (.ics)" })).toHaveAttribute(
       "href",
       "/api/events/test-event-xeqlxw/ics",
     );
+  });
+
+  it("hides duplicate closed-state suggestions when the published fixed date already matches the best slot", () => {
+    const finalizedSlot = buildPublishedFinalizedSlot(
+      createManageView().snapshot,
+      "2026-04-02T07:00:00.000Z",
+    );
+    const view = createManageView({
+      status: "CLOSED",
+      finalizedSlot,
+    });
+    renderWithI18n(<ManageEventClient initialView={view} />);
+
+    expect(screen.queryByText("Best windows right now")).not.toBeInTheDocument();
   });
 
   it("combines participant management and highlighting in one sidebar card", () => {

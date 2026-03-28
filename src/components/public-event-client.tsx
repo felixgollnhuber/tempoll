@@ -4,6 +4,7 @@ import { Loader2Icon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { CopyButton } from "@/components/copy-button";
 import { EventHeatmap, type BoardMode, type DraftSelection } from "@/components/event-heatmap";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +15,7 @@ import type { PublicEventSnapshot, RealtimeEventPayload } from "@/lib/types";
 
 type PublicEventClientProps = {
   slug: string;
+  shareUrl?: string;
   initialSnapshot: PublicEventSnapshot;
   initialSession:
     | {
@@ -49,10 +51,12 @@ function getSelectedSlotStarts(snapshot: PublicEventSnapshot) {
 
 export function PublicEventClient({
   slug,
+  shareUrl,
   initialSnapshot,
   initialSession,
 }: PublicEventClientProps) {
   const { messages, format, plural } = useI18n();
+  const publicShareUrl = shareUrl ?? `/e/${initialSnapshot.slug}`;
   const saveAvailabilityFallback = messages.errors.routeFallbacks.saveAvailability;
   const initialHasEditableSession = Boolean(initialSession && initialSnapshot.status === "OPEN");
   const [snapshot, setSnapshot] = useState(initialSnapshot);
@@ -277,10 +281,30 @@ export function PublicEventClient({
     [canEdit],
   );
 
-  const sidebarTopContent =
+  const shareCard = (
+    <Card>
+      <CardHeader className="p-4 pb-2">
+        <CardTitle className="text-sm">{messages.publicEvent.shareTitle}</CardTitle>
+        <CardDescription className="text-xs">
+          {messages.publicEvent.shareDescription}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3 p-4 pt-0">
+        <div className="space-y-2">
+          <Label>{messages.publicEvent.shareUrlLabel}</Label>
+          <div className="rounded-md border bg-muted/20 px-3 py-2 text-sm text-muted-foreground [overflow-wrap:anywhere]">
+            {publicShareUrl}
+          </div>
+        </div>
+        <CopyButton value={publicShareUrl} label={messages.publicEvent.copyShareUrl} />
+      </CardContent>
+    </Card>
+  );
+
+  const scheduleSummaryCard =
     snapshot.status === "CLOSED" && snapshot.finalizedSlot ? (
-        <Card>
-          <CardHeader className="p-4 pb-2">
+      <Card>
+        <CardHeader className="p-4 pb-2">
           <CardTitle className="text-sm">{messages.common.fixedDate}</CardTitle>
           <CardDescription className="text-xs">
             {messages.publicEvent.fixedDateDescription}
@@ -339,6 +363,13 @@ export function PublicEventClient({
         </CardContent>
       </Card>
     ) : null;
+
+  const sidebarTopContent = (
+    <>
+      {shareCard}
+      {scheduleSummaryCard}
+    </>
+  );
 
   return (
     <div className="space-y-4">
