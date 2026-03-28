@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { LanguagesIcon } from "lucide-react";
 
 import {
   Select,
@@ -17,12 +18,12 @@ const oneYearInSeconds = 60 * 60 * 24 * 365;
 
 type LanguageSwitcherProps = {
   className?: string;
-  compactLabel?: boolean;
+  mobileIcon?: boolean;
 };
 
 export function LanguageSwitcher({
   className,
-  compactLabel = false,
+  mobileIcon = false,
 }: LanguageSwitcherProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -47,15 +48,15 @@ export function LanguageSwitcher({
         className={className}
         disabled={isPending}
       >
-        {compactLabel ? (
-          <>
+        {mobileIcon ? (
+          <span className="inline-flex min-w-0 items-center">
             <span aria-hidden="true" className="sm:hidden">
-              {getCompactLocaleLabel(locale)}
+              <LanguagesIcon className="size-4" />
             </span>
             <span aria-hidden="true" className="hidden sm:inline">
               {currentLocaleLabel}
             </span>
-          </>
+          </span>
         ) : (
           <SelectValue />
         )}
@@ -79,8 +80,4 @@ function getLocaleLabel(
   locale: AppLocale,
 ) {
   return locale === "de" ? labels.de : labels.en;
-}
-
-function getCompactLocaleLabel(locale: AppLocale) {
-  return locale.toUpperCase();
 }

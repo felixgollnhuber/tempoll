@@ -42,9 +42,7 @@ export const en = {
   },
   appChrome: {
     newEvent: "New event",
-    newEventCompact: "New",
     recentEvents: "Recent events",
-    recentEventsCompact: "Recent",
     footerDescription:
       "{appName} is a self-hostable, realtime scheduling board for modern teams.",
     featureRequest: "Feature request or suggestion",
@@ -605,9 +603,7 @@ export const de: Messages = {
   },
   appChrome: {
     newEvent: "Neues Event",
-    newEventCompact: "Neu",
     recentEvents: "Letzte Events",
-    recentEventsCompact: "Events",
     footerDescription:
       "{appName} ist ein selbst hostbares Echtzeit-Planungsboard für moderne Teams.",
     featureRequest: "Feature-Wunsch oder Vorschlag",
