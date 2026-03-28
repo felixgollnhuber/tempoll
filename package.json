@@ -12,6 +12,8 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:ui": "vitest --ui",
+    "verify": "pnpm lint && pnpm typecheck && pnpm test:run && pnpm prisma:generate && pnpm build",
+    "verify:ci": "pnpm verify && docker build -t tempoll-debug .",
     "security:scan-secrets": "node scripts/secret-scan.mjs",
     "security:audit": "pnpm audit --prod",
     "prisma:generate": "prisma generate",
