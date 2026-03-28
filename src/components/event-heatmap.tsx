@@ -21,7 +21,8 @@ import {
 } from "react";
 
 import { buildFinalizedSlot, getAllowedFinalSlotStarts } from "@/lib/availability";
-import type { PublicEventSnapshot, SnapshotParticipant, SnapshotSlot } from "@/lib/types";
+import { useI18n } from "@/lib/i18n/context";
+import type { PublicEventSnapshot, SnapshotParticipant } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -204,7 +205,7 @@ function getVisibleRangeLabel(dates: PublicEventSnapshot["dates"]) {
     return dates[0].label;
   }
 
-  return `${dates[0].label} to ${dates[dates.length - 1].label}`;
+  return `${dates[0].label} – ${dates[dates.length - 1].label}`;
 }
 
 function getSlotElementFromPoint(clientX: number, clientY: number) {
@@ -241,16 +242,19 @@ function getSlotCoordinatesFromElement(element: HTMLElement) {
   };
 }
 
-function getDefaultDescription({ mode, usesDateWindowing }: DescriptionOptions) {
+function getDefaultDescription(
+  { mode, usesDateWindowing }: DescriptionOptions,
+  messages: ReturnType<typeof useI18n>["messages"],
+) {
   if (mode === "edit") {
     return usesDateWindowing
-      ? "Tap or drag to paint your availability. Use the arrows to move day by day."
-      : "Click or drag across the grid to paint your availability while keeping the team heatmap in view.";
+      ? messages.publicEvent.availabilityDescriptionEditWindowed
+      : messages.publicEvent.availabilityDescriptionEdit;
   }
 
   return usesDateWindowing
-    ? "Select a slot to inspect availability. Use the arrows to move through the date range."
-    : "Click any slot to see who is available and who is not.";
+    ? messages.publicEvent.availabilityDescriptionViewWindowed
+    : messages.publicEvent.availabilityDescriptionView;
 }
 
 export function EventHeatmap({
@@ -269,6 +273,7 @@ export function EventHeatmap({
   sidebarTopContent,
   getDescription,
 }: EventHeatmapProps) {
+  const { messages, format, plural, locale } = useI18n();
   const [activeSlotKey, setActiveSlotKey] = useState<string | null>(null);
   const [activeParticipantId, setActiveParticipantId] = useState<string | null>(null);
   const [gridContainerWidth, setGridContainerWidth] = useState(0);
@@ -279,6 +284,15 @@ export function EventHeatmap({
   const supportsPainting = canEdit && Boolean(onUpdateCell);
   const currentParticipantId = snapshot.currentParticipant?.id ?? null;
   const cellHeightClass = getCellHeightClass(snapshot.slotMinutes);
+  const getParticipantLabel = useCallback(
+    (participant: SnapshotParticipant) =>
+      participant.isCurrentUser
+        ? format(messages.publicEvent.participantYou, {
+            name: participant.displayName,
+          })
+        : participant.displayName,
+    [format, messages.publicEvent.participantYou],
+  );
   const slotStartSelections = useMemo(
     () =>
       getAllowedFinalSlotStarts({
@@ -468,6 +482,7 @@ export function EventHeatmap({
 
     return buildFinalizedSlot({
       dates: snapshot.dates.map((date) => date.dateKey),
+      locale,
       timezone: snapshot.timezone,
       dayStartMinutes: snapshot.dayStartMinutes,
       dayEndMinutes: snapshot.dayEndMinutes,
@@ -478,6 +493,7 @@ export function EventHeatmap({
     });
   }, [
     finalSlotStart,
+    locale,
     slotMap,
     snapshot.dates,
     snapshot.dayEndMinutes,
@@ -664,17 +680,19 @@ export function EventHeatmap({
                 style={{ background: participant.color }}
               />
               <div>
-                <p className="text-sm font-medium text-foreground">
-                  {participant.displayName}
-                  {participant.isCurrentUser ? " (you)" : ""}
-                </p>
+                <p className="text-sm font-medium text-foreground">{getParticipantLabel(participant)}</p>
                 <p className="text-[11px] text-muted-foreground">
-                  {participant.selectedSlotCount} selected slots
+                  {plural(
+                    messages.publicEvent.participantSelectedSlots,
+                    participant.selectedSlotCount,
+                  )}
                 </p>
               </div>
             </div>
             {activeParticipantId === participant.id ? (
-              <span className="text-[11px] font-medium text-muted-foreground">Highlighting</span>
+              <span className="text-[11px] font-medium text-muted-foreground">
+                {messages.publicEvent.participantHighlighting}
+              </span>
             ) : null}
           </button>
         ))}
@@ -682,10 +700,18 @@ export function EventHeatmap({
     );
   }
 
-  const description = (getDescription ?? getDefaultDescription)({
-    mode,
-    usesDateWindowing,
-  });
+  const description = getDescription
+    ? getDescription({
+        mode,
+        usesDateWindowing,
+      })
+    : getDefaultDescription(
+        {
+          mode,
+          usesDateWindowing,
+        },
+        messages,
+      );
 
   return (
     <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_250px]">
@@ -697,58 +723,59 @@ export function EventHeatmap({
                 <div className="flex flex-wrap items-center gap-2 text-[10px] font-medium tracking-[0.16em] text-muted-foreground uppercase">
                   <span className="inline-flex items-center gap-1">
                     <CalendarDaysIcon className="size-3" />
-                    {snapshot.dates.length} days
+                    {plural(messages.publicEvent.daysSummary, snapshot.dates.length)}
                   </span>
                   <span className="inline-flex items-center gap-1">
                     <Clock3Icon className="size-3" />
-                    {snapshot.slotMinutes}-minute grid
+                    {format(messages.publicEvent.gridSummary, { count: snapshot.slotMinutes })}
                   </span>
                   <span className="inline-flex items-center gap-1">
                     <UsersIcon className="size-3" />
-                    {snapshot.participants.length} participants
+                    {plural(messages.publicEvent.participantsSummary, snapshot.participants.length)}
                   </span>
                 </div>
                 <div>
                   <CardTitle className="text-2xl">{snapshot.title}</CardTitle>
                   <CardDescription className="mt-1 text-xs">
-                    Times shown in{" "}
-                    <span className="font-medium text-foreground">{snapshot.timezone}</span>
+                    {format(messages.publicEvent.timesShownIn, {
+                      timezone: snapshot.timezone,
+                    })}
                   </CardDescription>
                 </div>
               </div>
               {displayStatus === "CLOSED" ? (
                 <Badge variant="destructive" className="h-7 px-2.5 text-xs">
                   <LockIcon className="size-3.5" />
-                  Closed
+                  {messages.common.closed}
                 </Badge>
               ) : null}
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-3">
               <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
-                <span className="font-medium">Legend</span>
+                <span className="font-medium">{messages.publicEvent.legend}</span>
                 <span className="inline-flex items-center gap-1.5">
                   <span className="size-3 rounded-[3px] border bg-background" />
-                  empty
+                  {messages.publicEvent.legendEmpty}
                 </span>
                 <span className="inline-flex items-center gap-1">
                   <span className="size-3 rounded-[3px] bg-primary/24" />
-                  some overlap
+                  {messages.publicEvent.legendSomeOverlap}
                 </span>
                 <span className="inline-flex items-center gap-1">
                   <span className="size-3 rounded-[3px] bg-primary/65" />
-                  high overlap
+                  {messages.publicEvent.legendHighOverlap}
                 </span>
                 {supportsPainting && mode === "edit" ? (
                   <span className="inline-flex items-center gap-1">
                     <span className="size-3 rounded-[3px] bg-primary/24 outline outline-2 -outline-offset-2 outline-primary/85 ring-1 ring-inset ring-background" />
-                    your availability
+                    {messages.publicEvent.legendYourAvailability}
                   </span>
                 ) : null}
                 {finalizedSlot ? (
                   <span className="inline-flex items-center gap-1">
                     <span className="size-3 rounded-[3px] shadow-[inset_0_0_0_9999px_rgba(245,158,11,0.24)] ring-1 ring-inset ring-amber-500/70" />
-                    fixed date
+                    {messages.publicEvent.legendFixedDate}
                   </span>
                 ) : null}
                 {activeParticipant ? (
@@ -760,7 +787,9 @@ export function EventHeatmap({
                         participantColor: activeParticipant.color,
                       })}
                     />
-                    {activeParticipant.displayName} highlighted
+                    {format(messages.publicEvent.legendHighlighted, {
+                      name: activeParticipant.displayName,
+                    })}
                   </span>
                 ) : null}
               </div>
@@ -773,12 +802,12 @@ export function EventHeatmap({
                 <Sheet>
                   <SheetTrigger asChild>
                     <Button variant="outline" size="sm" className="xl:hidden">
-                      Participants
+                      {messages.common.participants}
                     </Button>
                   </SheetTrigger>
                   <SheetContent side="bottom" className="max-h-[80vh] rounded-t-xl">
                     <SheetHeader>
-                      <SheetTitle>Participants</SheetTitle>
+                      <SheetTitle>{messages.common.participants}</SheetTitle>
                     </SheetHeader>
                     <div className="pb-6">{participantList()}</div>
                   </SheetContent>
@@ -790,7 +819,7 @@ export function EventHeatmap({
             <div className="space-y-3">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="space-y-1">
-                  <CardTitle className="text-base">Availability</CardTitle>
+                  <CardTitle className="text-base">{messages.publicEvent.availabilityTitle}</CardTitle>
                   <CardDescription className="text-xs">{description}</CardDescription>
                 </div>
                 {showModeToggle ? (
@@ -804,7 +833,7 @@ export function EventHeatmap({
                       disabled={!supportsPainting}
                       onClick={() => onModeChange?.("edit")}
                     >
-                      Edit
+                      {messages.publicEvent.editMode}
                     </Button>
                     <Button
                       type="button"
@@ -814,7 +843,7 @@ export function EventHeatmap({
                       aria-pressed={mode === "view"}
                       onClick={() => onModeChange?.("view")}
                     >
-                      View
+                      {messages.publicEvent.viewMode}
                     </Button>
                   </div>
                 ) : null}
@@ -826,7 +855,7 @@ export function EventHeatmap({
                     type="button"
                     variant="outline"
                     size="icon-xs"
-                    aria-label="Show previous days"
+                    aria-label={messages.publicEvent.showPreviousDays}
                     disabled={!canShowPreviousDates}
                     onClick={() => moveVisibleDateWindow(-1)}
                   >
@@ -837,16 +866,18 @@ export function EventHeatmap({
                       {visibleRangeLabel}
                     </p>
                     <p className="text-[11px] text-muted-foreground">
-                      Days {clampedVisibleDateStartIndex + 1}
-                      {" - "}
-                      {clampedVisibleDateStartIndex + visibleDates.length} of {snapshot.dates.length}
+                      {format(messages.publicEvent.dayWindowSummary, {
+                        start: clampedVisibleDateStartIndex + 1,
+                        end: clampedVisibleDateStartIndex + visibleDates.length,
+                        total: snapshot.dates.length,
+                      })}
                     </p>
                   </div>
                   <Button
                     type="button"
                     variant="outline"
                     size="icon-xs"
-                    aria-label="Show next days"
+                    aria-label={messages.publicEvent.showNextDays}
                     disabled={!canShowNextDates}
                     onClick={() => moveVisibleDateWindow(1)}
                   >
@@ -904,8 +935,17 @@ export function EventHeatmap({
                           .map((participantId) => participantNamesById.get(participantId))
                           .filter(Boolean) as string[];
                         const availabilityTitle = availableNames.length
-                          ? `${date.label} ${timeRow.label} · ${slot.availabilityCount}/${snapshot.participants.length} available · ${availableNames.join(", ")}`
-                          : `${date.label} ${timeRow.label} · nobody available`;
+                          ? format(messages.publicEvent.availableCountTitle, {
+                              date: date.label,
+                              time: timeRow.label,
+                              available: slot.availabilityCount,
+                              total: snapshot.participants.length,
+                              names: availableNames.join(", "),
+                            })
+                          : format(messages.publicEvent.nobodyAvailableTitle, {
+                              date: date.label,
+                              time: timeRow.label,
+                            });
 
                         const isActiveViewSlot = mode === "view" && activeSlotKey === key;
                         const showCurrentUserSelection = supportsPainting && mode === "edit" && slot.selectedByCurrentUser;
@@ -993,15 +1033,21 @@ export function EventHeatmap({
             {mode === "view" ? (
               <div className="mt-4 rounded-md border bg-muted/10 p-4">
                 <div className="space-y-1">
-                  <h3 className="text-sm font-semibold text-foreground">Slot details</h3>
+                  <h3 className="text-sm font-semibold text-foreground">
+                    {messages.publicEvent.slotDetailsTitle}
+                  </h3>
                   {activeSlotDetails ? (
                     <p className="text-xs text-muted-foreground">
-                      {activeSlotDetails.dateLabel} · {activeSlotDetails.timeLabel} ·{" "}
-                      {activeSlotDetails.slot.availabilityCount}/{snapshot.participants.length} available
+                      {format(messages.publicEvent.slotDetailsSummary, {
+                        date: activeSlotDetails.dateLabel,
+                        time: activeSlotDetails.timeLabel,
+                        available: activeSlotDetails.slot.availabilityCount,
+                        total: snapshot.participants.length,
+                      })}
                     </p>
                   ) : (
                     <p className="text-xs text-muted-foreground">
-                      Select a slot in the heatmap to inspect availability for that time.
+                      {messages.publicEvent.slotDetailsPrompt}
                     </p>
                   )}
                 </div>
@@ -1011,7 +1057,7 @@ export function EventHeatmap({
                     <div className="grid gap-4 lg:grid-cols-2">
                       <div className="space-y-2">
                         <h4 className="text-xs font-medium tracking-[0.14em] text-muted-foreground uppercase">
-                          Available
+                          {messages.publicEvent.available}
                         </h4>
                         {activeSlotDetails.availableParticipants.length ? (
                           <div className="space-y-2">
@@ -1025,19 +1071,20 @@ export function EventHeatmap({
                                   style={{ background: participant.color }}
                                 />
                                 <span className="text-sm font-medium text-foreground">
-                                  {participant.displayName}
-                                  {participant.isCurrentUser ? " (you)" : ""}
+                                  {getParticipantLabel(participant)}
                                 </span>
                               </div>
                             ))}
                           </div>
                         ) : (
-                          <p className="text-sm text-muted-foreground">Nobody is available in this slot.</p>
+                          <p className="text-sm text-muted-foreground">
+                            {messages.publicEvent.nobodyAvailableInSlot}
+                          </p>
                         )}
                       </div>
                       <div className="space-y-2">
                         <h4 className="text-xs font-medium tracking-[0.14em] text-muted-foreground uppercase">
-                          Not available
+                          {messages.publicEvent.unavailable}
                         </h4>
                         {activeSlotDetails.unavailableParticipants.length ? (
                           <div className="space-y-2">
@@ -1051,15 +1098,14 @@ export function EventHeatmap({
                                   style={{ background: participant.color }}
                                 />
                                 <span className="text-sm font-medium text-foreground">
-                                  {participant.displayName}
-                                  {participant.isCurrentUser ? " (you)" : ""}
+                                  {getParticipantLabel(participant)}
                                 </span>
                               </div>
                             ))}
                           </div>
                         ) : (
                           <p className="text-sm text-muted-foreground">
-                            Everyone with at least one selection is available here.
+                            {messages.publicEvent.everyoneAvailableHere}
                           </p>
                         )}
                       </div>
@@ -1071,10 +1117,12 @@ export function EventHeatmap({
                           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div className="space-y-1">
                               <p className="text-sm font-medium text-foreground">
-                                This slot fits the full {snapshot.meetingDurationMinutes}-minute meeting.
+                                {format(messages.publicEvent.finalSlotFits, {
+                                  duration: snapshot.meetingDurationMinutes,
+                                })}
                               </p>
                               <p className="text-xs text-muted-foreground">
-                                Pick it as the fixed date for the closed event.
+                                {messages.publicEvent.finalSlotFitsDescription}
                               </p>
                             </div>
                             <Button
@@ -1083,13 +1131,16 @@ export function EventHeatmap({
                               variant={activeSlotDetails.isFinalSlotStart ? "secondary" : "default"}
                               onClick={() => onFinalSlotSelect?.(activeSlotDetails.slot.slotStart)}
                             >
-                              {activeSlotDetails.isFinalSlotStart ? "Fixed date selected" : "Set fixed date"}
+                              {activeSlotDetails.isFinalSlotStart
+                                ? messages.common.fixedDateSelected
+                                : messages.common.setFixedDate}
                             </Button>
                           </div>
                         ) : (
                           <p className="text-xs text-muted-foreground">
-                            This start time does not fit the full {snapshot.meetingDurationMinutes}-minute
-                            meeting inside the selected day window.
+                            {format(messages.publicEvent.finalSlotOutOfRange, {
+                              duration: snapshot.meetingDurationMinutes,
+                            })}
                           </p>
                         )}
                       </div>
@@ -1107,9 +1158,9 @@ export function EventHeatmap({
 
         <Card>
           <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-sm">Participants</CardTitle>
+            <CardTitle className="text-sm">{messages.common.participants}</CardTitle>
             <CardDescription className="text-xs">
-              Click a participant to highlight their availability on the grid.
+              {messages.publicEvent.participantsSidebarDescription}
             </CardDescription>
           </CardHeader>
           <CardContent className="p-4 pt-0">{participantList()}</CardContent>

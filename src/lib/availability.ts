@@ -1,5 +1,7 @@
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 
+import { getDateFnsLocale } from "@/lib/i18n/format";
+import type { AppLocale } from "@/lib/i18n/locale";
 import type {
   BestTimeSuggestion,
   FinalizedEventSlot,
@@ -27,6 +29,7 @@ type BuildSnapshotInput = {
     color: string;
     availabilitySlotStarts: string[];
   }>;
+  locale: AppLocale;
   finalSlotStart?: string | null;
   currentParticipantId?: string | null;
   viewerTimezone?: string | null;
@@ -79,11 +82,18 @@ export function buildSlotStart(dateKey: string, minutes: number, timezone: strin
   return fromZonedTime(`${dateKey}T${pad(hours)}:${pad(mins)}:00`, timezone).toISOString();
 }
 
-export function formatDateKeyLabel(dateKey: string, timezone: string) {
+function getCompactDateFormat(locale: AppLocale) {
+  return locale === "de" ? "EEE, d. MMM" : "EEE, MMM d";
+}
+
+export function formatDateKeyLabel(dateKey: string, timezone: string, locale: AppLocale) {
   return formatInTimeZone(
     fromZonedTime(`${dateKey}T12:00:00`, timezone),
     timezone,
-    "EEE, MMM d",
+    getCompactDateFormat(locale),
+    {
+      locale: getDateFnsLocale(locale),
+    },
   );
 }
 
@@ -172,11 +182,13 @@ export function buildMeetingWindows({
 function getMeetingWindowLabels({
   slotStart,
   slotEnd,
+  locale,
   timezone,
   viewerTimezone,
 }: {
   slotStart: string;
   slotEnd: string;
+  locale: AppLocale;
   timezone: string;
   viewerTimezone?: string | null;
 }) {
@@ -184,29 +196,36 @@ function getMeetingWindowLabels({
   const end = new Date(slotEnd);
 
   return {
-    label: `${formatInTimeZone(start, timezone, "EEE, MMM d · HH:mm")}–${formatInTimeZone(
-      end,
-      timezone,
-      "HH:mm",
-    )}`,
+    label: `${formatInTimeZone(start, timezone, locale === "de" ? "EEE, d. MMM · HH:mm" : "EEE, MMM d · HH:mm", {
+      locale: getDateFnsLocale(locale),
+    })}–${formatInTimeZone(end, timezone, "HH:mm", {
+      locale: getDateFnsLocale(locale),
+    })}`,
     localLabel:
       viewerTimezone && viewerTimezone !== timezone
-        ? `${formatInTimeZone(start, viewerTimezone, "EEE, MMM d · HH:mm")}–${formatInTimeZone(
-            end,
+        ? `${formatInTimeZone(
+            start,
             viewerTimezone,
-            "HH:mm",
-          )}`
+            locale === "de" ? "EEE, d. MMM · HH:mm" : "EEE, MMM d · HH:mm",
+            {
+              locale: getDateFnsLocale(locale),
+            },
+          )}–${formatInTimeZone(end, viewerTimezone, "HH:mm", {
+            locale: getDateFnsLocale(locale),
+          })}`
         : null,
   };
 }
 
 function summarizeMeetingWindow({
   meetingWindow,
+  locale,
   slotMap,
   timezone,
   viewerTimezone,
 }: {
   meetingWindow: MeetingWindow;
+  locale: AppLocale;
   slotMap: Map<string, SnapshotSlot>;
   timezone: string;
   viewerTimezone?: string | null;
@@ -232,6 +251,7 @@ function summarizeMeetingWindow({
   const labels = getMeetingWindowLabels({
     slotStart: meetingWindow.slotStart,
     slotEnd: meetingWindow.slotEnd,
+    locale,
     timezone,
     viewerTimezone,
   });
@@ -250,6 +270,7 @@ function summarizeMeetingWindow({
 
 export function buildFinalizedSlot({
   dates,
+  locale,
   timezone,
   dayStartMinutes,
   dayEndMinutes,
@@ -260,6 +281,7 @@ export function buildFinalizedSlot({
   viewerTimezone,
 }: {
   dates: string[];
+  locale: AppLocale;
   timezone: string;
   dayStartMinutes: number;
   dayEndMinutes: number;
@@ -286,6 +308,7 @@ export function buildFinalizedSlot({
 
   const summary = summarizeMeetingWindow({
     meetingWindow,
+    locale,
     slotMap,
     timezone,
     viewerTimezone,
@@ -295,7 +318,8 @@ export function buildFinalizedSlot({
     return null;
   }
 
-  const { sumCount: _sumCount, ...finalizedSlot } = summary;
+  const { sumCount, ...finalizedSlot } = summary;
+  void sumCount;
   return finalizedSlot;
 }
 
@@ -303,6 +327,7 @@ export function buildSnapshot({
   id,
   slug,
   title,
+  locale,
   timezone,
   status,
   slotMinutes,
@@ -318,7 +343,7 @@ export function buildSnapshot({
   const sortedDates = sortDateKeys(dates);
   const dateEntries: SnapshotDate[] = sortedDates.map((dateKey) => ({
     dateKey,
-    label: formatDateKeyLabel(dateKey, timezone),
+    label: formatDateKeyLabel(dateKey, timezone, locale),
   }));
   const timeRows = buildTimeRows({
     slotMinutes,
@@ -370,6 +395,7 @@ export function buildSnapshot({
 
   const suggestions = rankBestSuggestions({
     dates: sortedDates,
+    locale,
     timezone,
     dayStartMinutes,
     dayEndMinutes,
@@ -383,6 +409,7 @@ export function buildSnapshot({
     finalSlotStart && status === "CLOSED"
       ? buildFinalizedSlot({
           dates: sortedDates,
+          locale,
           timezone,
           dayStartMinutes,
           dayEndMinutes,
@@ -419,6 +446,7 @@ export function buildSnapshot({
 
 function rankBestSuggestions({
   dates,
+  locale,
   timezone,
   dayStartMinutes,
   dayEndMinutes,
@@ -428,6 +456,7 @@ function rankBestSuggestions({
   viewerTimezone,
 }: {
   dates: string[];
+  locale: AppLocale;
   timezone: string;
   dayStartMinutes: number;
   dayEndMinutes: number;
@@ -450,6 +479,7 @@ function rankBestSuggestions({
     .map((meetingWindow) =>
       summarizeMeetingWindow({
         meetingWindow,
+        locale,
         slotMap,
         timezone,
         viewerTimezone,
@@ -468,7 +498,11 @@ function rankBestSuggestions({
       return left.slotStart.localeCompare(right.slotStart);
     })
     .slice(0, 3)
-    .map(({ sumCount: _sumCount, ...suggestion }) => suggestion);
+    .map((summary) => {
+      const { sumCount, ...suggestion } = summary;
+      void sumCount;
+      return suggestion;
+    });
 }
 
 export function getAllowedSlotStarts({

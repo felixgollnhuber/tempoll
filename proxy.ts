@@ -3,6 +3,8 @@ import type { NextRequest } from "next/server";
 
 import { getParticipantSessionCookieFromEditLink } from "@/lib/event-service";
 import { appConfig } from "@/lib/config";
+import { LOCALE_COOKIE_NAME } from "@/lib/i18n/locale";
+import { createI18n, resolveLocale } from "@/lib/i18n/server";
 import { getParticipantCookieOptions } from "@/lib/tokens";
 import { isAppSetupComplete } from "@/lib/setup-state";
 import { PRIVATE_NO_STORE_HEADERS, mergeHeaders } from "@/lib/security";
@@ -17,6 +19,13 @@ function getEventSlug(pathname: string) {
 }
 
 export async function proxy(request: NextRequest) {
+  const i18n = createI18n(
+    resolveLocale({
+      cookieLocale: request.cookies.get(LOCALE_COOKIE_NAME)?.value,
+      acceptLanguage: request.headers.get("accept-language"),
+    }),
+  );
+
   if (!isAppSetupComplete()) {
     const { pathname } = request.nextUrl;
 
@@ -27,7 +36,7 @@ export async function proxy(request: NextRequest) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json(
         {
-          error: "App setup is not complete yet. Open /setup to generate the environment configuration.",
+          error: i18n.messages.errors.appSetupIncomplete,
         },
         { status: 503 },
       );

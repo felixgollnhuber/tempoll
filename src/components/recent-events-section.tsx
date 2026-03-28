@@ -14,10 +14,11 @@ import {
   removeRecentEvent,
   subscribeRecentEvents,
 } from "@/lib/recent-events";
+import { useI18n } from "@/lib/i18n/context";
 
-function formatTimestamp(value: string) {
+function formatTimestamp(value: string, locale: string) {
   try {
-    return new Intl.DateTimeFormat(undefined, {
+    return new Intl.DateTimeFormat(locale, {
       dateStyle: "medium",
       timeStyle: "short",
     }).format(new Date(value));
@@ -27,6 +28,7 @@ function formatTimestamp(value: string) {
 }
 
 export function RecentEventsSection() {
+  const { messages, intlLocale, format } = useI18n();
   const entries = useSyncExternalStore(
     subscribeRecentEvents,
     readRecentEvents,
@@ -37,15 +39,15 @@ export function RecentEventsSection() {
     <section id="recent-events" className="scroll-mt-24">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-2">
-          <p className="text-sm font-medium text-muted-foreground">Recent events</p>
-          <h2 className="text-3xl font-semibold tracking-tight">Open boards you visited before</h2>
+          <p className="text-sm font-medium text-muted-foreground">{messages.recentEvents.eyebrow}</p>
+          <h2 className="text-3xl font-semibold tracking-tight">{messages.recentEvents.title}</h2>
           <p className="max-w-2xl text-sm text-muted-foreground">
-            Saved only in this browser. Organizer links are marked as private.
+            {messages.recentEvents.description}
           </p>
         </div>
         {entries.length > 0 ? (
           <Button variant="outline" size="sm" onClick={() => clearRecentEvents()}>
-            Clear all
+            {messages.recentEvents.clearAll}
           </Button>
         ) : null}
       </div>
@@ -53,9 +55,9 @@ export function RecentEventsSection() {
       {entries.length === 0 ? (
         <Card className="mt-6">
           <CardHeader>
-            <CardTitle>No recent events yet</CardTitle>
+            <CardTitle>{messages.recentEvents.emptyTitle}</CardTitle>
             <CardDescription>
-              Open a public board or organizer page and it will appear here for quick access.
+              {messages.recentEvents.emptyDescription}
             </CardDescription>
           </CardHeader>
         </Card>
@@ -70,14 +72,16 @@ export function RecentEventsSection() {
                     <CardDescription className="text-xs">
                       <span className="inline-flex items-center gap-1">
                         <Clock3Icon className="size-3" />
-                        Last opened {formatTimestamp(entry.lastViewedAt)}
+                        {format(messages.recentEvents.lastOpened, {
+                          timestamp: formatTimestamp(entry.lastViewedAt, intlLocale),
+                        })}
                       </span>
                     </CardDescription>
                   </div>
                   {entry.manageUrl ? (
                     <Badge variant="outline" className="gap-1">
                       <LockIcon className="size-3" />
-                      Private link saved
+                      {messages.recentEvents.privateLinkSaved}
                     </Badge>
                   ) : null}
                 </div>
@@ -86,12 +90,12 @@ export function RecentEventsSection() {
                 <div className="flex flex-wrap items-center gap-2">
                   {entry.publicUrl ? (
                     <Button asChild size="sm">
-                      <Link href={entry.publicUrl}>Open public</Link>
+                      <Link href={entry.publicUrl}>{messages.recentEvents.openPublic}</Link>
                     </Button>
                   ) : null}
                   {entry.manageUrl ? (
                     <Button asChild variant="outline" size="sm">
-                      <Link href={entry.manageUrl}>Open organizer</Link>
+                      <Link href={entry.manageUrl}>{messages.recentEvents.openOrganizer}</Link>
                     </Button>
                   ) : null}
                 </div>
@@ -102,7 +106,7 @@ export function RecentEventsSection() {
                   onClick={() => removeRecentEvent(entry.slug)}
                 >
                   <Trash2Icon className="size-4" />
-                  Remove
+                  {messages.recentEvents.remove}
                 </Button>
               </CardContent>
             </Card>

@@ -49,6 +49,7 @@ describe("PUT /api/events/[slug]/availability", () => {
           selectedSlotStarts: ["2026-03-30T07:00:00.000Z"],
         }),
         headers: {
+          "Accept-Language": "en-US",
           "Content-Type": "application/json",
         },
       }),
@@ -61,6 +62,7 @@ describe("PUT /api/events/[slug]/availability", () => {
 
     expect(saveAvailability).toHaveBeenCalledWith(
       "test-event",
+      "en",
       {
         selectedSlotStarts: ["2026-03-30T07:00:00.000Z"],
       },
@@ -71,9 +73,7 @@ describe("PUT /api/events/[slug]/availability", () => {
   });
 
   it("returns the domain-auth error for missing or expired participant sessions", async () => {
-    saveAvailability.mockRejectedValue(
-      unauthorized("Your editing session is no longer valid. Reopen your participant link or join the event again."),
-    );
+    saveAvailability.mockRejectedValue(unauthorized("participant_session_missing"));
 
     const { PUT } = await import("./route");
     const response = await PUT(
@@ -83,6 +83,7 @@ describe("PUT /api/events/[slug]/availability", () => {
           selectedSlotStarts: [],
         }),
         headers: {
+          "Accept-Language": "en-US",
           "Content-Type": "application/json",
         },
       }),
@@ -110,6 +111,7 @@ describe("PUT /api/events/[slug]/availability", () => {
           selectedSlotStarts: [],
         }),
         headers: {
+          "Accept-Language": "en-US",
           "Content-Type": "application/json",
         },
       }),

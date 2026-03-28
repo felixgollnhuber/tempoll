@@ -67,6 +67,7 @@ export function getSetupDraftValues(): SetupWizardValues {
   return createSetupWizardValues({
     appName: getEnv("APP_NAME") ?? appConfig.appName,
     appUrl: getEnv("APP_URL") ?? appConfig.appUrl,
+    appDefaultLocale: appConfig.defaultLocale,
     legalPagesEnabled: getBooleanEnv("LEGAL_PAGES_ENABLED", false) ? "true" : "false",
     operatorLegalName: getEnv("OPERATOR_LEGAL_NAME") ?? "",
     operatorDisplayName: getEnv("OPERATOR_DISPLAY_NAME") ?? "",
@@ -81,9 +82,7 @@ export function getSetupDraftValues(): SetupWizardValues {
     mediaOwner: getEnv("MEDIA_OWNER") ?? "",
     editorialLine: getEnv("EDITORIAL_LINE") ?? "",
     privacyContactEmail: getEnv("PRIVACY_CONTACT_EMAIL") ?? getEnv("OPERATOR_EMAIL") ?? "",
-    hostingDescription:
-      getEnv("HOSTING_DESCRIPTION") ??
-      "Self-hosted deployment operated by the controller using its own infrastructure and/or hosting providers.",
+    hostingDescription: getEnv("HOSTING_DESCRIPTION") ?? "",
     privacyProcessors: parseProcessors(getEnv("PRIVACY_PROCESSORS")).join("\n"),
   });
 }

@@ -1,7 +1,8 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PublicEventClient } from "./public-event-client";
+import { renderWithI18n } from "@/test/render-with-i18n";
 import type { PublicEventSnapshot } from "@/lib/types";
 
 function createSnapshot(options?: {
@@ -119,6 +120,24 @@ afterEach(() => {
 });
 
 describe("PublicEventClient", () => {
+  it("renders localized controls in German", () => {
+    renderWithI18n(
+      <PublicEventClient
+        slug="test-event"
+        initialSnapshot={createSnapshot()}
+        initialSession={{
+          participantId: "p1",
+          displayName: "Felix",
+        }}
+      />,
+      { locale: "de" },
+    );
+
+    expect(screen.getByRole("button", { name: "Bearbeiten" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ansehen" })).toBeInTheDocument();
+    expect(screen.getByText("Verfügbarkeit")).toBeInTheDocument();
+  });
+
   it("hides best matching windows before anyone has selected availability", () => {
     const snapshot = createSnapshot({ withCurrentUser: false });
     snapshot.slots = snapshot.slots.map((slot) => ({
@@ -144,7 +163,7 @@ describe("PublicEventClient", () => {
       },
     ];
 
-    render(
+    renderWithI18n(
       <PublicEventClient
         slug="test-event"
         initialSnapshot={snapshot}
@@ -156,7 +175,7 @@ describe("PublicEventClient", () => {
   });
 
   it("keeps the heatmap visible in edit mode while marking the current user's slots", () => {
-    render(
+    renderWithI18n(
       <PublicEventClient
         slug="test-event"
         initialSnapshot={createSnapshot()}
@@ -179,7 +198,7 @@ describe("PublicEventClient", () => {
   });
 
   it("switches to view mode and shows available plus unavailable participants for a slot", () => {
-    render(
+    renderWithI18n(
       <PublicEventClient
         slug="test-event"
         initialSnapshot={createSnapshot()}
@@ -218,7 +237,7 @@ describe("PublicEventClient", () => {
   });
 
   it("highlights a clicked participant's availability on the grid and toggles it off again", () => {
-    render(
+    renderWithI18n(
       <PublicEventClient
         slug="test-event"
         initialSnapshot={createSnapshot()}
@@ -255,7 +274,7 @@ describe("PublicEventClient", () => {
   it("shows day navigation when the date range overflows and moves the visible window one day at a time", async () => {
     setViewportWidth(240);
 
-    render(
+    renderWithI18n(
       <PublicEventClient
         slug="test-event"
         initialSnapshot={createSnapshot({ dayCount: 5 })}
@@ -266,25 +285,25 @@ describe("PublicEventClient", () => {
       />,
     );
 
-    expect(await screen.findByText("Mon, Mar 30 to Tue, Mar 31")).toBeInTheDocument();
+    expect(await screen.findByText("Mon, Mar 30 – Tue, Mar 31")).toBeInTheDocument();
     expect(await screen.findByText("Days 1 - 2 of 5")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Show previous days" })).toBeDisabled();
 
     fireEvent.click(screen.getByRole("button", { name: "Show next days" }));
 
-    expect(await screen.findByText("Tue, Mar 31 to Wed, Apr 1")).toBeInTheDocument();
+    expect(await screen.findByText("Tue, Mar 31 – Wed, Apr 1")).toBeInTheDocument();
     expect(await screen.findByText("Days 2 - 3 of 5")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Show previous days" })).toBeEnabled();
 
     fireEvent.click(screen.getByRole("button", { name: "Show next days" }));
     fireEvent.click(screen.getByRole("button", { name: "Show next days" }));
 
-    expect(await screen.findByText("Thu, Apr 2 to Fri, Apr 3")).toBeInTheDocument();
+    expect(await screen.findByText("Thu, Apr 2 – Fri, Apr 3")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Show next days" })).toBeDisabled();
   });
 
   it("keeps edit interactions on the grid and does not open slot details while painting", () => {
-    render(
+    renderWithI18n(
       <PublicEventClient
         slug="test-event"
         initialSnapshot={createSnapshot()}
@@ -317,7 +336,7 @@ describe("PublicEventClient", () => {
   });
 
   it("stays in view mode when there is no editable session", () => {
-    render(
+    renderWithI18n(
       <PublicEventClient
         slug="test-event"
         initialSnapshot={createSnapshot({ withCurrentUser: false })}
@@ -331,7 +350,7 @@ describe("PublicEventClient", () => {
   });
 
   it("stays in view mode when the event is closed", () => {
-    render(
+    renderWithI18n(
       <PublicEventClient
         slug="test-event"
         initialSnapshot={createSnapshot({ status: "CLOSED" })}
@@ -371,7 +390,7 @@ describe("PublicEventClient", () => {
       },
     ];
 
-    render(
+    renderWithI18n(
       <PublicEventClient
         slug="test-event"
         initialSnapshot={snapshot}

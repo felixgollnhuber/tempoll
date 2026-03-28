@@ -25,7 +25,7 @@ describe("PATCH /api/manage/[token]", () => {
   });
 
   it("returns 404 for invalid organizer tokens without leaking internal details", async () => {
-    updateManagedEvent.mockRejectedValue(notFound("Event not found.", "manage_key_invalid"));
+    updateManagedEvent.mockRejectedValue(notFound("manage_key_invalid"));
 
     const { PATCH } = await import("./route");
     const response = await PATCH(
@@ -38,6 +38,7 @@ describe("PATCH /api/manage/[token]", () => {
           finalSlotStart: null,
         }),
         headers: {
+          "Accept-Language": "en-US",
           "Content-Type": "application/json",
         },
       }),
@@ -69,6 +70,7 @@ describe("PATCH /api/manage/[token]", () => {
           finalSlotStart: null,
         }),
         headers: {
+          "Accept-Language": "en-US",
           "Content-Type": "application/json",
         },
       }),

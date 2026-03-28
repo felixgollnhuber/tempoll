@@ -1,7 +1,8 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { ManageEventClient } from "./manage-event-client";
+import { renderWithI18n } from "@/test/render-with-i18n";
 import type { ManageEventView } from "@/lib/types";
 
 function createManageView(options?: {
@@ -94,7 +95,7 @@ function createManageView(options?: {
 describe("ManageEventClient", () => {
   it("keeps long share links wrappable inside the sidebar cards", () => {
     const view = createManageView();
-    render(<ManageEventClient initialView={view} />);
+    renderWithI18n(<ManageEventClient initialView={view} />);
 
     expect(screen.getByText(view.shareUrl).className).toContain("[overflow-wrap:anywhere]");
     expect(screen.getByText(view.manageUrl).className).toContain("[overflow-wrap:anywhere]");
@@ -102,7 +103,7 @@ describe("ManageEventClient", () => {
 
   it("renders the heatmap and lets the organizer select a fixed date on closed events", () => {
     const view = createManageView({ status: "CLOSED" });
-    render(<ManageEventClient initialView={view} />);
+    renderWithI18n(<ManageEventClient initialView={view} />);
 
     expect(screen.getByText("Availability")).toBeInTheDocument();
 
@@ -136,7 +137,7 @@ describe("ManageEventClient", () => {
         participantIds: ["participant_1", "participant_2"],
       },
     });
-    render(<ManageEventClient initialView={view} />);
+    renderWithI18n(<ManageEventClient initialView={view} />);
 
     expect(screen.getByText("Fixed date")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Add to calendar (.ics)" })).toHaveAttribute(
@@ -157,7 +158,7 @@ describe("ManageEventClient", () => {
       participantIds: [],
     }));
 
-    render(<ManageEventClient initialView={view} />);
+    renderWithI18n(<ManageEventClient initialView={view} />);
 
     expect(screen.queryByText("Best windows right now")).not.toBeInTheDocument();
   });

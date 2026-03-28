@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useI18n } from "@/lib/i18n/context";
 import type { PublicEventSnapshot, RealtimeEventPayload } from "@/lib/types";
 
 type PublicEventClientProps = {
@@ -51,6 +52,8 @@ export function PublicEventClient({
   initialSnapshot,
   initialSession,
 }: PublicEventClientProps) {
+  const { messages, format, plural } = useI18n();
+  const saveAvailabilityFallback = messages.errors.routeFallbacks.saveAvailability;
   const initialHasEditableSession = Boolean(initialSession && initialSnapshot.status === "OPEN");
   const [snapshot, setSnapshot] = useState(initialSnapshot);
   const [session, setSession] = useState<ParticipantSessionState>(initialSession);
@@ -164,7 +167,7 @@ export function PublicEventClient({
             if (!response.ok) {
               const payload = (await response.json()) as { error?: string };
               localAvailabilityEchoRef.current = null;
-              toast.error(payload.error ?? "Unable to save availability.");
+              toast.error(payload.error ?? saveAvailabilityFallback);
               continue;
             }
 
@@ -193,7 +196,16 @@ export function PublicEventClient({
     }, 500);
 
     return () => window.clearTimeout(handle);
-  }, [applySnapshot, canEdit, draftVersion, selectedMap, session, slug, snapshot.slots]);
+  }, [
+    applySnapshot,
+    canEdit,
+    draftVersion,
+    saveAvailabilityFallback,
+    selectedMap,
+    session,
+    slug,
+    snapshot.slots,
+  ]);
 
   useEffect(() => {
     if (!canEdit) {
@@ -223,14 +235,14 @@ export function PublicEventClient({
     setJoining(false);
 
     if (!response.ok || !payload.session) {
-      setJoinError(payload.error ?? "Unable to join event.");
+      setJoinError(payload.error ?? messages.errors.routeFallbacks.joinEvent);
       return;
     }
 
     setSession(payload.session);
     setMode("edit");
     setName("");
-    toast.success("You joined the event");
+    toast.success(messages.publicEvent.joined);
     await fetchSnapshot();
   }
 
@@ -267,11 +279,11 @@ export function PublicEventClient({
 
   const sidebarTopContent =
     snapshot.status === "CLOSED" && snapshot.finalizedSlot ? (
-      <Card>
-        <CardHeader className="p-4 pb-2">
-          <CardTitle className="text-sm">Fixed date</CardTitle>
+        <Card>
+          <CardHeader className="p-4 pb-2">
+          <CardTitle className="text-sm">{messages.common.fixedDate}</CardTitle>
           <CardDescription className="text-xs">
-            This event is closed and the organizer picked the final meeting slot.
+            {messages.publicEvent.fixedDateDescription}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2 p-4 pt-0">
@@ -279,38 +291,48 @@ export function PublicEventClient({
             <p className="text-sm font-semibold text-foreground">{snapshot.finalizedSlot.label}</p>
             {snapshot.finalizedSlot.localLabel ? (
               <p className="mt-1 text-[11px] text-muted-foreground">
-                Your timezone: {snapshot.finalizedSlot.localLabel}
+                {format(messages.publicEvent.yourTimezone, {
+                  label: snapshot.finalizedSlot.localLabel,
+                })}
               </p>
             ) : null}
             <p className="mt-1 text-[11px] text-muted-foreground">
-              {snapshot.finalizedSlot.availableCount} participants free for the full window
+              {plural(messages.publicEvent.fullWindowFree, snapshot.finalizedSlot.availableCount)}
             </p>
           </div>
           <Button asChild size="sm" className="w-full">
-            <a href={`/api/events/${slug}/ics`}>Add to calendar (.ics)</a>
+            <a href={`/api/events/${slug}/ics`}>
+              {messages.common.addToCalendar}
+            </a>
           </Button>
         </CardContent>
       </Card>
     ) : hasAnyAvailability ? (
       <Card>
         <CardHeader className="p-4 pb-2">
-          <CardTitle className="text-sm">Best matching windows</CardTitle>
+          <CardTitle className="text-sm">{messages.publicEvent.bestWindowsTitle}</CardTitle>
           <CardDescription className="text-xs">
-            Ranked by overlap across the full {snapshot.meetingDurationMinutes}-minute meeting.
+            {format(messages.publicEvent.bestWindowsDescription, {
+              duration: snapshot.meetingDurationMinutes,
+            })}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2 p-4 pt-0">
           {snapshot.suggestions.map((suggestion, index) => (
             <div key={suggestion.slotStart} className="rounded-md border bg-muted/20 px-3 py-2">
-              <p className="text-[11px] font-medium text-muted-foreground">Option {index + 1}</p>
+              <p className="text-[11px] font-medium text-muted-foreground">
+                {format(messages.common.option, { count: index + 1 })}
+              </p>
               <p className="mt-1 text-sm font-semibold text-foreground">{suggestion.label}</p>
               {suggestion.localLabel ? (
                 <p className="mt-1 text-[11px] text-muted-foreground">
-                  Your timezone: {suggestion.localLabel}
+                  {format(messages.publicEvent.yourTimezone, {
+                    label: suggestion.localLabel,
+                  })}
                 </p>
               ) : null}
               <p className="mt-1 text-[11px] text-muted-foreground">
-                {suggestion.availableCount} participants free for the full window
+                {plural(messages.publicEvent.fullWindowFree, suggestion.availableCount)}
               </p>
             </div>
           ))}
@@ -323,25 +345,25 @@ export function PublicEventClient({
       {!session ? (
         <Card>
           <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-base">Join this board</CardTitle>
+            <CardTitle className="text-base">{messages.publicEvent.joinTitle}</CardTitle>
             <CardDescription className="text-xs">
-              Enter your name to start selecting the times that work for you.
+              {messages.publicEvent.joinDescription}
             </CardDescription>
           </CardHeader>
           <CardContent className="p-4 pt-0">
             <div className="flex flex-col gap-3 md:flex-row md:items-end">
               <div className="flex-1 space-y-2">
-                <Label htmlFor="displayName">Your name</Label>
+                <Label htmlFor="displayName">{messages.publicEvent.yourNameLabel}</Label>
                 <Input
                   id="displayName"
                   value={name}
                   onChange={(event) => setName(event.target.value)}
-                  placeholder="Alex, Nora, Product team..."
+                  placeholder={messages.publicEvent.yourNamePlaceholder}
                 />
               </div>
               <Button onClick={handleJoin} disabled={joining || snapshot.status === "CLOSED"}>
                 {joining ? <Loader2Icon className="size-4 animate-spin" /> : null}
-                Join event
+                {messages.publicEvent.joinButton}
               </Button>
             </div>
             {joinError ? <p className="text-sm text-destructive">{joinError}</p> : null}

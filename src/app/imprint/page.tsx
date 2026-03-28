@@ -1,6 +1,8 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getServerI18n } from "@/lib/i18n/server";
 import { getSiteConfig } from "@/lib/site-config";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +16,16 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-export default function ImprintPage() {
+export async function generateMetadata(): Promise<Metadata> {
+  const { messages } = await getServerI18n();
+
+  return {
+    title: messages.metadata.imprintTitle,
+  };
+}
+
+export default async function ImprintPage() {
+  const { messages, format } = await getServerI18n();
   const siteConfig = getSiteConfig();
   if (!siteConfig.legalPagesEnabled) {
     notFound();
@@ -26,55 +37,59 @@ export default function ImprintPage() {
     siteConfig.operator.country,
   ].filter(Boolean);
   const websiteLabel = siteConfig.operator.website ?? siteConfig.appUrl;
-  const operatorName = siteConfig.operator.legalName ?? siteConfig.operator.displayName ?? "Available on request";
+  const operatorName =
+    siteConfig.operator.legalName ??
+    siteConfig.operator.displayName ??
+    messages.imprint.availableOnRequest;
 
   return (
     <main className="app-shell flex-1 py-10 sm:py-14">
       <div className="mx-auto max-w-4xl space-y-8">
         <div className="space-y-3">
-          <p className="text-sm font-medium text-muted-foreground">Legal</p>
-          <h1 className="text-4xl font-semibold tracking-tight">Imprint</h1>
+          <p className="text-sm font-medium text-muted-foreground">{messages.imprint.eyebrow}</p>
+          <h1 className="text-4xl font-semibold tracking-tight">{messages.imprint.title}</h1>
           <p className="max-w-3xl text-sm leading-7 text-muted-foreground">
-            This page contains the operator disclosure for {siteConfig.appName}. The structure is
-            prepared for Austrian self-hosted deployments and should be reviewed before production
-            use.
+            {format(messages.imprint.description, { appName: siteConfig.appName })}
           </p>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Provider information</CardTitle>
+            <CardTitle>{messages.imprint.providerInformation}</CardTitle>
             <CardDescription>
-              Information pursuant to the Austrian disclosure rules for websites.
+              {messages.imprint.providerInformationDescription}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <dl className="space-y-4">
-              <DetailRow label="Legal name" value={operatorName} />
+              <DetailRow label={messages.imprint.labels.legalName} value={operatorName} />
               {siteConfig.operator.displayName ? (
-                <DetailRow label="Display name" value={siteConfig.operator.displayName} />
+                <DetailRow
+                  label={messages.imprint.labels.displayName}
+                  value={siteConfig.operator.displayName}
+                />
               ) : null}
               <DetailRow
-                label="Address"
+                label={messages.imprint.labels.address}
                 value={
                   addressParts.length > 0
                     ? addressParts.join(", ")
-                    : "Not published here. Address details can be provided on request."
+                    : messages.imprint.addressOnRequest
                 }
               />
               <DetailRow
-                label="Email"
-                value={siteConfig.operator.email ?? "Not published here. Contact details can be provided on request."}
+                label={messages.imprint.labels.email}
+                value={siteConfig.operator.email ?? messages.imprint.contactOnRequest}
               />
               {siteConfig.operator.phone ? (
-                <DetailRow label="Phone" value={siteConfig.operator.phone} />
+                <DetailRow label={messages.imprint.labels.phone} value={siteConfig.operator.phone} />
               ) : null}
-              <DetailRow label="Website" value={websiteLabel} />
+              <DetailRow label={messages.imprint.labels.website} value={websiteLabel} />
               <DetailRow
-                label="Business purpose"
+                label={messages.imprint.labels.businessPurpose}
                 value={
                   siteConfig.operator.businessPurpose ??
-                  "Operation of a self-hosted scheduling service."
+                  messages.imprint.defaultBusinessPurpose
                 }
               />
             </dl>
@@ -83,22 +98,22 @@ export default function ImprintPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Media owner and editorial line</CardTitle>
+            <CardTitle>{messages.imprint.mediaOwnerAndEditorialLine}</CardTitle>
             <CardDescription>
-              Disclosure for informational content provided via this website.
+              {messages.imprint.mediaOwnerAndEditorialLineDescription}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <dl className="space-y-4">
               <DetailRow
-                label="Media owner"
-                value={siteConfig.media.owner ?? "Available on request."}
+                label={messages.imprint.labels.mediaOwner}
+                value={siteConfig.media.owner ?? messages.imprint.mediaOwnerOnRequest}
               />
               <DetailRow
-                label="Editorial line"
+                label={messages.imprint.labels.editorialLine}
                 value={
                   siteConfig.media.editorialLine ??
-                  "Project information and operational details about this scheduling service."
+                  messages.imprint.editorialLineDefault
                 }
               />
             </dl>
@@ -107,15 +122,15 @@ export default function ImprintPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Hosting notice</CardTitle>
+            <CardTitle>{messages.imprint.hostingNotice}</CardTitle>
             <CardDescription>
-              Operational note about how this service is provided.
+              {messages.imprint.hostingNoticeDescription}
             </CardDescription>
           </CardHeader>
           <CardContent className="text-sm leading-7 text-muted-foreground">
             <p>
               {siteConfig.privacy.hostingDescription ??
-                "Hosting details are not published here and can be provided on request."}
+                messages.imprint.hostingOnRequest}
             </p>
           </CardContent>
         </Card>

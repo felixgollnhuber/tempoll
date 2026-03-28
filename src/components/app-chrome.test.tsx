@@ -1,15 +1,19 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { AppChrome } from "./app-chrome";
+import { renderWithI18n } from "@/test/render-with-i18n";
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/",
+  useRouter: () => ({
+    refresh: vi.fn(),
+  }),
 }));
 
 describe("AppChrome", () => {
   it("renders the default logo when one is configured", () => {
-    render(
+    renderWithI18n(
       <AppChrome
         appName="tempoll"
         logoSrc="/tempoll-logo.png"
@@ -24,7 +28,7 @@ describe("AppChrome", () => {
   });
 
   it("falls back to the app name when no logo is configured", () => {
-    render(
+    renderWithI18n(
       <AppChrome appName="tempoll" setupComplete legalPagesEnabled={false}>
         <div>content</div>
       </AppChrome>,
@@ -34,7 +38,7 @@ describe("AppChrome", () => {
   });
 
   it("falls back to the app name when the logo cannot be loaded", () => {
-    render(
+    renderWithI18n(
       <AppChrome
         appName="tempoll"
         logoSrc="/tempoll-logo.png"
@@ -52,7 +56,7 @@ describe("AppChrome", () => {
   });
 
   it("shows a new logo again after a previous logo failed", () => {
-    const { rerender } = render(
+    const { rerender } = renderWithI18n(
       <AppChrome
         appName="tempoll"
         logoSrc="/tempoll-logo.png"

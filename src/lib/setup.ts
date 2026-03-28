@@ -1,6 +1,9 @@
+import { isSupportedLocale, type AppLocale } from "@/lib/i18n/locale";
+
 export type SetupWizardValues = {
   appName: string;
   appUrl: string;
+  appDefaultLocale: AppLocale;
   legalPagesEnabled: string;
   operatorLegalName: string;
   operatorDisplayName: string;
@@ -24,6 +27,7 @@ export type SetupWizardErrors = Partial<Record<keyof SetupWizardValues, string>>
 export const defaultSetupWizardValues: SetupWizardValues = {
   appName: "tempoll",
   appUrl: "http://localhost:3000",
+  appDefaultLocale: "de",
   legalPagesEnabled: "false",
   operatorLegalName: "",
   operatorDisplayName: "",
@@ -71,7 +75,7 @@ export function createSetupWizardValues(
 export function getStepFieldNames(step: number): Array<keyof SetupWizardValues> {
   switch (step) {
     case 0:
-      return ["appName", "appUrl"];
+      return ["appName", "appUrl", "appDefaultLocale"];
     case 1:
       return [];
     case 2:
@@ -86,8 +90,20 @@ export function getStepFieldNames(step: number): Array<keyof SetupWizardValues> 
 export function validateSetupValues(
   values: SetupWizardValues,
   fields: Array<keyof SetupWizardValues>,
+  messages?: {
+    required: string;
+    fullUrl: string;
+    validEmail: string;
+    validLocale: string;
+  },
 ): SetupWizardErrors {
   const errors: SetupWizardErrors = {};
+  const validationMessages = messages ?? {
+    required: "This field is required.",
+    fullUrl: "Use a full URL including http:// or https://.",
+    validEmail: "Use a valid email address.",
+    validLocale: "Choose a supported default language.",
+  };
 
   for (const field of fields) {
     const value = cleanValue(values[field]);
@@ -99,12 +115,16 @@ export function validateSetupValues(
       ].includes(field) &&
       !value
     ) {
-      errors[field] = "This field is required.";
+      errors[field] = validationMessages.required;
       continue;
     }
 
     if (field === "appUrl" && value && !isValidUrl(value)) {
-      errors[field] = "Use a full URL including http:// or https://.";
+      errors[field] = validationMessages.fullUrl;
+    }
+
+    if (field === "appDefaultLocale" && !isSupportedLocale(value)) {
+      errors[field] = validationMessages.validLocale;
     }
 
     if (
@@ -112,11 +132,11 @@ export function validateSetupValues(
       value &&
       !isValidEmail(value)
     ) {
-      errors[field] = "Use a valid email address.";
+      errors[field] = validationMessages.validEmail;
     }
 
     if (field === "operatorWebsite" && value && !isValidUrl(value)) {
-      errors[field] = "Use a full URL including http:// or https://.";
+      errors[field] = validationMessages.fullUrl;
     }
   }
 
@@ -144,6 +164,7 @@ export function buildEnvFileContent(values: SetupWizardValues) {
     "APP_SETUP_COMPLETE=true",
     `APP_NAME=${quoteEnvValue(cleanValue(values.appName))}`,
     `APP_URL=${quoteEnvValue(cleanValue(values.appUrl))}`,
+    `APP_DEFAULT_LOCALE=${quoteEnvValue(values.appDefaultLocale)}`,
     `LEGAL_PAGES_ENABLED=${cleanValue(values.legalPagesEnabled) === "true" ? "true" : "false"}`,
     "",
     `OPERATOR_LEGAL_NAME=${quoteEnvValue(cleanValue(values.operatorLegalName))}`,

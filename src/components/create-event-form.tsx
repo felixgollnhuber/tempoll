@@ -32,8 +32,9 @@ import {
   readCreateEventDefaults,
   saveCreateEventDefaults,
 } from "@/lib/create-event-defaults";
+import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/utils";
-import { eventCreateSchema } from "@/lib/validators";
+import { createEventCreateSchema } from "@/lib/validators";
 
 type CreateEventFormProps = {
   timezones: string[];
@@ -68,16 +69,24 @@ const eventFieldIds: Record<EventField, string> = {
 
 const eventFieldSet = new Set<EventField>(eventFieldOrder);
 
-function getRangeLabel(range: DateRange | undefined) {
+function getRangeLabel(
+  range: DateRange | undefined,
+  localeLabel: string,
+  messages: ReturnType<typeof useI18n>["messages"],
+  dateFnsLocale: ReturnType<typeof useI18n>["dateFnsLocale"],
+) {
   if (range?.from && range?.to) {
-    return `${format(range.from, "MMM d, yyyy")} - ${format(range.to, "MMM d, yyyy")}`;
+    return `${format(range.from, localeLabel, { locale: dateFnsLocale })} - ${format(range.to, localeLabel, { locale: dateFnsLocale })}`;
   }
 
   if (range?.from) {
-    return `${format(range.from, "MMM d, yyyy")} - pick an end date`;
+    return messages.createEvent.range.noEndDate.replace(
+      "{from}",
+      format(range.from, localeLabel, { locale: dateFnsLocale }),
+    );
   }
 
-  return "Choose a start and end date";
+  return messages.createEvent.dateRangePlaceholder;
 }
 
 function getRangeDays(range: DateRange | undefined) {
@@ -91,12 +100,9 @@ function getRangeDays(range: DateRange | undefined) {
   }).length;
 }
 
-function getRangeDaysText(days: number) {
-  return `${days} day${days === 1 ? "" : "s"}`;
-}
-
 export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps) {
   const router = useRouter();
+  const { messages, plural, format: formatMessage, dateFnsLocale, locale } = useI18n();
   const [isPending, startTransition] = useTransition();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<EventFormErrors>({});
@@ -159,8 +165,14 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
         }).map((date) => format(date, "yyyy-MM-dd"))
       : [];
 
-  const selectedRangeLabel = getRangeLabel(dateRange);
-  const draftRangeLabel = getRangeLabel(draftDateRange);
+  const compactDateLabel = locale === "de" ? "d. MMM yyyy" : "MMM d, yyyy";
+  const selectedRangeLabel = getRangeLabel(dateRange, compactDateLabel, messages, dateFnsLocale);
+  const draftRangeLabel = getRangeLabel(
+    draftDateRange,
+    compactDateLabel,
+    messages,
+    dateFnsLocale,
+  );
   const selectedRangeDays = getRangeDays(dateRange);
   const draftRangeDays = getRangeDays(draftDateRange);
 
@@ -241,13 +253,13 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
 
     if (!dateRange?.from || !dateRange?.to) {
       setFieldErrors({
-        dates: "Choose a start and end date for the event.",
+        dates: messages.validation.eventCreate.dateRangeRequired,
       });
       focusField("dates");
       return;
     }
 
-    const parsed = eventCreateSchema.safeParse({
+    const parsed = createEventCreateSchema(messages).safeParse({
       title,
       timezone,
       dates: selectedDates,
@@ -267,7 +279,7 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
         return;
       }
 
-      setErrorMessage("Please check your event settings.");
+      setErrorMessage(messages.createEvent.genericSettingsError);
       return;
     }
 
@@ -284,12 +296,12 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
 
       const payload = (await response.json()) as { error?: string; manageKey?: string };
       if (!response.ok || !payload.manageKey) {
-        setErrorMessage(payload.error ?? "Unable to create the event.");
-        toast.error(payload.error ?? "Unable to create the event.");
+        setErrorMessage(payload.error ?? messages.createEvent.createFailed);
+        toast.error(payload.error ?? messages.createEvent.createFailed);
         return;
       }
 
-      toast.success("Event created");
+      toast.success(messages.createEvent.created);
       saveCreateEventDefaults({
         dayStartMinutes,
         dayEndMinutes,
@@ -303,19 +315,18 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
       <Card>
         <CardHeader className="space-y-2">
-          <CardTitle className="text-2xl">Event details</CardTitle>
+          <CardTitle className="text-2xl">{messages.createEvent.eventDetailsTitle}</CardTitle>
           <CardDescription>
-            Set one date range, choose the daily window, and share a single link.
-            Every day inside the selected range will appear on the availability grid.
+            {messages.createEvent.eventDetailsDescription}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form className="space-y-6" onSubmit={onSubmit}>
             <div className="space-y-2">
-              <Label htmlFor="title">Event title</Label>
+              <Label htmlFor="title">{messages.createEvent.titleLabel}</Label>
               <Input
                 id="title"
-                placeholder="Design review, sprint planning, dinner with friends..."
+                placeholder={messages.createEvent.titlePlaceholder}
                 value={title}
                 aria-invalid={fieldErrors.title ? true : undefined}
                 aria-describedby={fieldErrors.title ? "title-error" : undefined}
@@ -337,7 +348,7 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor={eventFieldIds.timezone}>Timezone</Label>
+                <Label htmlFor={eventFieldIds.timezone}>{messages.createEvent.timezoneLabel}</Label>
                 <Select
                   value={timezone}
                   onValueChange={(value) => {
@@ -354,7 +365,7 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
                         "border-destructive focus:ring-destructive/20",
                     )}
                   >
-                    <SelectValue placeholder="Pick a timezone" />
+                    <SelectValue placeholder={messages.createEvent.timezonePlaceholder} />
                   </SelectTrigger>
                   <SelectContent className="max-h-80">
                     {timezones.map((timezoneOption) => (
@@ -372,7 +383,7 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor={eventFieldIds.dates}>Date range</Label>
+                <Label htmlFor={eventFieldIds.dates}>{messages.createEvent.dateRangeLabel}</Label>
                 <Popover open={isRangePickerOpen} onOpenChange={openRangePicker}>
                   <PopoverTrigger asChild>
                     <Button
@@ -393,7 +404,7 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
                       <span className="ml-3 flex shrink-0 items-center gap-2">
                         {selectedRangeDays > 0 ? (
                           <Badge variant="secondary" className="rounded-full px-2.5">
-                            {getRangeDaysText(selectedRangeDays)}
+                            {plural(messages.createEvent.range.days, selectedRangeDays)}
                           </Badge>
                         ) : null}
                         <ChevronDownIcon className="size-4 text-muted-foreground" />
@@ -406,9 +417,9 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
                     className="w-[min(22rem,calc(100vw-2rem))] p-0"
                   >
                     <div className="border-b px-4 py-3">
-                      <p className="text-sm font-medium">Choose event range</p>
+                      <p className="text-sm font-medium">{messages.createEvent.dateRangeOpenTitle}</p>
                       <p className="text-xs text-muted-foreground">
-                        Weeks start on Monday. The whole interval will be shown.
+                        {messages.createEvent.dateRangeOpenDescription}
                       </p>
                     </div>
                     <div className="p-3">
@@ -420,6 +431,7 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
                         disabled={(date) => isAfter(startOfToday(), date)}
                         weekStartsOn={1}
                         onSelect={setDraftDateRange}
+                        locale={dateFnsLocale}
                         className="mx-auto"
                       />
                     </div>
@@ -429,8 +441,10 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
                           <p className="truncate text-sm font-medium">{draftRangeLabel}</p>
                           <p className="text-xs text-muted-foreground">
                             {draftRangeDays > 0
-                              ? `${getRangeDaysText(draftRangeDays)} selected`
-                              : "Select a full range"}
+                              ? formatMessage(messages.createEvent.range.selected, {
+                                  count: plural(messages.createEvent.range.days, draftRangeDays),
+                                })
+                              : messages.createEvent.range.selectFullRange}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
@@ -443,7 +457,7 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
                               setIsRangePickerOpen(false);
                             }}
                           >
-                            Cancel
+                            {messages.common.cancel}
                           </Button>
                           <Button
                             type="button"
@@ -451,7 +465,7 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
                             onClick={applyRangeSelection}
                             disabled={!draftDateRange?.from || !draftDateRange?.to}
                           >
-                            Apply
+                            {messages.common.apply}
                           </Button>
                         </div>
                       </div>
@@ -470,7 +484,7 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor={eventFieldIds.dayStartMinutes}>Daily start</Label>
+                <Label htmlFor={eventFieldIds.dayStartMinutes}>{messages.createEvent.dailyStartLabel}</Label>
                 <Select
                   value={String(dayStartMinutes)}
                   onValueChange={(value) => {
@@ -489,7 +503,7 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
                         "border-destructive focus:ring-destructive/20",
                     )}
                   >
-                    <SelectValue placeholder="Pick a start time" />
+                    <SelectValue placeholder={messages.createEvent.dailyStartPlaceholder} />
                   </SelectTrigger>
                   <SelectContent className="max-h-80">
                     {timeOptions.map((option) => (
@@ -507,7 +521,7 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor={eventFieldIds.dayEndMinutes}>Daily end</Label>
+                <Label htmlFor={eventFieldIds.dayEndMinutes}>{messages.createEvent.dailyEndLabel}</Label>
                 <Select
                   value={String(dayEndMinutes)}
                   onValueChange={(value) => {
@@ -524,7 +538,7 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
                         "border-destructive focus:ring-destructive/20",
                     )}
                   >
-                    <SelectValue placeholder="Pick an end time" />
+                    <SelectValue placeholder={messages.createEvent.dailyEndPlaceholder} />
                   </SelectTrigger>
                   <SelectContent className="max-h-80">
                     {timeOptions.map((option) => (
@@ -542,7 +556,7 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor={eventFieldIds.slotMinutes}>Slot size</Label>
+                <Label htmlFor={eventFieldIds.slotMinutes}>{messages.createEvent.slotSizeLabel}</Label>
                 <Select
                   value={String(slotMinutes)}
                   onValueChange={(value) => {
@@ -559,12 +573,12 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
                         "border-destructive focus:ring-destructive/20",
                     )}
                   >
-                    <SelectValue placeholder="Choose slot size" />
+                    <SelectValue placeholder={messages.createEvent.slotSizePlaceholder} />
                   </SelectTrigger>
                   <SelectContent>
                     {[15, 30, 60].map((minutes) => (
                       <SelectItem key={minutes} value={String(minutes)}>
-                        {minutes} min
+                        {formatMessage(messages.createEvent.minutesShort, { count: minutes })}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -577,7 +591,9 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor={eventFieldIds.meetingDurationMinutes}>Meeting duration</Label>
+                <Label htmlFor={eventFieldIds.meetingDurationMinutes}>
+                  {messages.createEvent.meetingDurationLabel}
+                </Label>
                 <Select
                   value={String(meetingDurationMinutes)}
                   onValueChange={(value) => {
@@ -598,12 +614,12 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
                         "border-destructive focus:ring-destructive/20",
                     )}
                   >
-                    <SelectValue placeholder="Choose duration" />
+                    <SelectValue placeholder={messages.createEvent.meetingDurationPlaceholder} />
                   </SelectTrigger>
                   <SelectContent>
                     {[30, 60, 90, 120].map((minutes) => (
                       <SelectItem key={minutes} value={String(minutes)}>
-                        {minutes} min
+                        {formatMessage(messages.createEvent.minutesShort, { count: minutes })}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -620,7 +636,7 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
 
             <Button type="submit" size="lg" className="w-full sm:w-auto" disabled={isPending}>
               {isPending ? <Loader2Icon className="size-4 animate-spin" /> : <SparklesIcon className="size-4" />}
-              Create event
+              {messages.createEvent.createButton}
             </Button>
           </form>
         </CardContent>
@@ -629,39 +645,45 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
       <div className="space-y-6">
         <Card>
           <CardHeader className="space-y-2">
-            <CardTitle>Preview</CardTitle>
+            <CardTitle>{messages.createEvent.previewTitle}</CardTitle>
             <CardDescription>
-              This is the shape your event will have before anyone joins.
+              {messages.createEvent.previewDescription}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-1">
-              <p className="text-xl font-semibold">{title || "Untitled event"}</p>
+              <p className="text-xl font-semibold">{title || messages.createEvent.untitledEvent}</p>
               <p className="text-sm text-muted-foreground">{timezone}</p>
             </div>
             <Separator />
             <dl className="space-y-3 text-sm">
               <div className="flex items-center justify-between gap-4">
-                <dt className="text-muted-foreground">Date range</dt>
+                <dt className="text-muted-foreground">{messages.createEvent.previewFields.dateRange}</dt>
                 <dd className="text-right font-medium">{selectedRangeLabel}</dd>
               </div>
               <div className="flex items-center justify-between gap-4">
-                <dt className="text-muted-foreground">Days shown</dt>
+                <dt className="text-muted-foreground">{messages.createEvent.previewFields.daysShown}</dt>
                 <dd className="font-medium">{selectedRangeDays}</dd>
               </div>
               <div className="flex items-center justify-between gap-4">
-                <dt className="text-muted-foreground">Daily window</dt>
+                <dt className="text-muted-foreground">{messages.createEvent.previewFields.dailyWindow}</dt>
                 <dd className="font-medium">
                   {getTimeLabel(dayStartMinutes)} - {getTimeLabel(dayEndMinutes)}
                 </dd>
               </div>
               <div className="flex items-center justify-between gap-4">
-                <dt className="text-muted-foreground">Granularity</dt>
-                <dd className="font-medium">{slotMinutes} min</dd>
+                <dt className="text-muted-foreground">{messages.createEvent.previewFields.granularity}</dt>
+                <dd className="font-medium">
+                  {formatMessage(messages.createEvent.minutesShort, { count: slotMinutes })}
+                </dd>
               </div>
               <div className="flex items-center justify-between gap-4">
-                <dt className="text-muted-foreground">Ranked window</dt>
-                <dd className="font-medium">{meetingDurationMinutes} min</dd>
+                <dt className="text-muted-foreground">{messages.createEvent.previewFields.rankedWindow}</dt>
+                <dd className="font-medium">
+                  {formatMessage(messages.createEvent.minutesShort, {
+                    count: meetingDurationMinutes,
+                  })}
+                </dd>
               </div>
             </dl>
           </CardContent>
@@ -669,12 +691,12 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
 
         <Card>
           <CardHeader className="space-y-2">
-            <CardTitle>What gets created</CardTitle>
+            <CardTitle>{messages.createEvent.whatGetsCreatedTitle}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
-            <p>A public event page people can join without creating an account.</p>
-            <p>A private organizer page for renaming participants and closing the poll.</p>
-            <p>A live availability grid that fills every day between the chosen start and end date.</p>
+            <p>{messages.createEvent.whatGetsCreatedItems.publicPage}</p>
+            <p>{messages.createEvent.whatGetsCreatedItems.privatePage}</p>
+            <p>{messages.createEvent.whatGetsCreatedItems.liveGrid}</p>
           </CardContent>
         </Card>
       </div>

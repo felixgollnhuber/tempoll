@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { buildFinalizedSlot } from "@/lib/availability";
+import { useI18n } from "@/lib/i18n/context";
 import type { ManageEventView, PublicEventSnapshot } from "@/lib/types";
 
 type ManageEventClientProps = {
@@ -26,6 +27,7 @@ type ManageEventClientProps = {
 };
 
 export function ManageEventClient({ initialView }: ManageEventClientProps) {
+  const { messages, format, plural, locale } = useI18n();
   const [snapshot, setSnapshot] = useState<PublicEventSnapshot>(initialView.snapshot);
   const [title, setTitle] = useState(initialView.snapshot.title);
   const [status, setStatus] = useState(initialView.snapshot.status);
@@ -43,6 +45,7 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
 
     return buildFinalizedSlot({
       dates: snapshot.dates.map((date) => date.dateKey),
+      locale,
       timezone: snapshot.timezone,
       dayStartMinutes: snapshot.dayStartMinutes,
       dayEndMinutes: snapshot.dayEndMinutes,
@@ -53,6 +56,7 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
     });
   }, [
     finalSlotStart,
+    locale,
     snapshot.dates,
     snapshot.dayEndMinutes,
     snapshot.dayStartMinutes,
@@ -91,7 +95,7 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
 
   function updateEvent() {
     if (isClosingWithoutFixedDate) {
-      toast.error("Pick a fixed date before closing this event.");
+      toast.error(messages.manageEvent.closeRequiresFixedDate);
       return;
     }
 
@@ -111,11 +115,11 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
 
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) {
-        toast.error(payload.error ?? "Unable to update event.");
+        toast.error(payload.error ?? messages.errors.routeFallbacks.updateEvent);
         return;
       }
 
-      toast.success("Event updated");
+      toast.success(messages.manageEvent.eventUpdated);
       await refreshSnapshot();
     });
   }
@@ -136,11 +140,11 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
 
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) {
-        toast.error(payload.error ?? "Unable to rename participant.");
+        toast.error(payload.error ?? messages.errors.routeFallbacks.updateEvent);
         return;
       }
 
-      toast.success("Participant renamed");
+      toast.success(messages.manageEvent.participantRenamed);
       setSnapshot((current) => ({
         ...current,
         participants: current.participants.map((participant) =>
@@ -161,11 +165,11 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
 
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) {
-        toast.error(payload.error ?? "Unable to remove participant.");
+        toast.error(payload.error ?? messages.errors.routeFallbacks.removeParticipant);
         return;
       }
 
-      toast.success("Participant removed");
+      toast.success(messages.manageEvent.participantRemoved);
       await refreshSnapshot();
     });
   }
@@ -183,18 +187,22 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
   const bestWindowsCard = hasAnyAvailability ? (
     <Card>
       <CardHeader className="p-4 pb-2">
-        <CardTitle className="text-sm">Best windows right now</CardTitle>
+        <CardTitle className="text-sm">{messages.manageEvent.bestWindowsTitle}</CardTitle>
         <CardDescription className="text-xs">
-          Ranked by overlap across the full {snapshot.meetingDurationMinutes}-minute meeting.
+          {format(messages.publicEvent.bestWindowsDescription, {
+            duration: snapshot.meetingDurationMinutes,
+          })}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-2 p-4 pt-0">
         {snapshot.suggestions.map((suggestion, index) => (
           <div key={suggestion.slotStart} className="rounded-md border bg-muted/20 px-3 py-2">
-            <p className="text-[11px] font-medium text-muted-foreground">Option {index + 1}</p>
+            <p className="text-[11px] font-medium text-muted-foreground">
+              {format(messages.common.option, { count: index + 1 })}
+            </p>
             <p className="mt-1 text-sm font-semibold text-foreground">{suggestion.label}</p>
             <p className="mt-1 text-[11px] text-muted-foreground">
-              {suggestion.availableCount} people available
+              {plural(messages.manageEvent.peopleAvailable, suggestion.availableCount)}
             </p>
           </div>
         ))}
@@ -205,24 +213,26 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
     <>
       <Card>
         <CardHeader className="p-4 pb-2">
-          <CardTitle className="text-sm">Fixed date</CardTitle>
+          <CardTitle className="text-sm">{messages.common.fixedDate}</CardTitle>
           <CardDescription className="text-xs">
             {hasSavedFixedDate
-              ? "This is the published fixed date for the closed event."
-              : "This fixed date is selected locally and will be published after saving."}
+              ? messages.manageEvent.fixedDatePublishedDescription
+              : messages.manageEvent.fixedDateDraftDescription}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 p-4 pt-0">
           <div className="rounded-md border bg-muted/20 px-3 py-2">
             <p className="text-sm font-semibold text-foreground">{draftFinalizedSlot.label}</p>
             <p className="mt-1 text-[11px] text-muted-foreground">
-              {draftFinalizedSlot.availableCount} participants free for the full window
+              {plural(messages.publicEvent.fullWindowFree, draftFinalizedSlot.availableCount)}
             </p>
           </div>
           <div className="flex flex-col gap-2">
             {hasSavedFixedDate ? (
               <Button asChild size="sm" className="w-full">
-                <a href={`/api/events/${snapshot.slug}/ics`}>Add to calendar (.ics)</a>
+                <a href={`/api/events/${snapshot.slug}/ics`}>
+                  {messages.common.addToCalendar}
+                </a>
               </Button>
             ) : null}
             <Button
@@ -232,7 +242,7 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
               className="w-full"
               onClick={() => setFinalSlotStart(null)}
             >
-              Clear fixed date
+              {messages.common.clearFixedDate}
             </Button>
           </div>
         </CardContent>
@@ -247,37 +257,36 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="text-3xl">Manage event</CardTitle>
+          <CardTitle className="text-3xl">{messages.manageEvent.title}</CardTitle>
           <CardDescription>
-            Share the public board, keep the private organizer URL safe, control whether new changes
-            are still allowed and set the fixed date before closing the event.
+            {messages.manageEvent.description}
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-6 md:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="title">Title</Label>
+            <Label htmlFor="title">{messages.manageEvent.titleLabel}</Label>
             <Input id="title" value={title} onChange={(event) => setTitle(event.target.value)} />
           </div>
           <div className="space-y-2">
-            <Label>Status</Label>
+            <Label>{messages.manageEvent.statusLabel}</Label>
             <Select value={status} onValueChange={(value) => handleStatusChange(value as "OPEN" | "CLOSED")}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="OPEN">Open for edits</SelectItem>
-                <SelectItem value="CLOSED">Closed</SelectItem>
+                <SelectItem value="OPEN">{messages.manageEvent.statusOpen}</SelectItem>
+                <SelectItem value="CLOSED">{messages.manageEvent.statusClosed}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="md:col-span-2 space-y-3">
             <Button onClick={updateEvent} disabled={isPending || isClosingWithoutFixedDate} className="h-10">
               {isPending ? <Loader2Icon className="size-4 animate-spin" /> : null}
-              Save changes
+              {messages.common.saveChanges}
             </Button>
             {isClosingWithoutFixedDate ? (
               <p className="text-sm text-destructive">
-                Pick a fixed date in the heatmap before closing this event.
+                {messages.manageEvent.closeRequiresFixedDateInHeatmap}
               </p>
             ) : null}
           </div>
@@ -297,20 +306,20 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
         getDescription={({ usesDateWindowing }) =>
           status === "CLOSED"
             ? usesDateWindowing
-              ? "Select a slot to inspect overlap and use the button below to set the fixed date. Use the arrows to move through the date range."
-              : "Click any slot to inspect availability and set the fixed date for this closed event."
+              ? messages.manageEvent.closedHeatmapDescriptionWindowed
+              : messages.manageEvent.closedHeatmapDescription
             : usesDateWindowing
-              ? "Select a slot to inspect availability. Close the event to choose the fixed date."
-              : "Click any slot to inspect availability. Close the event when you are ready to choose the fixed date."
+              ? messages.manageEvent.openHeatmapDescriptionWindowed
+              : messages.manageEvent.openHeatmapDescription
         }
       />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
         <Card>
           <CardHeader>
-            <CardTitle>Participants</CardTitle>
+            <CardTitle>{messages.common.participants}</CardTitle>
             <CardDescription>
-              Rename participants for clarity or remove accidental entries.
+              {messages.manageEvent.participantsDescription}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -340,7 +349,10 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
                   </Button>
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  {participant.selectedSlotCount} selected slots
+                  {plural(
+                    messages.publicEvent.participantSelectedSlots,
+                    participant.selectedSlotCount,
+                  )}
                 </p>
               </div>
             ))}
@@ -350,30 +362,30 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
         <aside className="min-w-0 space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Share links</CardTitle>
+              <CardTitle>{messages.manageEvent.shareLinksTitle}</CardTitle>
               <CardDescription>
-                Keep the organizer link private. The public link is safe to share.
+                {messages.manageEvent.shareLinksDescription}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label>Public event URL</Label>
+                <Label>{messages.manageEvent.publicEventUrl}</Label>
                 <div className="rounded-md border bg-muted/20 px-4 py-3 text-sm text-muted-foreground [overflow-wrap:anywhere]">
                   {initialView.shareUrl}
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Button asChild>
-                    <Link href={initialView.shareUrl}>Open public event</Link>
+                    <Link href={initialView.shareUrl}>{messages.manageEvent.openPublicEvent}</Link>
                   </Button>
-                  <CopyButton value={initialView.shareUrl} label="Copy public URL" />
+                  <CopyButton value={initialView.shareUrl} label={messages.manageEvent.copyPublicUrl} />
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>Private organizer URL</Label>
+                <Label>{messages.manageEvent.privateOrganizerUrl}</Label>
                 <div className="rounded-md border bg-muted/20 px-4 py-3 text-sm text-muted-foreground [overflow-wrap:anywhere]">
                   {initialView.manageUrl}
                 </div>
-                <CopyButton value={initialView.manageUrl} label="Copy organizer URL" />
+                <CopyButton value={initialView.manageUrl} label={messages.manageEvent.copyOrganizerUrl} />
               </div>
             </CardContent>
           </Card>

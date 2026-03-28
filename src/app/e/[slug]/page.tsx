@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { PublicEventClient } from "@/components/public-event-client";
 import { RecentEventTracker } from "@/components/recent-event-tracker";
 import { getPublicEventSnapshot } from "@/lib/event-service";
+import { getServerI18n } from "@/lib/i18n/server";
 import { getParticipantCookieName } from "@/lib/tokens";
 
 type EventPageProps = {
@@ -18,8 +19,9 @@ export default async function EventPage({ params }: EventPageProps) {
   const { slug } = await params;
   const cookieStore = await cookies();
   const cookieValue = cookieStore.get(getParticipantCookieName(slug))?.value;
+  const { locale } = await getServerI18n();
 
-  const event = await getPublicEventSnapshot(slug, cookieValue);
+  const event = await getPublicEventSnapshot(slug, locale, cookieValue);
   if (!event) {
     notFound();
   }

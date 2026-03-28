@@ -1,23 +1,26 @@
 import { NextResponse } from "next/server";
 
 import { createEvent } from "@/lib/event-service";
+import { createI18n, getLocaleFromRequest } from "@/lib/i18n/server";
 import { handleRouteError, MANAGE_RESPONSE_HEADERS } from "@/lib/security";
 import { getClientIp } from "@/lib/request";
 import { enforceRateLimit } from "@/lib/rate-limit";
-import { eventCreateSchema } from "@/lib/validators";
+import { createEventCreateSchema } from "@/lib/validators";
 
 export async function POST(request: Request) {
+  const i18n = createI18n(getLocaleFromRequest(request));
+
   try {
     const ip = getClientIp(request);
 
     enforceRateLimit(`event-create:${ip}`, {
       limit: 10,
       windowMs: 15 * 60 * 1000,
-      message: "Too many event creation attempts. Please wait a few minutes and try again.",
+      code: "event_create_rate_limited",
     });
 
     const json = await request.json();
-    const input = eventCreateSchema.parse({
+    const input = createEventCreateSchema(i18n.messages).parse({
       ...json,
       dayStartMinutes: Number(json.dayStartMinutes),
       dayEndMinutes: Number(json.dayEndMinutes),
@@ -34,7 +37,8 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     return handleRouteError(error, {
-      fallbackMessage: "Unable to create event.",
+      fallbackMessage: i18n.messages.errors.routeFallbacks.createEvent,
+      messages: i18n.messages,
       route: "api/events",
       headers: MANAGE_RESPONSE_HEADERS,
     });

@@ -1,78 +1,99 @@
 import { z } from "zod";
 
 import { meetingDurationOptions, slotMinuteOptions } from "@/lib/constants";
+import type { Messages } from "@/lib/i18n/messages";
 
 const dateKeyRegex = /^\d{4}-\d{2}-\d{2}$/;
 const slotMinuteSet = new Set<number>(slotMinuteOptions);
 const meetingDurationSet = new Set<number>(meetingDurationOptions);
 
-export const eventCreateSchema = z
-  .object({
-    title: z
+export function createEventCreateSchema(messages: Messages) {
+  return z
+    .object({
+      title: z
+        .string()
+        .trim()
+        .min(3, messages.validation.eventCreate.titleMin)
+        .max(80, messages.validation.eventCreate.titleMax),
+      timezone: z.string().trim().min(1, messages.validation.eventCreate.timezoneRequired),
+      dates: z
+        .array(z.string().regex(dateKeyRegex, messages.validation.eventCreate.validCalendarDates))
+        .min(1, messages.validation.eventCreate.chooseStartAndEndDate)
+        .max(31, messages.validation.eventCreate.dateRangeMax),
+      dayStartMinutes: z
+        .number()
+        .int()
+        .min(0, messages.validation.eventCreate.validDailyStart)
+        .max(23 * 60 + 30, messages.validation.eventCreate.validDailyStart),
+      dayEndMinutes: z
+        .number()
+        .int()
+        .min(30, messages.validation.eventCreate.validDailyEnd)
+        .max(24 * 60, messages.validation.eventCreate.validDailyEnd),
+      slotMinutes: z.coerce.number().refine((value) => slotMinuteSet.has(value), {
+        message: messages.validation.eventCreate.supportedSlotSize,
+      }),
+      meetingDurationMinutes: z.coerce
+        .number()
+        .refine((value) => meetingDurationSet.has(value), {
+          message: messages.validation.eventCreate.supportedMeetingDuration,
+        }),
+    })
+    .superRefine((data, ctx) => {
+      if (data.dayEndMinutes <= data.dayStartMinutes) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["dayEndMinutes"],
+          message: messages.validation.eventCreate.endAfterStart,
+        });
+      }
+
+      if (data.meetingDurationMinutes % data.slotMinutes !== 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["meetingDurationMinutes"],
+          message: messages.validation.eventCreate.durationMatchesSlot,
+        });
+      }
+    });
+}
+
+export function createParticipantCreateSchema(messages: Messages) {
+  return z.object({
+    displayName: z
       .string()
       .trim()
-      .min(3, "Event title must be at least 3 characters long.")
-      .max(80, "Event title must be 80 characters or fewer."),
-    timezone: z.string().trim().min(1, "Choose a timezone."),
-    dates: z
-      .array(z.string().regex(dateKeyRegex, "Choose valid calendar dates."))
-      .min(1, "Choose a start and end date.")
-      .max(31, "Choose a date range of up to 31 days."),
-    dayStartMinutes: z
-      .number()
-      .int()
-      .min(0, "Choose a valid daily start time.")
-      .max(23 * 60 + 30, "Choose a valid daily start time."),
-    dayEndMinutes: z
-      .number()
-      .int()
-      .min(30, "Choose a valid daily end time.")
-      .max(24 * 60, "Choose a valid daily end time."),
-    slotMinutes: z.coerce.number().refine((value) => slotMinuteSet.has(value), {
-      message: "Select a supported slot size.",
-    }),
-    meetingDurationMinutes: z.coerce
-      .number()
-      .refine((value) => meetingDurationSet.has(value), {
-        message: "Select a supported meeting duration.",
-      }),
-  })
-  .superRefine((data, ctx) => {
-    if (data.dayEndMinutes <= data.dayStartMinutes) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["dayEndMinutes"],
-        message: "End time must be later than start time.",
-      });
-    }
-
-    if (data.meetingDurationMinutes % data.slotMinutes !== 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["meetingDurationMinutes"],
-        message: "Meeting duration must align with slot size.",
-      });
-    }
+      .min(2, messages.validation.participantCreate.nameMin)
+      .max(32, messages.validation.participantCreate.nameMax),
   });
+}
 
-export const participantCreateSchema = z.object({
-  displayName: z.string().trim().min(2).max(32),
-});
+export function createAvailabilityMutationSchema() {
+  return z.object({
+    selectedSlotStarts: z.array(z.string().datetime()).max(1000),
+  });
+}
 
-export const availabilityMutationSchema = z.object({
-  selectedSlotStarts: z.array(z.string().datetime()).max(1000),
-});
-
-export const manageUpdateSchema = z.discriminatedUnion("action", [
-  z.object({
-    action: z.literal("updateEvent"),
-    title: z.string().trim().min(3).max(80),
-    status: z.enum(["OPEN", "CLOSED"]),
-    finalSlotStart: z.string().datetime().nullable(),
-  }),
-  z.object({
-    action: z.literal("renameParticipant"),
-    participantId: z.string().min(1),
-    displayName: z.string().trim().min(2).max(32),
-  }),
-]);
+export function createManageUpdateSchema(messages: Messages) {
+  return z.discriminatedUnion("action", [
+    z.object({
+      action: z.literal("updateEvent"),
+      title: z
+        .string()
+        .trim()
+        .min(3, messages.validation.eventCreate.titleMin)
+        .max(80, messages.validation.eventCreate.titleMax),
+      status: z.enum(["OPEN", "CLOSED"]),
+      finalSlotStart: z.string().datetime().nullable(),
+    }),
+    z.object({
+      action: z.literal("renameParticipant"),
+      participantId: z.string().min(1),
+      displayName: z
+        .string()
+        .trim()
+        .min(2, messages.validation.participantCreate.nameMin)
+        .max(32, messages.validation.participantCreate.nameMax),
+    }),
+  ]);
+}
