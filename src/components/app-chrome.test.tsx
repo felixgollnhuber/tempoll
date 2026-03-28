@@ -82,4 +82,17 @@ describe("AppChrome", () => {
 
     expect(screen.getByAltText("tempoll")).toHaveAttribute("src", "/tempoll-logo-2.png");
   });
+
+  it("keeps compact header controls accessible via full labels", () => {
+    renderWithI18n(
+      <AppChrome appName="tempoll" setupComplete legalPagesEnabled={false}>
+        <div>content</div>
+      </AppChrome>,
+      { locale: "de" },
+    );
+
+    expect(screen.getByRole("combobox", { name: "Sprache" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Neues Event" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Letzte Events" })).toBeInTheDocument();
+  });
 });
