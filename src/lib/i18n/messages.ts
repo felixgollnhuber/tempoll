@@ -51,8 +51,6 @@ export const en = {
   appChrome: {
     newEvent: "New event",
     recentEvents: "Recent events",
-    footerDescription:
-      "{appName} is a free scheduling board with live availability heatmaps, and self-hostable if you want it.",
     openSource: "Open source on GitHub",
     featureRequest: "Open an issue on GitHub",
     imprint: "Imprint",
@@ -647,8 +645,6 @@ export const de: Messages = {
   appChrome: {
     newEvent: "Neues Event",
     recentEvents: "Letzte Events",
-    footerDescription:
-      "{appName} ist ein kostenloses Planungsboard mit Live-Heatmaps und bei Bedarf auch selbst hostbar.",
     openSource: "Open Source auf GitHub",
     featureRequest: "Issue auf GitHub eröffnen",
     imprint: "Impressum",
