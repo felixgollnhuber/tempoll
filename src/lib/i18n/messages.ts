@@ -53,7 +53,8 @@ export const en = {
     recentEvents: "Recent events",
     footerDescription:
       "{appName} is a free scheduling board with live availability heatmaps, and self-hostable if you want it.",
-    featureRequest: "Feature request or suggestion",
+    openSource: "Open source on GitHub",
+    featureRequest: "Open an issue on GitHub",
     imprint: "Imprint",
     privacy: "Privacy",
   },
@@ -648,7 +649,8 @@ export const de: Messages = {
     recentEvents: "Letzte Events",
     footerDescription:
       "{appName} ist ein kostenloses Planungsboard mit Live-Heatmaps und bei Bedarf auch selbst hostbar.",
-    featureRequest: "Feature-Wunsch oder Vorschlag",
+    openSource: "Open Source auf GitHub",
+    featureRequest: "Issue auf GitHub eröffnen",
     imprint: "Impressum",
     privacy: "Datenschutz",
   },
