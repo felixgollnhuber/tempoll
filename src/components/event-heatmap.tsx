@@ -759,7 +759,11 @@ export function EventHeatmap({
       )}
     >
       <div className="min-w-0 space-y-4">
-        {sidebarTopContent ? <div className="xl:hidden">{sidebarTopContent}</div> : null}
+        {sidebarTopContent ? (
+          <div data-slot="event-heatmap-mobile-sidebar" className="space-y-4 xl:hidden">
+            {sidebarTopContent}
+          </div>
+        ) : null}
         <Card className="min-w-0 overflow-hidden">
           <CardHeader className="gap-3 p-4">
             <div

@@ -170,6 +170,29 @@ describe("PublicEventClient", () => {
     expect(screen.getAllByRole("button", { name: "Öffentliche URL kopieren" })).toHaveLength(2);
   });
 
+  it("keeps a mobile spacing wrapper around sidebar cards", () => {
+    renderWithI18n(
+      <PublicEventClient
+        slug="test-event"
+        shareUrl="https://tempoll.app/e/test-event"
+        initialSnapshot={createSnapshot()}
+        initialSession={{
+          participantId: "p1",
+          displayName: "Felix",
+        }}
+      />,
+    );
+
+    const mobileSidebar = document.querySelector<HTMLElement>(
+      '[data-slot="event-heatmap-mobile-sidebar"]',
+    );
+
+    expect(mobileSidebar).not.toBeNull();
+    expect(mobileSidebar).toHaveClass("space-y-4");
+    expect(within(mobileSidebar!).getByText("Share this board")).toBeInTheDocument();
+    expect(within(mobileSidebar!).getByText("Best matching windows")).toBeInTheDocument();
+  });
+
   it("hides best matching windows before anyone has selected availability", () => {
     const snapshot = createSnapshot({ withCurrentUser: false });
     snapshot.slots = snapshot.slots.map((slot) => ({
