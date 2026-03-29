@@ -178,7 +178,11 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
   const draftRangeDays = getRangeDays(draftDateRange);
 
   const getTimeLabel = (minutes: number) =>
-    timeOptions.find((option) => option.value === minutes)?.label ?? String(minutes);
+    timeOptions.find((option) => option.value === minutes)?.label ??
+    (minutes === 24 * 60 ? "24:00" : String(minutes));
+
+  const startTimeOptions = timeOptions.filter((option) => option.value < dayEndMinutes);
+  const endTimeOptions = timeOptions.filter((option) => option.value > dayStartMinutes);
 
   function clearErrors(...fields: EventField[]) {
     setErrorMessage(null);
@@ -507,7 +511,7 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
                     <SelectValue placeholder={messages.createEvent.dailyStartPlaceholder} />
                   </SelectTrigger>
                   <SelectContent className="max-h-80">
-                    {timeOptions.map((option) => (
+                    {startTimeOptions.map((option) => (
                       <SelectItem key={option.value} value={String(option.value)}>
                         {option.label}
                       </SelectItem>
@@ -542,7 +546,7 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
                     <SelectValue placeholder={messages.createEvent.dailyEndPlaceholder} />
                   </SelectTrigger>
                   <SelectContent className="max-h-80">
-                    {timeOptions.map((option) => (
+                    {endTimeOptions.map((option) => (
                       <SelectItem key={option.value} value={String(option.value)}>
                         {option.label}
                       </SelectItem>

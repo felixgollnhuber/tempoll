@@ -63,13 +63,21 @@ export function minutesToLabel(minutes: number) {
 }
 
 export function buildTimeOptions(stepMinutes = 30) {
-  return Array.from({ length: (24 * 60) / stepMinutes }, (_, index) => {
-    const minutes = index * stepMinutes;
-    return {
+  const options: Array<{ value: number; label: string }> = [];
+
+  for (let minutes = 0; minutes < 24 * 60; minutes += stepMinutes) {
+    options.push({
       value: minutes,
       label: minutesToLabel(minutes),
-    };
+    });
+  }
+
+  options.push({
+    value: 24 * 60,
+    label: minutesToLabel(24 * 60),
   });
+
+  return options;
 }
 
 export function sortDateKeys(dateKeys: string[]) {

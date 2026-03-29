@@ -1,8 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { buildSlotStart, buildSnapshot } from "./availability";
+import { buildSlotStart, buildSnapshot, buildTimeOptions } from "./availability";
 
 describe("availability helpers", () => {
+  it("includes 24:00 as the final time option", () => {
+    const options = buildTimeOptions(30);
+    const lastOption = options.at(-1);
+
+    expect(lastOption).toEqual({
+      value: 24 * 60,
+      label: "24:00",
+    });
+  });
+
   it("builds stable UTC slot timestamps from a local date and timezone", () => {
     expect(buildSlotStart("2026-04-10", 9 * 60, "Europe/Vienna")).toBe(
       "2026-04-10T07:00:00.000Z",
