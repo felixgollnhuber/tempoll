@@ -32,6 +32,7 @@ import {
   readCreateEventDefaults,
   saveCreateEventDefaults,
 } from "@/lib/create-event-defaults";
+import { meetingDurationOptions, slotMinuteOptions } from "@/lib/constants";
 import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/utils";
 import { createEventCreateSchema } from "@/lib/validators";
@@ -580,7 +581,7 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
                     <SelectValue placeholder={messages.createEvent.slotSizePlaceholder} />
                   </SelectTrigger>
                   <SelectContent>
-                    {[15, 30, 60].map((minutes) => (
+                    {slotMinuteOptions.map((minutes) => (
                       <SelectItem key={minutes} value={String(minutes)}>
                         {formatMessage(messages.createEvent.minutesShort, { count: minutes })}
                       </SelectItem>
@@ -621,7 +622,7 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
                     <SelectValue placeholder={messages.createEvent.meetingDurationPlaceholder} />
                   </SelectTrigger>
                   <SelectContent>
-                    {[30, 60, 90, 120].map((minutes) => (
+                    {meetingDurationOptions.map((minutes) => (
                       <SelectItem key={minutes} value={String(minutes)}>
                         {formatMessage(messages.createEvent.minutesShort, { count: minutes })}
                       </SelectItem>
