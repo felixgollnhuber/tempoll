@@ -312,7 +312,7 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
   }
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
       <Card>
         <CardHeader className="space-y-2">
           <CardTitle className="text-2xl">{messages.createEvent.eventDetailsTitle}</CardTitle>
@@ -346,7 +346,7 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
               ) : null}
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor={eventFieldIds.timezone}>{messages.createEvent.timezoneLabel}</Label>
                 <Select
@@ -482,7 +482,7 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
 
             <Separator />
 
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor={eventFieldIds.dayStartMinutes}>{messages.createEvent.dailyStartLabel}</Label>
                 <Select
