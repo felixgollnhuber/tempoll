@@ -95,4 +95,31 @@ describe("AppChrome", () => {
     expect(screen.getByRole("link", { name: "Neues Event" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Letzte Events" })).toBeInTheDocument();
   });
+
+  it("renders GitHub open source and issue links in the footer instead of mailto", () => {
+    renderWithI18n(
+      <AppChrome appName="tempoll" setupComplete legalPagesEnabled={false}>
+        <div>content</div>
+      </AppChrome>,
+    );
+
+    const repositoryLink = screen.getByRole("link", { name: "Open source on GitHub" });
+    const issuesLink = screen.getByRole("link", { name: "Open an issue on GitHub" });
+
+    expect(repositoryLink).toHaveAttribute(
+      "href",
+      "https://github.com/felixgollnhuber/tempoll",
+    );
+    expect(repositoryLink).toHaveAttribute("target", "_blank");
+    expect(repositoryLink).toHaveAttribute("rel", "noreferrer");
+
+    expect(issuesLink).toHaveAttribute(
+      "href",
+      "https://github.com/felixgollnhuber/tempoll/issues",
+    );
+    expect(issuesLink).toHaveAttribute("target", "_blank");
+    expect(issuesLink).toHaveAttribute("rel", "noreferrer");
+
+    expect(document.querySelector('a[href^="mailto:"]')).toBeNull();
+  });
 });

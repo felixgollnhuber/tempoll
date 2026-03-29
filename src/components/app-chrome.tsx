@@ -18,8 +18,22 @@ type AppChromeProps = {
   children: React.ReactNode;
 };
 
-const featureRequestMailto =
-  "mailto:tempoll-featurerequest@felixgollnhuber.dev?subject=Feature%20request%20or%20suggestion%20for%20tempoll";
+const githubRepositoryUrl = "https://github.com/felixgollnhuber/tempoll";
+const githubIssuesUrl = "https://github.com/felixgollnhuber/tempoll/issues";
+
+function GitHubMarkIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className={className}
+      fill="currentColor"
+      focusable="false"
+    >
+      <path d="M12 .5A12 12 0 0 0 8.2 23.9c.6.1.8-.3.8-.6V21c-3.4.7-4.1-1.4-4.1-1.4-.5-1.3-1.2-1.7-1.2-1.7-1-.7.1-.7.1-.7 1.1.1 1.7 1.2 1.7 1.2 1 1.8 2.8 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.7-.3-5.6-1.4-5.6-6.2 0-1.4.5-2.5 1.2-3.4-.1-.3-.6-1.6.1-3.3 0 0 1-.3 3.4 1.2a11.7 11.7 0 0 1 6.2 0c2.4-1.5 3.4-1.2 3.4-1.2.7 1.7.3 3 .1 3.3.8.9 1.2 2 1.2 3.4 0 4.8-2.9 5.9-5.7 6.2.5.4.8 1.1.8 2.3v3.5c0 .4.2.8.8.6A12 12 0 0 0 12 .5Z" />
+    </svg>
+  );
+}
 
 export function AppChrome({
   appName,
@@ -104,7 +118,21 @@ export function AppChrome({
         <div className="app-shell flex flex-col gap-3 py-6 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <p>{format(messages.appChrome.footerDescription, { appName })}</p>
           <div className="flex flex-wrap items-center gap-4">
-            <a href={featureRequestMailto} className="hover:text-foreground">
+            <a
+              href={githubRepositoryUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 hover:text-foreground"
+            >
+              <GitHubMarkIcon className="size-3.5" />
+              {messages.appChrome.openSource}
+            </a>
+            <a
+              href={githubIssuesUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="hover:text-foreground"
+            >
               {messages.appChrome.featureRequest}
             </a>
             {legalPagesEnabled ? (
