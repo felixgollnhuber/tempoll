@@ -142,4 +142,14 @@ describe("CreateEventForm", () => {
       slotMinutes: 15,
     });
   });
+
+  it("offers meeting durations up to 6 hours", async () => {
+    const user = userEvent.setup();
+
+    renderCreateEventForm();
+
+    await user.click(screen.getByRole("combobox", { name: "Meeting duration" }));
+
+    expect(screen.getByRole("option", { name: "360 min" })).toBeInTheDocument();
+  });
 });
