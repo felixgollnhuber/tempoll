@@ -28,6 +28,7 @@ const defaultTimeOptions = [
   { value: 9 * 60, label: "09:00" },
   { value: 17 * 60, label: "17:00" },
   { value: 18 * 60, label: "18:00" },
+  { value: 24 * 60, label: "24:00" },
 ];
 
 function renderCreateEventForm(locale: AppLocale = "en") {
@@ -141,5 +142,56 @@ describe("CreateEventForm", () => {
       dayEndMinutes: 17 * 60,
       slotMinutes: 15,
     });
+  });
+
+  it("shows only daily end options that are later than the selected daily start", async () => {
+    const user = userEvent.setup();
+
+    renderCreateEventForm();
+
+    await user.click(screen.getByRole("combobox", { name: "Daily start" }));
+    await user.click(screen.getByRole("option", { name: "17:00" }));
+
+    await user.click(screen.getByRole("combobox", { name: "Daily end" }));
+
+    expect(screen.queryByRole("option", { name: "08:00" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "17:00" })).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "18:00" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "24:00" })).toBeInTheDocument();
+  });
+
+  it("allows selecting 24:00 as daily end and submits dayEndMinutes as 1440", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        manageKey: "manage-key-123",
+      }),
+    });
+    global.fetch = fetchMock as typeof fetch;
+
+    renderCreateEventForm();
+
+    await user.type(screen.getByLabelText("Event title"), "Sprint planning");
+
+    await user.click(screen.getByRole("combobox", { name: "Daily end" }));
+    expect(screen.getByRole("option", { name: "24:00" })).toBeInTheDocument();
+    await user.click(screen.getByRole("option", { name: "24:00" }));
+
+    expect(screen.getByText("09:00 - 24:00")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Create event" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(push).toHaveBeenCalledWith("/manage/manage-key-123");
+    });
+
+    const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const payload = JSON.parse(String(requestInit.body)) as {
+      dayEndMinutes: number;
+    };
+
+    expect(payload.dayEndMinutes).toBe(24 * 60);
   });
 });
