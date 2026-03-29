@@ -164,9 +164,10 @@ describe("PublicEventClient", () => {
     expect(screen.getByRole("button", { name: "Bearbeiten" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Ansehen" })).toBeInTheDocument();
     expect(screen.getByText("Verfügbarkeit")).toBeInTheDocument();
-    expect(screen.getByText("Board teilen")).toBeInTheDocument();
-    expect(screen.getByText("https://tempoll.app/e/test-event")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Öffentliche URL kopieren" })).toBeInTheDocument();
+    // Share card appears in both the mobile slot and the xl+ sidebar slot.
+    expect(screen.getAllByText("Board teilen")).toHaveLength(2);
+    expect(screen.getAllByText("https://tempoll.app/e/test-event")).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Öffentliche URL kopieren" })).toHaveLength(2);
   });
 
   it("hides best matching windows before anyone has selected availability", () => {
@@ -496,9 +497,11 @@ describe("PublicEventClient", () => {
       />,
     );
 
-    expect(screen.getByText("Fixed date")).toBeInTheDocument();
+    // "Fixed date" title appears in both the mobile slot and the xl+ sidebar slot.
+    expect(screen.getAllByText("Fixed date")).toHaveLength(2);
     expect(screen.queryByText("Best matching windows")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Add to calendar (.ics)" })).toHaveAttribute(
+    // "Add to calendar" link appears in both slots.
+    expect(screen.getAllByRole("link", { name: "Add to calendar (.ics)" })[0]).toHaveAttribute(
       "href",
       "/api/events/test-event/ics",
     );
@@ -516,5 +519,23 @@ describe("PublicEventClient", () => {
     expect(firstCell.className).toContain("bg-amber-100");
     expect(secondCell.className).toContain("bg-amber-100");
     expect(firstCell.className).toBe(secondCell.className);
+  });
+
+  it("renders the share card in the DOM on mobile viewports", () => {
+    setViewportWidth(390);
+
+    renderWithI18n(
+      <PublicEventClient
+        slug="test-event"
+        shareUrl="https://tempoll.app/e/test-event"
+        initialSnapshot={createSnapshot()}
+        initialSession={null}
+      />,
+    );
+
+    // The share card appears in both the mobile slot and the xl+ sidebar slot,
+    // so the URL and copy button are present in the DOM at any viewport width.
+    expect(screen.getAllByText("https://tempoll.app/e/test-event")).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Copy public URL" })).toHaveLength(2);
   });
 });
