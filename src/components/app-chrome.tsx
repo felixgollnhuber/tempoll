@@ -116,7 +116,6 @@ export function AppChrome({
 
       <footer className="mt-auto border-t">
         <div className="app-shell flex flex-col gap-3 py-6 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-          <p>{format(messages.appChrome.footerDescription, { appName })}</p>
           <div className="flex flex-wrap items-center gap-4">
             <a
               href={githubRepositoryUrl}
