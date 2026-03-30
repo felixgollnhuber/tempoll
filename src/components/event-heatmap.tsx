@@ -512,29 +512,51 @@ export function EventHeatmap({
       return new Map<number, string>();
     }
 
-    if (!referenceDateKey) {
+    if (visibleDates.length === 0) {
       return new Map<number, string>();
     }
 
+    const majorTimeRows = snapshot.timeRows.filter((timeRow) => isMajorTimeLabel(timeRow.minutes));
+    if (majorTimeRows.length === 0) {
+      return new Map<number, string>();
+    }
+
+    const formatter = new Intl.DateTimeFormat(locale, {
+      timeZone: viewerTimezone,
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    });
+
     return new Map(
-      snapshot.timeRows.map((timeRow) => {
-        const slotStart = snapshot.slots.find(
-          (slot) => slot.dateKey === referenceDateKey && slot.minutes === timeRow.minutes,
-        )?.slotStart;
-        if (!slotStart) {
+      majorTimeRows.map((timeRow) => {
+        const viewerTimes = new Set<string>();
+        for (const date of visibleDates) {
+          const slot = slotMap.get(slotKey(date.dateKey, timeRow.minutes));
+          if (slot) {
+            viewerTimes.add(formatter.format(new Date(slot.slotStart)));
+          }
+        }
+
+        if (viewerTimes.size === 0) {
           return [timeRow.minutes, timeRow.label];
         }
 
-        const localTimeLabel = new Intl.DateTimeFormat(locale, {
-          timeZone: viewerTimezone,
-          hour: "2-digit",
-          minute: "2-digit",
-          hourCycle: "h23",
-        }).format(new Date(slotStart));
-        return [timeRow.minutes, `${timeRow.label} / ${localTimeLabel}`];
+        if (viewerTimes.size === 1) {
+          const [viewerTime] = viewerTimes;
+          return [timeRow.minutes, `${timeRow.label} / ${viewerTime}`];
+        }
+
+        // DST transition within visible range: show the extent of viewer times
+        const sorted = [...viewerTimes].sort((a, b) => {
+          const [ah = 0, am = 0] = a.split(":").map(Number);
+          const [bh = 0, bm = 0] = b.split(":").map(Number);
+          return ah * 60 + am - (bh * 60 + bm);
+        });
+        return [timeRow.minutes, `${timeRow.label} / ${sorted[0]}–${sorted[sorted.length - 1]}`];
       }),
     );
-  }, [locale, referenceDateKey, snapshot.slots, snapshot.timeRows, snapshot.timezone, viewerTimezone]);
+  }, [locale, slotMap, snapshot.timeRows, snapshot.timezone, viewerTimezone, visibleDates]);
   const activeParticipant =
     activeParticipantId
       ? snapshot.participants.find((participant) => participant.id === activeParticipantId) ?? null
