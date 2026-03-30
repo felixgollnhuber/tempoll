@@ -173,6 +173,8 @@ export const en = {
       other: "{count} participants",
     },
     timesShownIn: "Times shown in {timezone}",
+    timesShownInDualTimezone:
+      "Host: {hostTimezone} ({hostLabel}) · You: {viewerTimezone} ({viewerLabel})",
     legend: "Legend",
     legendEmpty: "empty",
     legendSomeOverlap: "some overlap",
@@ -770,6 +772,8 @@ export const de: Messages = {
       other: "{count} Teilnehmende",
     },
     timesShownIn: "Zeiten angezeigt in {timezone}",
+    timesShownInDualTimezone:
+      "Host: {hostTimezone} ({hostLabel}) · Du: {viewerTimezone} ({viewerLabel})",
     legend: "Legende",
     legendEmpty: "leer",
     legendSomeOverlap: "einige Überschneidungen",
