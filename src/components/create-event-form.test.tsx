@@ -2,7 +2,6 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { readCreateEventDefaults } from "@/lib/create-event-defaults";
 import type { AppLocale } from "@/lib/i18n/locale";
 import { renderWithI18n } from "@/test/render-with-i18n";
 import { CreateEventForm } from "./create-event-form";
@@ -95,7 +94,19 @@ describe("CreateEventForm", () => {
     expect(titleInput).not.toHaveAttribute("aria-invalid");
   });
 
-  it("stores the last used daily window and slot size after a successful event creation", async () => {
+  it("shows daily start options immediately without requiring a daily end selection first", async () => {
+    const user = userEvent.setup();
+
+    renderCreateEventForm();
+
+    await user.click(screen.getByRole("combobox", { name: "Daily start" }));
+
+    expect(screen.getByRole("option", { name: "08:00" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "09:00" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "17:00" })).toBeInTheDocument();
+  });
+
+  it("submits selected daily window and slot size after a successful event creation", async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -133,11 +144,6 @@ describe("CreateEventForm", () => {
     };
 
     expect(payload).toMatchObject({
-      dayStartMinutes: 8 * 60,
-      dayEndMinutes: 17 * 60,
-      slotMinutes: 15,
-    });
-    expect(readCreateEventDefaults()).toEqual({
       dayStartMinutes: 8 * 60,
       dayEndMinutes: 17 * 60,
       slotMinutes: 15,
