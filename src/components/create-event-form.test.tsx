@@ -50,6 +50,12 @@ describe("CreateEventForm", () => {
     expect(screen.getByRole("button", { name: "Event erstellen" })).toBeInTheDocument();
   });
 
+  it("defaults the slot size to 60 minutes", () => {
+    renderCreateEventForm();
+
+    expect(screen.getByRole("combobox", { name: "Slot size" })).toHaveTextContent("60 min");
+  });
+
   it("shows a friendly inline title validation message before submitting", () => {
     const fetchMock = vi.fn();
     global.fetch = fetchMock as typeof fetch;
