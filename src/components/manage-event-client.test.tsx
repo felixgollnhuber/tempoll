@@ -266,13 +266,14 @@ describe("ManageEventClient", () => {
     renderWithI18n(<ManageEventClient initialView={view} timezones={defaultTimezones} />);
 
     await user.click(screen.getByRole("combobox", { name: "Display timezone" }));
-    await user.click(screen.getByRole("option", { name: "America/New_York" }));
+    await user.click(screen.getByRole("option", { name: /America\/New_York/ }));
 
     expect(screen.getByRole("combobox", { name: "Display timezone" })).toHaveTextContent(
       "America/New_York",
     );
-    expect(screen.getByText("09:00 / 03:00")).toBeInTheDocument();
-    expect(screen.getByText("Your timezone: Thu, Apr 2 · 03:00–04:00")).toBeInTheDocument();
+    expect(screen.getByText("03:00")).toBeInTheDocument();
+    expect(screen.queryByText("09:00 / 03:00")).not.toBeInTheDocument();
+    expect(screen.getByText("Thu, Apr 2 · 03:00–04:00")).toBeInTheDocument();
   });
 
   it("shows local fixed-date labels on the organizer page after a manual timezone override", async () => {
@@ -289,9 +290,9 @@ describe("ManageEventClient", () => {
     renderWithI18n(<ManageEventClient initialView={view} timezones={defaultTimezones} />);
 
     await user.click(screen.getByRole("combobox", { name: "Display timezone" }));
-    await user.click(screen.getByRole("option", { name: "America/New_York" }));
+    await user.click(screen.getByRole("option", { name: /America\/New_York/ }));
 
-    expect(screen.getByText("Your timezone: Thu, Apr 2 · 03:00–04:00")).toBeInTheDocument();
+    expect(screen.getByText("Thu, Apr 2 · 03:00–04:00")).toBeInTheDocument();
   });
 
   it("closes the event directly from the selected slot without requiring a separate save", async () => {

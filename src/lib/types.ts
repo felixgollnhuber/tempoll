@@ -18,6 +18,12 @@ export type AvailabilityBatchMutation = {
   selectedSlotStarts: string[];
 };
 
+export type TimezoneOption = {
+  value: string;
+  label: string;
+  offsetMinutes: number;
+};
+
 export type SnapshotDate = {
   dateKey: string;
   label: string;

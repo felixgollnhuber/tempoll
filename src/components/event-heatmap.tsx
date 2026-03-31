@@ -21,9 +21,15 @@ import {
   useState,
 } from "react";
 
-import { buildFinalizedSlot, getAllowedFinalSlotStarts } from "@/lib/availability";
+import {
+  buildFinalizedSlot,
+  buildProjectedBoard,
+  getAllowedFinalSlotStarts,
+  minutesToLabel,
+} from "@/lib/availability";
 import { useI18n } from "@/lib/i18n/context";
-import type { PublicEventSnapshot, SnapshotParticipant } from "@/lib/types";
+import { findTimezoneOption } from "@/lib/timezone-options";
+import type { PublicEventSnapshot, SnapshotParticipant, TimezoneOption } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { AUTOMATIC_TIMEZONE_VALUE } from "@/lib/viewer-timezone";
 import { Badge } from "@/components/ui/badge";
@@ -59,7 +65,7 @@ type EventHeatmapProps = {
   onModeChange?: (mode: BoardMode) => void;
   canEdit: boolean;
   selectedMap?: DraftSelection;
-  onUpdateCell?: (dateKey: string, minutes: number, nextValue?: boolean) => boolean;
+  onUpdateCell?: (slotStart: string, nextValue?: boolean) => boolean;
   displayStatus?: PublicEventSnapshot["status"];
   finalSlotStart: string | null;
   showStatusBadge?: boolean;
@@ -71,7 +77,7 @@ type EventHeatmapProps = {
   showModeToggle?: boolean;
   showSidebar?: boolean;
   sidebarTopContent?: ReactNode;
-  timezones?: string[];
+  timezoneOptions?: TimezoneOption[];
   viewerTimezone: string;
   viewerTimezoneSelectValue: string;
   onViewerTimezoneChange: (timezone: string) => void;
@@ -84,10 +90,6 @@ const GRID_TIME_COLUMN_WIDTH_PX = 72;
 const GRID_DAY_COLUMN_MIN_WIDTH_PX = 84;
 const GRID_DAY_COLUMN_MOBILE_MIN_WIDTH_PX = 72;
 const GRID_DAY_COLUMN_MOBILE_BREAKPOINT_PX = 640;
-
-function slotKey(dateKey: string, minutes: number) {
-  return `${dateKey}-${minutes}`;
-}
 
 function getHeatColor(availabilityCount: number, maxAvailabilityCount: number) {
   if (availabilityCount <= 0 || maxAvailabilityCount <= 0) {
@@ -193,21 +195,9 @@ function isMajorTimeLabel(minutes: number) {
   return minutes % 60 === 0;
 }
 
-function getTimeZoneShortName(timezone: string, locale: string, date: Date) {
-  const formatter = new Intl.DateTimeFormat(locale, {
-    timeZone: timezone,
-    timeZoneName: "short",
-  });
-  const timeZonePart = formatter
-    .formatToParts(date)
-    .find((part) => part.type === "timeZoneName")?.value;
-
-  return timeZonePart ?? timezone;
-}
-
 function getSelectedMap(snapshot: PublicEventSnapshot) {
   return snapshot.slots.reduce<DraftSelection>((acc, slot) => {
-    acc[slotKey(slot.dateKey, slot.minutes)] = slot.selectedByCurrentUser;
+    acc[slot.slotStart] = slot.selectedByCurrentUser;
     return acc;
   }, {});
 }
@@ -261,7 +251,9 @@ function getSlotElementFromPoint(clientX: number, clientY: number) {
   const elements =
     typeof document.elementsFromPoint === "function"
       ? document.elementsFromPoint(clientX, clientY)
-      : [document.elementFromPoint(clientX, clientY)].filter(Boolean);
+      : typeof document.elementFromPoint === "function"
+        ? [document.elementFromPoint(clientX, clientY)].filter(Boolean)
+        : [];
 
   for (const element of elements) {
     if (!(element instanceof HTMLElement)) {
@@ -277,18 +269,13 @@ function getSlotElementFromPoint(clientX: number, clientY: number) {
   return null;
 }
 
-function getSlotCoordinatesFromElement(element: HTMLElement) {
-  const dateKey = element.dataset.dateKey;
-  const minutes = Number(element.dataset.minutes);
-  if (!dateKey || Number.isNaN(minutes)) {
+function getSlotStartFromElement(element: HTMLElement) {
+  const slotStart = element.dataset.slotStart;
+  if (!slotStart) {
     return null;
   }
 
-  return {
-    dateKey,
-    minutes,
-    key: element.dataset.slotKey ?? slotKey(dateKey, minutes),
-  };
+  return slotStart;
 }
 
 function getDefaultDescription(
@@ -324,7 +311,7 @@ export function EventHeatmap({
   showModeToggle = true,
   showSidebar = true,
   sidebarTopContent,
-  timezones = [],
+  timezoneOptions = [],
   viewerTimezone,
   viewerTimezoneSelectValue,
   onViewerTimezoneChange,
@@ -333,7 +320,7 @@ export function EventHeatmap({
   getDescription,
 }: EventHeatmapProps) {
   const { messages, format, plural, locale } = useI18n();
-  const [activeSlotKey, setActiveSlotKey] = useState<string | null>(null);
+  const [activeSlotStart, setActiveSlotStart] = useState<string | null>(null);
   const [internalActiveParticipantId, setInternalActiveParticipantId] = useState<string | null>(
     null,
   );
@@ -378,7 +365,7 @@ export function EventHeatmap({
 
   useEffect(() => {
     if (mode === "edit") {
-      setActiveSlotKey(null);
+      setActiveSlotStart(null);
     }
   }, [mode]);
 
@@ -431,8 +418,7 @@ export function EventHeatmap({
     () =>
       new Map(
         snapshot.slots.map((slot) => {
-          const key = slotKey(slot.dateKey, slot.minutes);
-          const selectedByCurrentUser = effectiveSelectedMap[key] ?? false;
+          const selectedByCurrentUser = effectiveSelectedMap[slot.slotStart] ?? false;
           let participantIds = slot.participantIds;
 
           if (currentParticipantId) {
@@ -448,7 +434,7 @@ export function EventHeatmap({
           }
 
           return [
-            key,
+            slot.slotStart,
             {
               ...slot,
               participantIds,
@@ -460,6 +446,19 @@ export function EventHeatmap({
       ),
     [currentParticipantId, effectiveSelectedMap, snapshot.slots],
   );
+  const projectedBoard = useMemo(
+    () =>
+      buildProjectedBoard({
+        slots: Array.from(slotMap.values()),
+        timezone: viewerTimezone,
+        locale,
+      }),
+    [locale, slotMap, viewerTimezone],
+  );
+  const projectedSlotMap = useMemo(
+    () => new Map(projectedBoard.slots.map((slot) => [slot.slotStart, slot])),
+    [projectedBoard.slots],
+  );
   const maxAvailabilityCount = useMemo(
     () =>
       Array.from(slotMap.values()).reduce(
@@ -470,14 +469,6 @@ export function EventHeatmap({
   );
   const someOverlapLegendClass = getHeatColor(maxAvailabilityCount > 0 ? 1 : 0, maxAvailabilityCount);
   const highOverlapLegendClass = getHeatColor(maxAvailabilityCount, maxAvailabilityCount);
-  const dateLabelsByKey = useMemo(
-    () => new Map(snapshot.dates.map((date) => [date.dateKey, date.label])),
-    [snapshot.dates],
-  );
-  const timeLabelsByMinutes = useMemo(
-    () => new Map(snapshot.timeRows.map((timeRow) => [timeRow.minutes, timeRow.label])),
-    [snapshot.timeRows],
-  );
   const participantNamesById = useMemo(
     () => new Map(snapshot.participants.map((participant) => [participant.id, participant.displayName])),
     [snapshot.participants],
@@ -495,106 +486,97 @@ export function EventHeatmap({
     [gridContainerWidth],
   );
   const visibleDayCount = useMemo(
-    () => getVisibleDayCount(gridContainerWidth, snapshot.dates.length),
-    [gridContainerWidth, snapshot.dates.length],
+    () => getVisibleDayCount(gridContainerWidth, projectedBoard.dates.length),
+    [gridContainerWidth, projectedBoard.dates.length],
   );
-  const usesDateWindowing = visibleDayCount > 0 && visibleDayCount < snapshot.dates.length;
+  const usesDateWindowing = visibleDayCount > 0 && visibleDayCount < projectedBoard.dates.length;
   const clampedVisibleDateStartIndex = useMemo(
     () =>
-      clampVisibleDateStartIndex(visibleDateStartIndex, snapshot.dates.length, visibleDayCount || 1),
-    [visibleDateStartIndex, snapshot.dates.length, visibleDayCount],
+      clampVisibleDateStartIndex(visibleDateStartIndex, projectedBoard.dates.length, visibleDayCount || 1),
+    [visibleDateStartIndex, projectedBoard.dates.length, visibleDayCount],
   );
   const visibleDates = useMemo(() => {
     if (!usesDateWindowing) {
-      return snapshot.dates;
+      return projectedBoard.dates;
     }
 
-    return snapshot.dates.slice(
+    return projectedBoard.dates.slice(
       clampedVisibleDateStartIndex,
       clampedVisibleDateStartIndex + visibleDayCount,
     );
-  }, [clampedVisibleDateStartIndex, snapshot.dates, usesDateWindowing, visibleDayCount]);
+  }, [clampedVisibleDateStartIndex, projectedBoard.dates, usesDateWindowing, visibleDayCount]);
   const visibleDateKeys = useMemo(() => new Set(visibleDates.map((date) => date.dateKey)), [visibleDates]);
   const canShowPreviousDates = usesDateWindowing && clampedVisibleDateStartIndex > 0;
   const canShowNextDates =
     usesDateWindowing &&
-    clampedVisibleDateStartIndex + visibleDates.length < snapshot.dates.length;
+    clampedVisibleDateStartIndex + visibleDates.length < projectedBoard.dates.length;
   const visibleRangeLabel = useMemo(() => getVisibleRangeLabel(visibleDates), [visibleDates]);
-  const referenceDateKey = visibleDates[0]?.dateKey ?? snapshot.dates[0]?.dateKey;
-  const referenceSlotStart = useMemo(() => {
-    if (!referenceDateKey) {
-      return null;
+  const viewerTimezoneOption = useMemo(
+    () => findTimezoneOption(timezoneOptions, viewerTimezone),
+    [timezoneOptions, viewerTimezone],
+  );
+  const visibleProjectedSlots = useMemo(
+    () => projectedBoard.slots.filter((slot) => visibleDateKeys.has(slot.projectedDateKey)),
+    [projectedBoard.slots, visibleDateKeys],
+  );
+  const visibleTimeRows = useMemo(() => {
+    const maxOccurrenceByMinutes = new Map<number, number>();
+
+    for (const slot of visibleProjectedSlots) {
+      maxOccurrenceByMinutes.set(
+        slot.projectedMinutes,
+        Math.max(maxOccurrenceByMinutes.get(slot.projectedMinutes) ?? 0, slot.projectedOccurrence),
+      );
     }
 
-    return (
-      snapshot.slots.find(
-        (slot) => slot.dateKey === referenceDateKey && slot.minutes === snapshot.dayStartMinutes,
-      )?.slotStart ?? null
-    );
-  }, [referenceDateKey, snapshot.dayStartMinutes, snapshot.slots]);
-  const timezoneLabels = useMemo(() => {
-    const referenceDate = referenceSlotStart ? new Date(referenceSlotStart) : new Date();
+    return [...maxOccurrenceByMinutes.entries()]
+      .sort(([leftMinutes], [rightMinutes]) => leftMinutes - rightMinutes)
+      .flatMap(([minutes, maxOccurrence]) =>
+        Array.from({ length: maxOccurrence }, (_, index) => ({
+          id: `${minutes}:${index + 1}`,
+          minutes,
+          occurrence: index + 1,
+          label: minutesToLabel(minutes),
+        })),
+      );
+  }, [visibleProjectedSlots]);
+  const visibleTimeRowLabels = useMemo(() => {
+    const maxOccurrenceByMinutes = new Map<number, number>();
 
-    return {
-      host: getTimeZoneShortName(snapshot.timezone, locale, referenceDate),
-      viewer: viewerTimezone ? getTimeZoneShortName(viewerTimezone, locale, referenceDate) : null,
-    };
-  }, [locale, referenceSlotStart, snapshot.timezone, viewerTimezone]);
-  const dualTimeLabelsByMinutes = useMemo(() => {
-    if (!viewerTimezone || viewerTimezone === snapshot.timezone) {
-      return new Map<number, string>();
+    for (const slot of visibleProjectedSlots) {
+      maxOccurrenceByMinutes.set(
+        slot.projectedMinutes,
+        Math.max(maxOccurrenceByMinutes.get(slot.projectedMinutes) ?? 0, slot.projectedOccurrence),
+      );
     }
-
-    if (visibleDates.length === 0) {
-      return new Map<number, string>();
-    }
-
-    const majorTimeRows = snapshot.timeRows.filter((timeRow) => isMajorTimeLabel(timeRow.minutes));
-    if (majorTimeRows.length === 0) {
-      return new Map<number, string>();
-    }
-
-    const formatter = new Intl.DateTimeFormat(locale, {
-      timeZone: viewerTimezone,
-      hour: "2-digit",
-      minute: "2-digit",
-      hourCycle: "h23",
-    });
 
     return new Map(
-      majorTimeRows.map((timeRow) => {
-        const viewerTimes = new Set<string>();
-        for (const date of visibleDates) {
-          const slot = slotMap.get(slotKey(date.dateKey, timeRow.minutes));
-          if (slot) {
-            viewerTimes.add(formatter.format(new Date(slot.slotStart)));
-          }
+      visibleTimeRows.map((timeRow) => {
+        const maxOccurrence = maxOccurrenceByMinutes.get(timeRow.minutes) ?? 0;
+        if (maxOccurrence < 2) {
+          return [timeRow.id, timeRow.label] as const;
         }
 
-        if (viewerTimes.size === 0) {
-          return [timeRow.minutes, timeRow.label];
-        }
+        const representativeSlot = visibleProjectedSlots.find(
+          (slot) =>
+            slot.projectedMinutes === timeRow.minutes &&
+            slot.projectedOccurrence === timeRow.occurrence,
+        );
 
-        if (viewerTimes.size === 1) {
-          const [viewerTime] = viewerTimes;
-          return [timeRow.minutes, `${timeRow.label} / ${viewerTime}`];
-        }
-
-        // DST transition within visible range: show the extent of viewer times
-        const sorted = [...viewerTimes].sort((a, b) => {
-          const [ah = 0, am = 0] = a.split(":").map(Number);
-          const [bh = 0, bm = 0] = b.split(":").map(Number);
-          return ah * 60 + am - (bh * 60 + bm);
-        });
-        return [timeRow.minutes, `${timeRow.label} / ${sorted[0]}–${sorted[sorted.length - 1]}`];
+        return [
+          timeRow.id,
+          representativeSlot
+            ? `${timeRow.label} ${representativeSlot.projectedTimeZoneShortName}`
+            : timeRow.label,
+        ] as const;
       }),
     );
-  }, [locale, slotMap, snapshot.timeRows, snapshot.timezone, viewerTimezone, visibleDates]);
+  }, [visibleProjectedSlots, visibleTimeRows]);
   const activeParticipant =
     activeParticipantId
       ? snapshot.participants.find((participant) => participant.id === activeParticipantId) ?? null
       : null;
-  const activeSlot = activeSlotKey ? (slotMap.get(activeSlotKey) ?? null) : null;
+  const activeSlot = activeSlotStart ? (projectedSlotMap.get(activeSlotStart) ?? null) : null;
   const activeSlotDetails = useMemo(() => {
     if (!activeSlot) {
       return null;
@@ -604,8 +586,8 @@ export function EventHeatmap({
 
     return {
       slot: activeSlot,
-      dateLabel: dateLabelsByKey.get(activeSlot.dateKey) ?? activeSlot.dateKey,
-      timeLabel: timeLabelsByMinutes.get(activeSlot.minutes) ?? "",
+      dateLabel: activeSlot.projectedDateLabel,
+      timeLabel: visibleTimeRowLabels.get(activeSlot.projectedRowId) ?? activeSlot.projectedTimeLabel,
       availableParticipants: snapshot.participants.filter((participant) =>
         availableSet.has(participant.id),
       ),
@@ -617,12 +599,11 @@ export function EventHeatmap({
     };
   }, [
     activeSlot,
-    dateLabelsByKey,
     finalSlotStart,
     participantsWithAvailability,
     slotStartSelections,
     snapshot.participants,
-    timeLabelsByMinutes,
+    visibleTimeRowLabels,
   ]);
 
   const finalizedSlot = useMemo(() => {
@@ -663,74 +644,77 @@ export function EventHeatmap({
     const rangeEnd = new Date(finalizedSlot.slotEnd).getTime();
 
     return new Set(
-      Array.from(slotMap.entries())
-        .filter(([, slot]) => {
+      projectedBoard.slots
+        .filter((slot) => {
           const slotTime = new Date(slot.slotStart).getTime();
           return slotTime >= rangeStart && slotTime < rangeEnd;
         })
-        .map(([key]) => key),
+        .map((slot) => slot.slotStart),
     );
-  }, [finalizedSlot, slotMap]);
+  }, [finalizedSlot, projectedBoard.slots]);
 
   useEffect(() => {
     setVisibleDateStartIndex((current) =>
-      clampVisibleDateStartIndex(current, snapshot.dates.length, visibleDayCount || 1),
+      clampVisibleDateStartIndex(current, projectedBoard.dates.length, visibleDayCount || 1),
     );
-  }, [snapshot.dates.length, visibleDayCount]);
+  }, [projectedBoard.dates.length, visibleDayCount]);
 
   useEffect(() => {
-    if (!activeSlotKey || mode !== "view") {
+    if (!activeSlotStart || mode !== "view") {
       return;
     }
 
-    const slot = slotMap.get(activeSlotKey);
-    if (!slot || !visibleDateKeys.has(slot.dateKey)) {
-      setActiveSlotKey(null);
+    const slot = projectedSlotMap.get(activeSlotStart);
+    if (!slot || !visibleDateKeys.has(slot.projectedDateKey)) {
+      setActiveSlotStart(null);
     }
-  }, [activeSlotKey, mode, slotMap, visibleDateKeys]);
+  }, [activeSlotStart, mode, projectedSlotMap, visibleDateKeys]);
 
   const moveVisibleDateWindow = useCallback(
     (direction: -1 | 1) => {
       setVisibleDateStartIndex((current) =>
-        clampVisibleDateStartIndex(current + direction, snapshot.dates.length, visibleDayCount || 1),
+        clampVisibleDateStartIndex(
+          current + direction,
+          projectedBoard.dates.length,
+          visibleDayCount || 1,
+        ),
       );
     },
-    [snapshot.dates.length, visibleDayCount],
+    [projectedBoard.dates.length, visibleDayCount],
   );
 
   const paintCellInSession = useCallback(
-    (session: PaintSession, dateKey: string, minutes: number) => {
+    (session: PaintSession, slotStart: string) => {
       if (!onUpdateCell) {
         return;
       }
 
-      const key = slotKey(dateKey, minutes);
-      if (session.paintedKeys.has(key)) {
+      if (session.paintedKeys.has(slotStart)) {
         return;
       }
 
-      session.paintedKeys.add(key);
-      onUpdateCell(dateKey, minutes, session.value);
+      session.paintedKeys.add(slotStart);
+      onUpdateCell(slotStart, session.value);
     },
     [onUpdateCell],
   );
 
   const continuePaintSession = useCallback(
-    (clientX: number, clientY: number, fallbackDateKey: string, fallbackMinutes: number) => {
+    (clientX: number, clientY: number, fallbackSlotStart: string) => {
       const session = paintSessionRef.current;
       if (!session) {
         return;
       }
 
       const slotElement = getSlotElementFromPoint(clientX, clientY);
-      const nextSlot = slotElement ? getSlotCoordinatesFromElement(slotElement) : null;
+      const nextSlotStart = slotElement ? getSlotStartFromElement(slotElement) : null;
 
-      if (nextSlot) {
-        paintCellInSession(session, nextSlot.dateKey, nextSlot.minutes);
+      if (nextSlotStart) {
+        paintCellInSession(session, nextSlotStart);
         return;
       }
 
-      paintCellInSession(session, fallbackDateKey, fallbackMinutes);
+      paintCellInSession(session, fallbackSlotStart);
     },
     [paintCellInSession],
   );
@@ -751,8 +735,7 @@ export function EventHeatmap({
   const handleCellPointerDown = useCallback(
     (
       event: ReactPointerEvent<HTMLButtonElement>,
-      dateKey: string,
-      minutes: number,
+      slotStart: string,
       isSelectedByCurrentUser: boolean,
     ) => {
       if (!event.isPrimary || mode !== "edit" || !supportsPainting) {
@@ -770,32 +753,32 @@ export function EventHeatmap({
 
       paintSessionRef.current = nextSession;
       event.currentTarget.setPointerCapture?.(event.pointerId);
-      paintCellInSession(nextSession, dateKey, minutes);
+      paintCellInSession(nextSession, slotStart);
     },
     [mode, paintCellInSession, supportsPainting],
   );
 
   const handleCellPointerMove = useCallback(
-    (event: ReactPointerEvent<HTMLButtonElement>, dateKey: string, minutes: number) => {
+    (event: ReactPointerEvent<HTMLButtonElement>, slotStart: string) => {
       const session = paintSessionRef.current;
       if (!session || session.pointerId !== event.pointerId) {
         return;
       }
 
       event.preventDefault();
-      continuePaintSession(event.clientX, event.clientY, dateKey, minutes);
+      continuePaintSession(event.clientX, event.clientY, slotStart);
     },
     [continuePaintSession],
   );
 
   const handleCellPointerEnd = useCallback(
-    (event: ReactPointerEvent<HTMLButtonElement>, dateKey: string, minutes: number) => {
+    (event: ReactPointerEvent<HTMLButtonElement>, slotStart: string) => {
       const session = paintSessionRef.current;
       if (!session || session.pointerId !== event.pointerId) {
         return;
       }
 
-      continuePaintSession(event.clientX, event.clientY, dateKey, minutes);
+      continuePaintSession(event.clientX, event.clientY, slotStart);
 
       if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
         event.currentTarget.releasePointerCapture?.(event.pointerId);
@@ -902,7 +885,7 @@ export function EventHeatmap({
                 <div className="flex flex-wrap items-center gap-2 text-[10px] font-medium tracking-[0.16em] text-muted-foreground uppercase">
                   <span className="inline-flex items-center gap-1">
                     <CalendarDaysIcon className="size-3" />
-                    {plural(messages.publicEvent.daysSummary, snapshot.dates.length)}
+                    {plural(messages.publicEvent.daysSummary, projectedBoard.dates.length)}
                   </span>
                   <span className="inline-flex items-center gap-1">
                     <Clock3Icon className="size-3" />
@@ -917,16 +900,9 @@ export function EventHeatmap({
                   <div>
                     <CardTitle className="text-2xl">{snapshot.title}</CardTitle>
                     <CardDescription className="mt-1 text-xs">
-                      {viewerTimezone && viewerTimezone !== snapshot.timezone
-                        ? format(messages.publicEvent.timesShownInDualTimezone, {
-                            hostTimezone: snapshot.timezone,
-                            hostLabel: timezoneLabels.host,
-                            viewerTimezone,
-                            viewerLabel: timezoneLabels.viewer ?? viewerTimezone,
-                          })
-                        : format(messages.publicEvent.timesShownIn, {
-                            timezone: snapshot.timezone,
-                          })}
+                      {format(messages.publicEvent.timesShownIn, {
+                        timezone: viewerTimezoneOption?.label ?? viewerTimezone,
+                      })}
                     </CardDescription>
                   </div>
                 ) : null}
@@ -1032,9 +1008,9 @@ export function EventHeatmap({
                         <SelectItem value={AUTOMATIC_TIMEZONE_VALUE}>
                           {messages.publicEvent.viewerTimezoneAutomatic}
                         </SelectItem>
-                        {timezones.map((timezoneOption) => (
-                          <SelectItem key={timezoneOption} value={timezoneOption}>
-                            {timezoneOption}
+                        {timezoneOptions.map((timezoneOption) => (
+                          <SelectItem key={timezoneOption.value} value={timezoneOption.value}>
+                            {timezoneOption.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -1088,7 +1064,7 @@ export function EventHeatmap({
                       {format(messages.publicEvent.dayWindowSummary, {
                         start: clampedVisibleDateStartIndex + 1,
                         end: clampedVisibleDateStartIndex + visibleDates.length,
-                        total: snapshot.dates.length,
+                        total: projectedBoard.dates.length,
                       })}
                     </p>
                   </div>
@@ -1135,8 +1111,8 @@ export function EventHeatmap({
                       </div>
                     );
                   })}
-                  {snapshot.timeRows.map((timeRow) => (
-                    <Fragment key={timeRow.minutes}>
+                  {visibleTimeRows.map((timeRow) => (
+                    <Fragment key={timeRow.id}>
                       <div
                         className={cn(
                           "sticky left-0 z-10 flex items-center justify-end bg-background px-2 text-[11px] font-medium text-muted-foreground",
@@ -1144,50 +1120,55 @@ export function EventHeatmap({
                         )}
                       >
                         {isMajorTimeLabel(timeRow.minutes)
-                          ? dualTimeLabelsByMinutes.get(timeRow.minutes) ?? timeRow.label
+                          ? visibleTimeRowLabels.get(timeRow.id) ?? timeRow.label
                           : ""}
                       </div>
                       {visibleDates.map((date) => {
-                        const key = slotKey(date.dateKey, timeRow.minutes);
-                        const slot = slotMap.get(key);
+                        const slot = projectedBoard.slotLookup.get(`${date.dateKey}|${timeRow.id}`);
                         if (!slot) {
-                          return null;
+                          return (
+                            <div
+                              key={`${date.dateKey}-${timeRow.id}`}
+                              className={cn("min-w-[84px] bg-background", cellHeightClass)}
+                            />
+                          );
                         }
 
                         const availableNames = slot.participantIds
                           .map((participantId) => participantNamesById.get(participantId))
                           .filter(Boolean) as string[];
+                        const timeLabel =
+                          visibleTimeRowLabels.get(slot.projectedRowId) ?? slot.projectedTimeLabel;
                         const availabilityTitle = availableNames.length
                           ? format(messages.publicEvent.availableCountTitle, {
-                              date: date.label,
-                              time: timeRow.label,
+                              date: slot.projectedDateLabel,
+                              time: timeLabel,
                               available: slot.availabilityCount,
                               total: snapshot.participants.length,
                               names: availableNames.join(", "),
                             })
                           : format(messages.publicEvent.nobodyAvailableTitle, {
-                              date: date.label,
-                              time: timeRow.label,
+                              date: slot.projectedDateLabel,
+                              time: timeLabel,
                             });
 
-                        const isActiveViewSlot = mode === "view" && activeSlotKey === key;
+                        const isActiveViewSlot = mode === "view" && activeSlotStart === slot.slotStart;
                         const showCurrentUserSelection = supportsPainting && mode === "edit" && slot.selectedByCurrentUser;
                         const isHighlightedParticipantAvailable = activeParticipantId
                           ? slot.participantIds.includes(activeParticipantId)
                           : false;
-                        const isInFinalSlotWindow = finalizedSlotKeys.has(key);
-                        const isFinalSlotStart = finalizedSlot?.slotStart === slot.slotStart;
+                        const isInFinalSlotWindow = finalizedSlotKeys.has(slot.slotStart);
+                        const isFinalSlotStart = finalSlotStart === slot.slotStart;
 
                         return (
                           <button
-                            key={key}
+                            key={slot.slotStart}
                             type="button"
                             aria-label={availabilityTitle}
                             aria-pressed={mode === "edit" ? slot.selectedByCurrentUser : isActiveViewSlot}
                             title={availabilityTitle}
-                            data-slot-key={key}
-                            data-date-key={date.dateKey}
-                            data-minutes={timeRow.minutes}
+                            data-slot-key={slot.slotStart}
+                            data-slot-start={slot.slotStart}
                             data-current-user-selected={
                               showCurrentUserSelection ? "true" : undefined
                             }
@@ -1218,20 +1199,13 @@ export function EventHeatmap({
                             onPointerDown={(event) =>
                               handleCellPointerDown(
                                 event,
-                                date.dateKey,
-                                timeRow.minutes,
+                                slot.slotStart,
                                 slot.selectedByCurrentUser,
                               )
                             }
-                            onPointerMove={(event) =>
-                              handleCellPointerMove(event, date.dateKey, timeRow.minutes)
-                            }
-                            onPointerUp={(event) =>
-                              handleCellPointerEnd(event, date.dateKey, timeRow.minutes)
-                            }
-                            onPointerCancel={(event) =>
-                              handleCellPointerEnd(event, date.dateKey, timeRow.minutes)
-                            }
+                            onPointerMove={(event) => handleCellPointerMove(event, slot.slotStart)}
+                            onPointerUp={(event) => handleCellPointerEnd(event, slot.slotStart)}
+                            onPointerCancel={(event) => handleCellPointerEnd(event, slot.slotStart)}
                             onLostPointerCapture={(event) => {
                               endPaintSession(event.pointerId);
                             }}
@@ -1240,7 +1214,7 @@ export function EventHeatmap({
                                 return;
                               }
 
-                              setActiveSlotKey(key);
+                              setActiveSlotStart(slot.slotStart);
                             }}
                           >
                             <span className="sr-only">{availabilityTitle}</span>

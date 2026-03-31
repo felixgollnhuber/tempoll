@@ -158,6 +158,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -208,7 +209,7 @@ describe("PublicEventClient", () => {
     expect(within(mobileSidebar!).getByText("Best matching windows")).toBeInTheDocument();
   });
 
-  it("shows host and viewer timezone labels side-by-side when they differ", () => {
+  it("shows only the projected viewer timezone when it differs", () => {
     mockedGetViewerTimezone.mockReturnValue("America/New_York");
 
     renderWithI18n(
@@ -223,9 +224,10 @@ describe("PublicEventClient", () => {
       />,
     );
 
-    expect(screen.getByText(/Host: Europe\/Vienna/)).toBeInTheDocument();
-    expect(screen.getByText(/You: America\/New_York/)).toBeInTheDocument();
-    expect(screen.getByText("09:00 / 03:00")).toBeInTheDocument();
+    expect(screen.queryByText(/Host: Europe\/Vienna/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Times shown in .*America\/New_York/)).toBeInTheDocument();
+    expect(screen.getByText("03:00")).toBeInTheDocument();
+    expect(screen.queryByText("09:00 / 03:00")).not.toBeInTheDocument();
   });
 
   it("shows a timezone selector even when the detected timezone matches the event timezone", async () => {
@@ -252,14 +254,15 @@ describe("PublicEventClient", () => {
     expect(timezoneSelect).toHaveTextContent("Automatic");
 
     await user.click(timezoneSelect);
-    await user.click(screen.getByRole("option", { name: "America/New_York" }));
+    await user.click(screen.getByRole("option", { name: /America\/New_York/ }));
 
     expect(screen.getByRole("combobox", { name: "Display timezone" })).toHaveTextContent(
       "America/New_York",
     );
-    expect(screen.getByText(/Host: Europe\/Vienna/)).toBeInTheDocument();
-    expect(screen.getByText(/You: America\/New_York/)).toBeInTheDocument();
-    expect(screen.getByText("09:00 / 03:00")).toBeInTheDocument();
+    expect(screen.queryByText(/Host: Europe\/Vienna/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Times shown in .*America\/New_York/)).toBeInTheDocument();
+    expect(screen.getByText("03:00")).toBeInTheDocument();
+    expect(screen.queryByText("09:00 / 03:00")).not.toBeInTheDocument();
   });
 
   it("renders local suggestion labels after a manual timezone override", async () => {
@@ -287,9 +290,9 @@ describe("PublicEventClient", () => {
     );
 
     await user.click(screen.getByRole("combobox", { name: "Display timezone" }));
-    await user.click(screen.getByRole("option", { name: "America/New_York" }));
+    await user.click(screen.getByRole("option", { name: /America\/New_York/ }));
 
-    expect(screen.getAllByText("Your timezone: Mon, Mar 30 · 03:00–04:00")).toHaveLength(2);
+    expect(screen.getAllByText("Mon, Mar 30 · 03:00–04:00")).toHaveLength(2);
   });
 
   it("renders local fixed-date labels after a manual timezone override", async () => {
@@ -317,9 +320,9 @@ describe("PublicEventClient", () => {
     );
 
     await user.click(screen.getByRole("combobox", { name: "Display timezone" }));
-    await user.click(screen.getByRole("option", { name: "America/New_York" }));
+    await user.click(screen.getByRole("option", { name: /America\/New_York/ }));
 
-    expect(screen.getAllByText("Your timezone: Mon, Mar 30 · 03:00–04:00")).toHaveLength(2);
+    expect(screen.getAllByText("Mon, Mar 30 · 03:00–04:00")).toHaveLength(2);
   });
 
   it("reads a stored timezone override on remount", async () => {
@@ -337,7 +340,7 @@ describe("PublicEventClient", () => {
     const firstRender = renderWithI18n(<PublicEventClient {...props} />);
 
     await user.click(screen.getByRole("combobox", { name: "Display timezone" }));
-    await user.click(screen.getByRole("option", { name: "America/New_York" }));
+    await user.click(screen.getByRole("option", { name: /America\/New_York/ }));
 
     firstRender.unmount();
 
@@ -346,7 +349,140 @@ describe("PublicEventClient", () => {
     expect(screen.getByRole("combobox", { name: "Display timezone" })).toHaveTextContent(
       "America/New_York",
     );
-    expect(screen.getByText(/You: America\/New_York/)).toBeInTheDocument();
+    expect(screen.getByText(/Times shown in .*America\/New_York/)).toBeInTheDocument();
+  });
+
+  it("keeps repeated fallback-hour slots distinct and saves canonical slot starts", async () => {
+    vi.useFakeTimers();
+    const initialSnapshot: PublicEventSnapshot = {
+      id: "event_dst",
+      slug: "test-event",
+      title: "DST Event",
+      timezone: "Europe/Vienna",
+      status: "OPEN",
+      slotMinutes: 60,
+      meetingDurationMinutes: 60,
+      dayStartMinutes: 2 * 60,
+      dayEndMinutes: 4 * 60,
+      dates: [{ dateKey: "2026-10-25", label: "Sun, Oct 25" }],
+      timeRows: [{ minutes: 2 * 60, label: "02:00" }],
+      slots: [
+        {
+          slotStart: "2026-10-25T00:00:00.000Z",
+          dateKey: "2026-10-25",
+          minutes: 2 * 60,
+          availabilityCount: 1,
+          participantIds: ["p1"],
+          selectedByCurrentUser: true,
+        },
+        {
+          slotStart: "2026-10-25T01:00:00.000Z",
+          dateKey: "2026-10-25",
+          minutes: 2 * 60,
+          availabilityCount: 0,
+          participantIds: [],
+          selectedByCurrentUser: false,
+        },
+      ],
+      participants: [
+        {
+          id: "p1",
+          displayName: "Felix",
+          color: "#ef7f3b",
+          selectedSlotCount: 1,
+          isCurrentUser: true,
+        },
+      ],
+      suggestions: [],
+      finalizedSlot: null,
+      currentParticipant: {
+        id: "p1",
+        displayName: "Felix",
+        color: "#ef7f3b",
+        selectedSlotCount: 1,
+        isCurrentUser: true,
+      },
+    };
+    const savedSnapshot: PublicEventSnapshot = {
+      ...initialSnapshot,
+      slots: initialSnapshot.slots.map((slot) =>
+        slot.slotStart === "2026-10-25T01:00:00.000Z"
+          ? {
+              ...slot,
+              availabilityCount: 1,
+              participantIds: ["p1"],
+              selectedByCurrentUser: true,
+            }
+          : slot,
+      ),
+      participants: [
+        {
+          id: "p1",
+          displayName: "Felix",
+          color: "#ef7f3b",
+          selectedSlotCount: 2,
+          isCurrentUser: true,
+        },
+      ],
+      currentParticipant: {
+        id: "p1",
+        displayName: "Felix",
+        color: "#ef7f3b",
+        selectedSlotCount: 2,
+        isCurrentUser: true,
+      },
+    };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === "/api/events/test-event/availability") {
+        expect(init?.method).toBe("PUT");
+        return {
+          ok: true,
+          json: async () => ({ snapshot: savedSnapshot }),
+        };
+      }
+
+      throw new Error(`Unhandled fetch call: ${String(input)}`);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    renderWithI18n(
+      <PublicEventClient
+        slug="test-event"
+        initialSnapshot={initialSnapshot}
+        initialSession={{
+          participantId: "p1",
+          displayName: "Felix",
+        }}
+        timezones={defaultTimezones}
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: /Sun, Oct 25 02:00 CEST · 1\/1 available/i }),
+    ).toBeInTheDocument();
+
+    const secondHourSlot = screen.getByRole("button", {
+      name: /Sun, Oct 25 02:00 CET · nobody available/i,
+    });
+
+    fireEvent.pointerDown(secondHourSlot, {
+      pointerId: 1,
+      isPrimary: true,
+    });
+    fireEvent.pointerUp(secondHourSlot, {
+      pointerId: 1,
+      isPrimary: true,
+    });
+    await vi.advanceTimersByTimeAsync(600);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
+    expect(JSON.parse(String(requestInit?.body))).toMatchObject({
+      selectedSlotStarts: ["2026-10-25T00:00:00.000Z", "2026-10-25T01:00:00.000Z"],
+    });
+
+    vi.useRealTimers();
   });
 
   it("hides best matching windows before anyone has selected availability", () => {
