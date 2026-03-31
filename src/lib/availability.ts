@@ -187,7 +187,7 @@ export function buildMeetingWindows({
   return meetingWindows;
 }
 
-function getMeetingWindowLabels({
+export function formatMeetingWindowLabels({
   slotStart,
   slotEnd,
   locale,
@@ -256,7 +256,7 @@ function summarizeMeetingWindow({
     ? Math.min(...windowSlots.map((slot) => slot.availabilityCount))
     : 0;
   const sumCount = windowSlots.reduce((acc, slot) => acc + slot.availabilityCount, 0);
-  const labels = getMeetingWindowLabels({
+  const labels = formatMeetingWindowLabels({
     slotStart: meetingWindow.slotStart,
     slotEnd: meetingWindow.slotEnd,
     locale,

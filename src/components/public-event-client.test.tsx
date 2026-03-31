@@ -1,4 +1,5 @@
 import { fireEvent, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PublicEventClient } from "./public-event-client";
@@ -6,6 +7,7 @@ import { renderWithI18n } from "@/test/render-with-i18n";
 import type { PublicEventSnapshot } from "@/lib/types";
 
 const mockedGetViewerTimezone = vi.hoisted(() => vi.fn(() => "Europe/Vienna"));
+const defaultTimezones = ["Europe/Vienna", "America/New_York", "UTC"];
 
 vi.mock("@/lib/availability", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/availability")>();
@@ -152,6 +154,7 @@ function setViewportWidth(width: number) {
 beforeEach(() => {
   setViewportWidth(1024);
   mockedGetViewerTimezone.mockReturnValue("Europe/Vienna");
+  window.localStorage.clear();
 });
 
 afterEach(() => {
@@ -223,6 +226,127 @@ describe("PublicEventClient", () => {
     expect(screen.getByText(/Host: Europe\/Vienna/)).toBeInTheDocument();
     expect(screen.getByText(/You: America\/New_York/)).toBeInTheDocument();
     expect(screen.getByText("09:00 / 03:00")).toBeInTheDocument();
+  });
+
+  it("shows a timezone selector even when the detected timezone matches the event timezone", async () => {
+    const user = userEvent.setup();
+
+    renderWithI18n(
+      <PublicEventClient
+        slug="test-event"
+        shareUrl="https://tempoll.app/e/test-event"
+        initialSnapshot={createSnapshot()}
+        initialSession={{
+          participantId: "p1",
+          displayName: "Felix",
+        }}
+        timezones={defaultTimezones}
+      />,
+    );
+
+    const timezoneSelect = screen.getByRole("combobox", {
+      name: "Display timezone",
+    });
+
+    expect(timezoneSelect).toBeInTheDocument();
+    expect(timezoneSelect).toHaveTextContent("Automatic");
+
+    await user.click(timezoneSelect);
+    await user.click(screen.getByRole("option", { name: "America/New_York" }));
+
+    expect(screen.getByRole("combobox", { name: "Display timezone" })).toHaveTextContent(
+      "America/New_York",
+    );
+    expect(screen.getByText(/Host: Europe\/Vienna/)).toBeInTheDocument();
+    expect(screen.getByText(/You: America\/New_York/)).toBeInTheDocument();
+    expect(screen.getByText("09:00 / 03:00")).toBeInTheDocument();
+  });
+
+  it("renders local suggestion labels after a manual timezone override", async () => {
+    const user = userEvent.setup();
+    const snapshot = createSnapshot({ withCurrentUser: false });
+    snapshot.suggestions = [
+      {
+        slotStart: "2026-03-30T07:00:00.000Z",
+        slotEnd: "2026-03-30T08:00:00.000Z",
+        dateKey: "2026-03-30",
+        label: "Mon, Mar 30 · 09:00–10:00",
+        localLabel: null,
+        availableCount: 2,
+        participantIds: ["p1", "p2"],
+      },
+    ];
+
+    renderWithI18n(
+      <PublicEventClient
+        slug="test-event"
+        initialSnapshot={snapshot}
+        initialSession={null}
+        timezones={defaultTimezones}
+      />,
+    );
+
+    await user.click(screen.getByRole("combobox", { name: "Display timezone" }));
+    await user.click(screen.getByRole("option", { name: "America/New_York" }));
+
+    expect(screen.getAllByText("Your timezone: Mon, Mar 30 · 03:00–04:00")).toHaveLength(2);
+  });
+
+  it("renders local fixed-date labels after a manual timezone override", async () => {
+    const user = userEvent.setup();
+    const snapshot = createSnapshot({
+      status: "CLOSED",
+      finalizedSlot: {
+        slotStart: "2026-03-30T07:00:00.000Z",
+        slotEnd: "2026-03-30T08:00:00.000Z",
+        dateKey: "2026-03-30",
+        label: "Mon, Mar 30 · 09:00–10:00",
+        localLabel: null,
+        availableCount: 2,
+        participantIds: ["p1", "p2"],
+      },
+    });
+
+    renderWithI18n(
+      <PublicEventClient
+        slug="test-event"
+        initialSnapshot={snapshot}
+        initialSession={null}
+        timezones={defaultTimezones}
+      />,
+    );
+
+    await user.click(screen.getByRole("combobox", { name: "Display timezone" }));
+    await user.click(screen.getByRole("option", { name: "America/New_York" }));
+
+    expect(screen.getAllByText("Your timezone: Mon, Mar 30 · 03:00–04:00")).toHaveLength(2);
+  });
+
+  it("reads a stored timezone override on remount", async () => {
+    const user = userEvent.setup();
+    const props = {
+      slug: "test-event",
+      shareUrl: "https://tempoll.app/e/test-event",
+      initialSnapshot: createSnapshot(),
+      initialSession: {
+        participantId: "p1",
+        displayName: "Felix",
+      },
+      timezones: defaultTimezones,
+    };
+    const firstRender = renderWithI18n(<PublicEventClient {...props} />);
+
+    await user.click(screen.getByRole("combobox", { name: "Display timezone" }));
+    await user.click(screen.getByRole("option", { name: "America/New_York" }));
+
+    firstRender.unmount();
+
+    renderWithI18n(<PublicEventClient {...props} />);
+
+    expect(screen.getByRole("combobox", { name: "Display timezone" })).toHaveTextContent(
+      "America/New_York",
+    );
+    expect(screen.getByText(/You: America\/New_York/)).toBeInTheDocument();
   });
 
   it("hides best matching windows before anyone has selected availability", () => {

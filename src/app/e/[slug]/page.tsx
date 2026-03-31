@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import { PublicEventClient } from "@/components/public-event-client";
 import { RecentEventTracker } from "@/components/recent-event-tracker";
+import { getSupportedTimezones } from "@/lib/constants";
 import { getPublicEventSnapshot } from "@/lib/event-service";
 import { getServerI18n } from "@/lib/i18n/server";
 import { buildSocialImages, buildSocialTitle } from "@/lib/site-metadata";
@@ -55,6 +56,7 @@ export default async function EventPage({ params }: EventPageProps) {
   const cookieStore = await cookies();
   const cookieValue = cookieStore.get(getParticipantCookieName(slug))?.value;
   const { locale } = await getServerI18n();
+  const timezones = getSupportedTimezones();
 
   const event = await getPublicEventSnapshot(slug, locale, cookieValue);
   if (!event) {
@@ -72,6 +74,7 @@ export default async function EventPage({ params }: EventPageProps) {
         slug={slug}
         shareUrl={buildPublicEventUrl(slug)}
         initialSnapshot={event.snapshot}
+        timezones={timezones}
         initialSession={
           event.participant
             ? {
