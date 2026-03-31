@@ -82,6 +82,8 @@ type EventHeatmapProps = {
 
 const GRID_TIME_COLUMN_WIDTH_PX = 72;
 const GRID_DAY_COLUMN_MIN_WIDTH_PX = 84;
+const GRID_DAY_COLUMN_MOBILE_MIN_WIDTH_PX = 72;
+const GRID_DAY_COLUMN_MOBILE_BREAKPOINT_PX = 640;
 
 function slotKey(dateKey: string, minutes: number) {
   return `${dateKey}-${minutes}`;
@@ -219,17 +221,23 @@ function getVisibleDayCount(containerWidth: number, totalDays: number) {
     return totalDays;
   }
 
-  const fullGridWidth = GRID_TIME_COLUMN_WIDTH_PX + totalDays * GRID_DAY_COLUMN_MIN_WIDTH_PX;
+  const dayColumnMinWidth = getGridDayColumnMinWidth(containerWidth);
+  const fullGridWidth = GRID_TIME_COLUMN_WIDTH_PX + totalDays * dayColumnMinWidth;
   if (containerWidth >= fullGridWidth) {
     return totalDays;
   }
 
-  const availableWidth = Math.max(
-    containerWidth - GRID_TIME_COLUMN_WIDTH_PX,
-    GRID_DAY_COLUMN_MIN_WIDTH_PX,
-  );
+  const availableWidth = Math.max(containerWidth - GRID_TIME_COLUMN_WIDTH_PX, dayColumnMinWidth);
 
-  return Math.max(1, Math.floor(availableWidth / GRID_DAY_COLUMN_MIN_WIDTH_PX));
+  return Math.max(1, Math.floor(availableWidth / dayColumnMinWidth));
+}
+
+function getGridDayColumnMinWidth(containerWidth: number) {
+  if (containerWidth > 0 && containerWidth < GRID_DAY_COLUMN_MOBILE_BREAKPOINT_PX) {
+    return GRID_DAY_COLUMN_MOBILE_MIN_WIDTH_PX;
+  }
+
+  return GRID_DAY_COLUMN_MIN_WIDTH_PX;
 }
 
 function clampVisibleDateStartIndex(startIndex: number, totalDays: number, visibleDayCount: number) {
@@ -481,6 +489,10 @@ export function EventHeatmap({
   const participantsWithAvailability = useMemo(
     () => snapshot.participants.filter((participant) => participant.selectedSlotCount > 0),
     [snapshot.participants],
+  );
+  const dayColumnMinWidth = useMemo(
+    () => getGridDayColumnMinWidth(gridContainerWidth),
+    [gridContainerWidth],
   );
   const visibleDayCount = useMemo(
     () => getVisibleDayCount(gridContainerWidth, snapshot.dates.length),
@@ -1095,12 +1107,13 @@ export function EventHeatmap({
 
               <div ref={gridContainerRef} className="min-w-0 overflow-hidden rounded-md border">
                 <div
+                  data-slot="event-heatmap-grid"
                   className={cn(
                     "grid gap-px bg-border select-none",
                     mode === "edit" && supportsPainting ? "touch-none" : "touch-pan-y",
                   )}
                   style={{
-                    gridTemplateColumns: `${GRID_TIME_COLUMN_WIDTH_PX}px repeat(${visibleDates.length}, minmax(${GRID_DAY_COLUMN_MIN_WIDTH_PX}px, 1fr))`,
+                    gridTemplateColumns: `${GRID_TIME_COLUMN_WIDTH_PX}px repeat(${visibleDates.length}, minmax(${dayColumnMinWidth}px, 1fr))`,
                   }}
                 >
                   <div className="sticky left-0 top-0 z-30 bg-background" />
@@ -1110,7 +1123,8 @@ export function EventHeatmap({
                     return (
                       <div
                         key={date.dateKey}
-                        className="sticky top-0 z-20 flex min-w-[84px] flex-col items-center justify-center bg-background px-2 py-1 text-center"
+                        className="sticky top-0 z-20 flex flex-col items-center justify-center bg-background px-2 py-1 text-center"
+                        style={{ minWidth: `${dayColumnMinWidth}px` }}
                       >
                         <span className="text-[11px] font-semibold leading-none text-foreground">
                           {parts.weekday}

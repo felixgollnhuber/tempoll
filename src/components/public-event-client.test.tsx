@@ -1,4 +1,4 @@
-import { fireEvent, screen, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -723,5 +723,29 @@ describe("PublicEventClient", () => {
     // so the URL and copy button are present in the DOM at any viewport width.
     expect(screen.getAllByText("https://tempoll.app/e/test-event")).toHaveLength(2);
     expect(screen.getAllByRole("button", { name: "Copy public URL" })).toHaveLength(2);
+  });
+
+  it("uses narrower day columns on mobile viewports to show more days at once", async () => {
+    setViewportWidth(390);
+
+    renderWithI18n(
+      <PublicEventClient
+        slug="test-event"
+        shareUrl="https://tempoll.app/e/test-event"
+        initialSnapshot={createSnapshot({ dayCount: 7 })}
+        initialSession={null}
+      />,
+      { locale: "de" },
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Verfügbarkeit")).toBeInTheDocument();
+      const heatmapGrid = document.querySelector<HTMLElement>(
+        '[data-slot="event-heatmap-grid"]',
+      );
+
+      expect(heatmapGrid).not.toBeNull();
+      expect(heatmapGrid?.style.gridTemplateColumns).toContain("minmax(72px, 1fr)");
+    });
   });
 });
