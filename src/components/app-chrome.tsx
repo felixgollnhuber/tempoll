@@ -42,7 +42,7 @@ export function AppChrome({
   legalPagesEnabled,
   children,
 }: AppChromeProps) {
-  const { messages, format } = useI18n();
+  const { messages } = useI18n();
   const pathname = usePathname();
   const hideChrome = !setupComplete && pathname === "/setup";
   const [failedLogoSrc, setFailedLogoSrc] = useState<string | null>(null);

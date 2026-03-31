@@ -9,7 +9,7 @@ import {
   SparklesIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +32,7 @@ import {
 } from "@/lib/create-event-defaults";
 import { meetingDurationOptions, slotMinuteOptions } from "@/lib/constants";
 import { useI18n } from "@/lib/i18n/context";
+import { buildTimezoneOptions } from "@/lib/timezone-options";
 import { cn } from "@/lib/utils";
 import { createEventCreateSchema } from "@/lib/validators";
 
@@ -158,6 +159,18 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
   );
   const selectedRangeDays = getRangeDays(dateRange);
   const draftRangeDays = getRangeDays(draftDateRange);
+  const timezoneOptions = useMemo(
+    () =>
+      buildTimezoneOptions(
+        timezones,
+        format(dateRange?.from ?? startOfToday(), "yyyy-MM-dd"),
+      ),
+    [dateRange?.from, timezones],
+  );
+  const selectedTimezoneOption = useMemo(
+    () => timezoneOptions.find((option) => option.value === timezone) ?? null,
+    [timezone, timezoneOptions],
+  );
 
   const getTimeLabel = (minutes: number) =>
     timeOptions.find((option) => option.value === minutes)?.label ??
@@ -350,9 +363,9 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
                     <SelectValue placeholder={messages.createEvent.timezonePlaceholder} />
                   </SelectTrigger>
                   <SelectContent className="max-h-80">
-                    {timezones.map((timezoneOption) => (
-                      <SelectItem key={timezoneOption} value={timezoneOption}>
-                        {timezoneOption}
+                    {timezoneOptions.map((timezoneOption) => (
+                      <SelectItem key={timezoneOption.value} value={timezoneOption.value}>
+                        {timezoneOption.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -635,7 +648,9 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
           <CardContent className="space-y-4">
             <div className="space-y-1">
               <p className="text-xl font-semibold">{title || messages.createEvent.untitledEvent}</p>
-              <p className="text-sm text-muted-foreground">{timezone}</p>
+              <p className="text-sm text-muted-foreground">
+                {selectedTimezoneOption?.label ?? timezone}
+              </p>
             </div>
             <Separator />
             <dl className="space-y-3 text-sm">

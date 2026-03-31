@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatMeetingWindowLabels } from "@/lib/availability";
 import { useI18n } from "@/lib/i18n/context";
+import { buildTimezoneOptions } from "@/lib/timezone-options";
 import type { PublicEventSnapshot, RealtimeEventPayload } from "@/lib/types";
 import { useViewerTimezone } from "@/lib/viewer-timezone";
 
@@ -41,7 +42,7 @@ function getInitialMode(hasEditableSession: boolean): BoardMode {
 
 function getSelectedMap(snapshot: PublicEventSnapshot) {
   return snapshot.slots.reduce<DraftSelection>((acc, slot) => {
-    acc[`${slot.dateKey}-${slot.minutes}`] = slot.selectedByCurrentUser;
+    acc[slot.slotStart] = slot.selectedByCurrentUser;
     return acc;
   }, {});
 }
@@ -83,6 +84,10 @@ export function PublicEventClient({
     viewerTimezoneSelectValue,
     setViewerTimezonePreference,
   } = useViewerTimezone(snapshot.timezone, timezones);
+  const timezoneOptions = useMemo(
+    () => buildTimezoneOptions(timezones, snapshot.dates[0]?.dateKey),
+    [snapshot.dates, timezones],
+  );
 
   const applySnapshot = useCallback((nextSnapshot: PublicEventSnapshot) => {
     setSnapshot(nextSnapshot);
@@ -93,7 +98,7 @@ export function PublicEventClient({
   const hasAnyAvailability = snapshot.participants.some(
     (participant) => participant.selectedSlotCount > 0,
   );
-  const finalizedSlotLocalLabel = useMemo(() => {
+  const finalizedSlotDisplayLabel = useMemo(() => {
     if (!snapshot.finalizedSlot) {
       return null;
     }
@@ -102,23 +107,21 @@ export function PublicEventClient({
       slotStart: snapshot.finalizedSlot.slotStart,
       slotEnd: snapshot.finalizedSlot.slotEnd,
       locale,
-      timezone: snapshot.timezone,
-      viewerTimezone,
-    }).localLabel;
-  }, [locale, snapshot.finalizedSlot, snapshot.timezone, viewerTimezone]);
-  const suggestionsWithLocalLabels = useMemo(
+      timezone: viewerTimezone,
+    }).label;
+  }, [locale, snapshot.finalizedSlot, viewerTimezone]);
+  const suggestionsWithDisplayLabels = useMemo(
     () =>
       snapshot.suggestions.map((suggestion) => ({
         ...suggestion,
-        localLabel: formatMeetingWindowLabels({
+        displayLabel: formatMeetingWindowLabels({
           slotStart: suggestion.slotStart,
           slotEnd: suggestion.slotEnd,
           locale,
-          timezone: snapshot.timezone,
-          viewerTimezone,
-        }).localLabel,
+          timezone: viewerTimezone,
+        }).label,
       })),
-    [locale, snapshot.suggestions, snapshot.timezone, viewerTimezone],
+    [locale, snapshot.suggestions, viewerTimezone],
   );
 
   const fetchSnapshot = useCallback(async () => {
@@ -163,7 +166,7 @@ export function PublicEventClient({
 
     const handle = window.setTimeout(async () => {
       const selectedSlotStarts = snapshot.slots
-        .filter((slot) => selectedMap[`${slot.dateKey}-${slot.minutes}`])
+        .filter((slot) => selectedMap[slot.slotStart])
         .map((slot) => slot.slotStart);
 
       queuedSelectedSlotStartsRef.current = selectedSlotStarts;
@@ -287,24 +290,23 @@ export function PublicEventClient({
   }
 
   const updateCell = useCallback(
-    (dateKey: string, minutes: number, nextValue?: boolean) => {
+    (slotStart: string, nextValue?: boolean) => {
       if (!canEdit) {
         return false;
       }
 
-      const key = `${dateKey}-${minutes}`;
       let didChange = false;
 
       setSelectedMap((current) => {
-        const targetValue = nextValue ?? !current[key];
-        if (current[key] === targetValue) {
+        const targetValue = nextValue ?? !current[slotStart];
+        if (current[slotStart] === targetValue) {
           return current;
         }
 
         didChange = true;
         return {
           ...current,
-          [key]: targetValue,
+          [slotStart]: targetValue,
         };
       });
 
@@ -346,16 +348,9 @@ export function PublicEventClient({
             {messages.publicEvent.fixedDateDescription}
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-2 p-4 pt-0">
+          <CardContent className="space-y-2 p-4 pt-0">
           <div className="rounded-md border bg-muted/20 px-3 py-2">
-            <p className="text-sm font-semibold text-foreground">{snapshot.finalizedSlot.label}</p>
-            {finalizedSlotLocalLabel ? (
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                {format(messages.publicEvent.yourTimezone, {
-                  label: finalizedSlotLocalLabel,
-                })}
-              </p>
-            ) : null}
+            <p className="text-sm font-semibold text-foreground">{finalizedSlotDisplayLabel}</p>
             <p className="mt-1 text-[11px] text-muted-foreground">
               {plural(messages.publicEvent.fullWindowFree, snapshot.finalizedSlot.availableCount)}
             </p>
@@ -376,21 +371,14 @@ export function PublicEventClient({
               duration: snapshot.meetingDurationMinutes,
             })}
           </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2 p-4 pt-0">
-          {suggestionsWithLocalLabels.map((suggestion, index) => (
+          </CardHeader>
+          <CardContent className="space-y-2 p-4 pt-0">
+          {suggestionsWithDisplayLabels.map((suggestion, index) => (
             <div key={suggestion.slotStart} className="rounded-md border bg-muted/20 px-3 py-2">
               <p className="text-[11px] font-medium text-muted-foreground">
                 {format(messages.common.option, { count: index + 1 })}
               </p>
-              <p className="mt-1 text-sm font-semibold text-foreground">{suggestion.label}</p>
-              {suggestion.localLabel ? (
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  {format(messages.publicEvent.yourTimezone, {
-                    label: suggestion.localLabel,
-                  })}
-                </p>
-              ) : null}
+              <p className="mt-1 text-sm font-semibold text-foreground">{suggestion.displayLabel}</p>
               <p className="mt-1 text-[11px] text-muted-foreground">
                 {plural(messages.publicEvent.fullWindowFree, suggestion.availableCount)}
               </p>
@@ -448,7 +436,7 @@ export function PublicEventClient({
         finalSlotStart={snapshot.finalizedSlot?.slotStart ?? null}
         sessionBadgeLabel={session?.displayName ?? null}
         sidebarTopContent={sidebarTopContent}
-        timezones={timezones}
+        timezoneOptions={timezoneOptions}
         viewerTimezone={viewerTimezone}
         viewerTimezoneSelectValue={viewerTimezoneSelectValue}
         onViewerTimezoneChange={setViewerTimezonePreference}

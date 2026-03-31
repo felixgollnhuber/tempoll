@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { buildSlotStart, buildSnapshot, buildTimeOptions } from "./availability";
+import {
+  buildMeetingWindows,
+  buildSlotStart,
+  buildSnapshot,
+  buildTimeOptions,
+  enumerateEventSlots,
+  getAllowedFinalSlotStarts,
+  getAllowedSlotStarts,
+} from "./availability";
 
 describe("availability helpers", () => {
   it("includes 24:00 as the final time option", () => {
@@ -17,6 +25,51 @@ describe("availability helpers", () => {
     expect(buildSlotStart("2026-04-10", 9 * 60, "Europe/Vienna")).toBe(
       "2026-04-10T07:00:00.000Z",
     );
+  });
+
+  it("skips nonexistent spring-forward wall times when enumerating event slots", () => {
+    const slots = enumerateEventSlots({
+      dates: ["2026-03-29"],
+      timezone: "Europe/Vienna",
+      dayStartMinutes: 1 * 60,
+      dayEndMinutes: 4 * 60,
+      slotMinutes: 30,
+    });
+
+    expect(slots.map((slot) => slot.label)).toEqual(["01:00", "01:30", "03:00", "03:30"]);
+    expect(getAllowedSlotStarts({
+      dates: ["2026-03-29"],
+      timezone: "Europe/Vienna",
+      dayStartMinutes: 1 * 60,
+      dayEndMinutes: 4 * 60,
+      slotMinutes: 30,
+    })).toEqual(new Set(slots.map((slot) => slot.slotStart)));
+  });
+
+  it("keeps repeated fall-back wall times as distinct slots", () => {
+    const slots = enumerateEventSlots({
+      dates: ["2026-10-25"],
+      timezone: "Europe/Vienna",
+      dayStartMinutes: 1 * 60,
+      dayEndMinutes: 4 * 60,
+      slotMinutes: 30,
+    });
+
+    expect(slots.filter((slot) => slot.label === "02:00")).toHaveLength(2);
+    expect(slots.filter((slot) => slot.label === "02:30")).toHaveLength(2);
+    expect(new Set(slots.filter((slot) => slot.label === "02:00").map((slot) => slot.slotStart)).size).toBe(2);
+  });
+
+  it("handles US daylight-saving transitions with the same instant-based enumeration", () => {
+    const springForwardSlots = enumerateEventSlots({
+      dates: ["2026-03-08"],
+      timezone: "America/New_York",
+      dayStartMinutes: 1 * 60,
+      dayEndMinutes: 4 * 60,
+      slotMinutes: 30,
+    });
+
+    expect(springForwardSlots.map((slot) => slot.label)).toEqual(["01:00", "01:30", "03:00", "03:30"]);
   });
 
   it("ranks best windows by strongest full-duration overlap", () => {
@@ -140,5 +193,25 @@ describe("availability helpers", () => {
     });
 
     expect(invalidSnapshot.finalizedSlot).toBeNull();
+  });
+
+  it("derives allowed final slots from the same DST-safe meeting windows used for ranking", () => {
+    const expectedMeetingWindows = buildMeetingWindows({
+      dates: ["2026-03-29"],
+      timezone: "Europe/Vienna",
+      dayStartMinutes: 1 * 60,
+      dayEndMinutes: 4 * 60,
+      slotMinutes: 30,
+      meetingDurationMinutes: 60,
+    });
+
+    expect(getAllowedFinalSlotStarts({
+      dates: ["2026-03-29"],
+      timezone: "Europe/Vienna",
+      dayStartMinutes: 1 * 60,
+      dayEndMinutes: 4 * 60,
+      slotMinutes: 30,
+      meetingDurationMinutes: 60,
+    })).toEqual(new Set(expectedMeetingWindows.map((meetingWindow) => meetingWindow.slotStart)));
   });
 });

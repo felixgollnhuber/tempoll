@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AppLocale } from "@/lib/i18n/locale";
 import { renderWithI18n } from "@/test/render-with-i18n";
@@ -40,6 +40,10 @@ function renderCreateEventForm(locale: AppLocale = "en") {
 beforeEach(() => {
   window.localStorage.clear();
   push.mockReset();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("CreateEventForm", () => {
@@ -104,6 +108,29 @@ describe("CreateEventForm", () => {
     expect(screen.getByRole("option", { name: "08:00" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "09:00" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "17:00" })).toBeInTheDocument();
+  });
+
+  it("sorts timezone options by GMT offset for the selected range start", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-03-28T12:00:00.000Z"));
+
+    renderWithI18n(
+      <CreateEventForm
+        timezones={["Europe/Vienna", "America/New_York", "UTC"]}
+        timeOptions={defaultTimeOptions}
+      />,
+    );
+
+    vi.useRealTimers();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("combobox", { name: "Timezone" }));
+
+    expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual([
+      "(GMT-4) America/New_York",
+      "(GMT+0) UTC",
+      "(GMT+2) Europe/Vienna",
+    ]);
   });
 
   it("submits selected daily window and slot size after a successful event creation", async () => {

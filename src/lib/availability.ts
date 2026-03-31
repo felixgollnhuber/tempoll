@@ -1,6 +1,6 @@
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 
-import { getDateFnsLocale } from "@/lib/i18n/format";
+import { getDateFnsLocale, getIntlLocale } from "@/lib/i18n/format";
 import type { AppLocale } from "@/lib/i18n/locale";
 import type {
   BestTimeSuggestion,
@@ -42,6 +42,42 @@ type MeetingWindow = {
   slotStarts: string[];
 };
 
+export type EnumeratedEventSlot = {
+  slotStart: string;
+  dateKey: string;
+  minutes: number;
+  label: string;
+};
+
+export type ProjectedDate = {
+  dateKey: string;
+  label: string;
+};
+
+export type ProjectedTimeRow = {
+  id: string;
+  minutes: number;
+  occurrence: number;
+  label: string;
+};
+
+export type ProjectedSlot = SnapshotSlot & {
+  projectedDateKey: string;
+  projectedDateLabel: string;
+  projectedMinutes: number;
+  projectedTimeLabel: string;
+  projectedOccurrence: number;
+  projectedRowId: string;
+  projectedTimeZoneShortName: string;
+};
+
+export type ProjectedBoard = {
+  dates: ProjectedDate[];
+  timeRows: ProjectedTimeRow[];
+  slots: ProjectedSlot[];
+  slotLookup: Map<string, ProjectedSlot>;
+};
+
 type MeetingWindowSummary = FinalizedEventSlot & {
   sumCount: number;
 };
@@ -54,6 +90,43 @@ function isMeetingWindowSummary(
 
 function pad(value: number) {
   return String(value).padStart(2, "0");
+}
+
+function parseDateKey(dateKey: string) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return new Date(Date.UTC(year ?? 0, (month ?? 1) - 1, day ?? 1));
+}
+
+function formatDateKey(date: Date) {
+  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
+}
+
+function addDaysToDateKey(dateKey: string, days: number) {
+  const date = parseDateKey(dateKey);
+  date.setUTCDate(date.getUTCDate() + days);
+  return formatDateKey(date);
+}
+
+function getDateKeyInTimezone(date: Date, timezone: string) {
+  return formatInTimeZone(date, timezone, "yyyy-MM-dd");
+}
+
+function getMinutesInTimezone(date: Date, timezone: string) {
+  const [hoursText = "00", minutesText = "00"] = formatInTimeZone(date, timezone, "HH:mm").split(":");
+  return Number(hoursText) * 60 + Number(minutesText);
+}
+
+function getTimeZoneShortName(timezone: string, locale: AppLocale, date: Date) {
+  const timeZoneNameLocale = locale === "en" ? "en-GB" : getIntlLocale(locale);
+  const formatter = new Intl.DateTimeFormat(timeZoneNameLocale, {
+    timeZone: timezone,
+    timeZoneName: "short",
+  });
+  const timeZonePart = formatter
+    .formatToParts(date)
+    .find((part) => part.type === "timeZoneName")?.value;
+
+  return timeZonePart ?? timezone;
 }
 
 export function minutesToLabel(minutes: number) {
@@ -134,6 +207,61 @@ export function buildTimeRows({
   return timeRows;
 }
 
+function buildSnapshotTimeRows(slots: EnumeratedEventSlot[]) {
+  return [...new Set(slots.map((slot) => slot.minutes))]
+    .sort((left, right) => left - right)
+    .map((minutes) => ({
+      minutes,
+      label: minutesToLabel(minutes),
+    }));
+}
+
+export function enumerateEventSlots({
+  dates,
+  timezone,
+  dayStartMinutes,
+  dayEndMinutes,
+  slotMinutes,
+}: {
+  dates: string[];
+  timezone: string;
+  dayStartMinutes: number;
+  dayEndMinutes: number;
+  slotMinutes: number;
+}) {
+  const eventSlots: EnumeratedEventSlot[] = [];
+
+  for (const dateKey of sortDateKeys(dates)) {
+    const utcDayStart = fromZonedTime(`${dateKey}T00:00:00`, timezone);
+    const utcNextDayStart = fromZonedTime(`${addDaysToDateKey(dateKey, 1)}T00:00:00`, timezone);
+
+    for (
+      let slotTime = utcDayStart.getTime();
+      slotTime < utcNextDayStart.getTime();
+      slotTime += slotMinutes * 60 * 1000
+    ) {
+      const slotDate = new Date(slotTime);
+      if (getDateKeyInTimezone(slotDate, timezone) !== dateKey) {
+        continue;
+      }
+
+      const minutes = getMinutesInTimezone(slotDate, timezone);
+      if (minutes < dayStartMinutes || minutes >= dayEndMinutes) {
+        continue;
+      }
+
+      eventSlots.push({
+        slotStart: slotDate.toISOString(),
+        dateKey,
+        minutes,
+        label: minutesToLabel(minutes),
+      });
+    }
+  }
+
+  return eventSlots;
+}
+
 function getMeetingWindowSize(slotMinutes: number, meetingDurationMinutes: number) {
   return Math.max(1, Math.floor(meetingDurationMinutes / slotMinutes));
 }
@@ -154,17 +282,27 @@ export function buildMeetingWindows({
   meetingDurationMinutes: number;
 }) {
   const meetingWindows: MeetingWindow[] = [];
-  const timeRows = buildTimeRows({
-    slotMinutes,
+  const eventSlots = enumerateEventSlots({
+    dates,
+    timezone,
     dayStartMinutes,
     dayEndMinutes,
+    slotMinutes,
   });
+  const eventSlotsByDate = new Map<string, EnumeratedEventSlot[]>();
+  for (const slot of eventSlots) {
+    const existing = eventSlotsByDate.get(slot.dateKey) ?? [];
+    existing.push(slot);
+    eventSlotsByDate.set(slot.dateKey, existing);
+  }
   const windowSize = getMeetingWindowSize(slotMinutes, meetingDurationMinutes);
 
   for (const dateKey of sortDateKeys(dates)) {
-    for (let index = 0; index <= timeRows.length - windowSize; index += 1) {
-      const windowRows = timeRows.slice(index, index + windowSize);
-      const slotStarts = windowRows.map((timeRow) => buildSlotStart(dateKey, timeRow.minutes, timezone));
+    const daySlots = eventSlotsByDate.get(dateKey) ?? [];
+
+    for (let index = 0; index <= daySlots.length - windowSize; index += 1) {
+      const windowSlots = daySlots.slice(index, index + windowSize);
+      const slotStarts = windowSlots.map((slot) => slot.slotStart);
       const slotStart = slotStarts[0];
 
       if (!slotStart) {
@@ -222,6 +360,76 @@ export function formatMeetingWindowLabels({
             locale: getDateFnsLocale(locale),
           })}`
         : null,
+  };
+}
+
+export function buildProjectedBoard({
+  slots,
+  timezone,
+  locale,
+}: {
+  slots: SnapshotSlot[];
+  timezone: string;
+  locale: AppLocale;
+}): ProjectedBoard {
+  const projectedSlotsBase = [...slots]
+    .sort((left, right) => left.slotStart.localeCompare(right.slotStart))
+    .map((slot) => {
+      const slotDate = new Date(slot.slotStart);
+      const projectedDateKey = getDateKeyInTimezone(slotDate, timezone);
+      const projectedMinutes = getMinutesInTimezone(slotDate, timezone);
+
+      return {
+        ...slot,
+        projectedDateKey,
+        projectedDateLabel: formatDateKeyLabel(projectedDateKey, timezone, locale),
+        projectedMinutes,
+        projectedTimeLabel: minutesToLabel(projectedMinutes),
+        projectedTimeZoneShortName: getTimeZoneShortName(timezone, locale, slotDate),
+      };
+    });
+  const occurrenceByDateAndMinutes = new Map<string, number>();
+  const maxOccurrenceByMinutes = new Map<number, number>();
+
+  const projectedSlots: ProjectedSlot[] = projectedSlotsBase.map((slot) => {
+    const occurrenceKey = `${slot.projectedDateKey}|${slot.projectedMinutes}`;
+    const projectedOccurrence = (occurrenceByDateAndMinutes.get(occurrenceKey) ?? 0) + 1;
+    occurrenceByDateAndMinutes.set(occurrenceKey, projectedOccurrence);
+    maxOccurrenceByMinutes.set(
+      slot.projectedMinutes,
+      Math.max(maxOccurrenceByMinutes.get(slot.projectedMinutes) ?? 0, projectedOccurrence),
+    );
+
+    return {
+      ...slot,
+      projectedOccurrence,
+      projectedRowId: `${slot.projectedMinutes}:${projectedOccurrence}`,
+    };
+  });
+
+  const dates = sortDateKeys(projectedSlots.map((slot) => slot.projectedDateKey)).map((dateKey) => ({
+    dateKey,
+    label: formatDateKeyLabel(dateKey, timezone, locale),
+  }));
+  const timeRows = [...maxOccurrenceByMinutes.entries()]
+    .sort(([leftMinutes], [rightMinutes]) => leftMinutes - rightMinutes)
+    .flatMap(([minutes, maxOccurrence]) =>
+      Array.from({ length: maxOccurrence }, (_, index) => ({
+        id: `${minutes}:${index + 1}`,
+        minutes,
+        occurrence: index + 1,
+        label: minutesToLabel(minutes),
+      })),
+    );
+  const slotLookup = new Map(
+    projectedSlots.map((slot) => [`${slot.projectedDateKey}|${slot.projectedRowId}`, slot] as const),
+  );
+
+  return {
+    dates,
+    timeRows,
+    slots: projectedSlots,
+    slotLookup,
   };
 }
 
@@ -349,15 +557,18 @@ export function buildSnapshot({
   viewerTimezone,
 }: BuildSnapshotInput): PublicEventSnapshot {
   const sortedDates = sortDateKeys(dates);
+  const enumeratedSlots = enumerateEventSlots({
+    dates: sortedDates,
+    timezone,
+    dayStartMinutes,
+    dayEndMinutes,
+    slotMinutes,
+  });
   const dateEntries: SnapshotDate[] = sortedDates.map((dateKey) => ({
     dateKey,
     label: formatDateKeyLabel(dateKey, timezone, locale),
   }));
-  const timeRows = buildTimeRows({
-    slotMinutes,
-    dayStartMinutes,
-    dayEndMinutes,
-  });
+  const timeRows = buildSnapshotTimeRows(enumeratedSlots);
 
   const participantSelections = new Map<string, Set<string>>();
   const slotParticipants = new Map<string, Set<string>>();
@@ -373,25 +584,21 @@ export function buildSnapshot({
     }
   }
 
-  const slots: SnapshotSlot[] = [];
-  for (const dateKey of sortedDates) {
-    for (const timeRow of timeRows) {
-      const slotStart = buildSlotStart(dateKey, timeRow.minutes, timezone);
-      const participantIds = Array.from(slotParticipants.get(slotStart) ?? []);
-      const selectedByCurrentUser = currentParticipantId
-        ? participantSelections.get(currentParticipantId)?.has(slotStart) ?? false
-        : false;
+  const slots: SnapshotSlot[] = enumeratedSlots.map((slot) => {
+    const participantIds = Array.from(slotParticipants.get(slot.slotStart) ?? []);
+    const selectedByCurrentUser = currentParticipantId
+      ? participantSelections.get(currentParticipantId)?.has(slot.slotStart) ?? false
+      : false;
 
-      slots.push({
-        slotStart,
-        dateKey,
-        minutes: timeRow.minutes,
-        availabilityCount: participantIds.length,
-        participantIds,
-        selectedByCurrentUser,
-      });
-    }
-  }
+    return {
+      slotStart: slot.slotStart,
+      dateKey: slot.dateKey,
+      minutes: slot.minutes,
+      availabilityCount: participantIds.length,
+      participantIds,
+      selectedByCurrentUser,
+    };
+  });
 
   const participantEntries: SnapshotParticipant[] = participants.map((participant) => ({
     id: participant.id,
@@ -526,20 +733,15 @@ export function getAllowedSlotStarts({
   dayEndMinutes: number;
   slotMinutes: number;
 }) {
-  const allowed = new Set<string>();
-  const timeRows = buildTimeRows({
-    slotMinutes,
-    dayStartMinutes,
-    dayEndMinutes,
-  });
-
-  for (const dateKey of dates) {
-    for (const timeRow of timeRows) {
-      allowed.add(buildSlotStart(dateKey, timeRow.minutes, timezone));
-    }
-  }
-
-  return allowed;
+  return new Set(
+    enumerateEventSlots({
+      dates,
+      timezone,
+      dayStartMinutes,
+      dayEndMinutes,
+      slotMinutes,
+    }).map((slot) => slot.slotStart),
+  );
 }
 
 export function getAllowedFinalSlotStarts({
