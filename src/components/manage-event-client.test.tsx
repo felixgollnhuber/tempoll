@@ -472,11 +472,20 @@ describe("ManageEventClient", () => {
 
     expect(participantRow).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText("Highlighting")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", {
-        name: /Thu, Apr 2 09:00 · 2\/2 available/i,
-      }),
-    ).toHaveAttribute("data-highlighted-participant-availability", "true");
+    const participantColorDot = participantRow?.querySelector('[data-slot="participant-color-dot"]');
+    expect(participantColorDot).not.toBeNull();
+    expect(participantColorDot).toHaveClass("size-3", "shrink-0", "rounded-full");
+    const highlightedCell = screen.getByRole("button", {
+      name: /Thu, Apr 2 09:00 · 2\/2 available/i,
+    });
+
+    expect(highlightedCell).toHaveAttribute("data-highlighted-participant-availability", "true");
+
+    const highlightStyle = highlightedCell.getAttribute("style") ?? "";
+    expect(highlightStyle).toContain("repeating-linear-gradient");
+    expect(highlightStyle).toContain("color-mix");
+    expect(highlightStyle).toContain("outline");
+    expect(highlightStyle).not.toContain("box-shadow");
   });
 
   it("hides best windows before anyone has entered availability", () => {
