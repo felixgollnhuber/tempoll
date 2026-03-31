@@ -21,13 +21,22 @@ import {
   useState,
 } from "react";
 
-import { buildFinalizedSlot, getAllowedFinalSlotStarts, getViewerTimezone } from "@/lib/availability";
+import { buildFinalizedSlot, getAllowedFinalSlotStarts } from "@/lib/availability";
 import { useI18n } from "@/lib/i18n/context";
 import type { PublicEventSnapshot, SnapshotParticipant } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { AUTOMATIC_TIMEZONE_VALUE } from "@/lib/viewer-timezone";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
 export type DraftSelection = Record<string, boolean>;
@@ -62,6 +71,10 @@ type EventHeatmapProps = {
   showModeToggle?: boolean;
   showSidebar?: boolean;
   sidebarTopContent?: ReactNode;
+  timezones?: string[];
+  viewerTimezone: string;
+  viewerTimezoneSelectValue: string;
+  onViewerTimezoneChange: (timezone: string) => void;
   activeParticipantId?: string | null;
   onActiveParticipantChange?: (participantId: string | null) => void;
   getDescription?: (options: DescriptionOptions) => string;
@@ -303,6 +316,10 @@ export function EventHeatmap({
   showModeToggle = true,
   showSidebar = true,
   sidebarTopContent,
+  timezones = [],
+  viewerTimezone,
+  viewerTimezoneSelectValue,
+  onViewerTimezoneChange,
   activeParticipantId: activeParticipantIdProp,
   onActiveParticipantChange,
   getDescription,
@@ -314,7 +331,6 @@ export function EventHeatmap({
   );
   const [gridContainerWidth, setGridContainerWidth] = useState(0);
   const [visibleDateStartIndex, setVisibleDateStartIndex] = useState(0);
-  const [viewerTimezone, setViewerTimezone] = useState<string | null>(null);
   const gridContainerRef = useRef<HTMLDivElement | null>(null);
   const paintSessionRef = useRef<PaintSession | null>(null);
   const effectiveSelectedMap = selectedMap ?? getSelectedMap(snapshot);
@@ -357,10 +373,6 @@ export function EventHeatmap({
       setActiveSlotKey(null);
     }
   }, [mode]);
-
-  useEffect(() => {
-    setViewerTimezone(getViewerTimezone());
-  }, []);
 
   const measureGridContainer = useCallback(() => {
     const nextWidth = gridContainerRef.current?.clientWidth || window.innerWidth;
@@ -616,6 +628,7 @@ export function EventHeatmap({
       meetingDurationMinutes: snapshot.meetingDurationMinutes,
       slots: Array.from(slotMap.values()),
       finalSlotStart,
+      viewerTimezone,
     });
   }, [
     finalSlotStart,
@@ -627,6 +640,7 @@ export function EventHeatmap({
     snapshot.meetingDurationMinutes,
     snapshot.slotMinutes,
     snapshot.timezone,
+    viewerTimezone,
   ]);
   const finalizedSlotKeys = useMemo(() => {
     if (!finalizedSlot) {
@@ -846,6 +860,7 @@ export function EventHeatmap({
         messages,
       );
   const shouldShowFixedDateAction = showFixedDateAction && Boolean(onFixedDateAction);
+  const viewerTimezoneSelectId = "viewer-timezone-trigger";
 
   return (
     <div
@@ -985,31 +1000,60 @@ export function EventHeatmap({
                   <CardTitle className="text-base">{messages.publicEvent.availabilityTitle}</CardTitle>
                   <CardDescription className="text-xs">{description}</CardDescription>
                 </div>
-                {showModeToggle ? (
-                  <div className="inline-flex rounded-md border bg-muted/30 p-1">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={mode === "edit" ? "secondary" : "ghost"}
-                      className="h-7 px-3"
-                      aria-pressed={mode === "edit"}
-                      disabled={!supportsPainting}
-                      onClick={() => onModeChange?.("edit")}
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <div className="flex items-center gap-2">
+                    <Label
+                      htmlFor={viewerTimezoneSelectId}
+                      className="whitespace-nowrap text-xs text-muted-foreground"
                     >
-                      {messages.publicEvent.editMode}
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={mode === "view" ? "secondary" : "ghost"}
-                      className="h-7 px-3"
-                      aria-pressed={mode === "view"}
-                      onClick={() => onModeChange?.("view")}
-                    >
-                      {messages.publicEvent.viewMode}
-                    </Button>
+                      {messages.publicEvent.viewerTimezoneLabel}
+                    </Label>
+                    <Select value={viewerTimezoneSelectValue} onValueChange={onViewerTimezoneChange}>
+                      <SelectTrigger
+                        id={viewerTimezoneSelectId}
+                        size="sm"
+                        className="min-w-[11.5rem] bg-background text-xs"
+                      >
+                        <SelectValue placeholder={messages.publicEvent.viewerTimezoneLabel} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={AUTOMATIC_TIMEZONE_VALUE}>
+                          {messages.publicEvent.viewerTimezoneAutomatic}
+                        </SelectItem>
+                        {timezones.map((timezoneOption) => (
+                          <SelectItem key={timezoneOption} value={timezoneOption}>
+                            {timezoneOption}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                ) : null}
+                  {showModeToggle ? (
+                    <div className="inline-flex rounded-md border bg-muted/30 p-1">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={mode === "edit" ? "secondary" : "ghost"}
+                        className="h-7 px-3"
+                        aria-pressed={mode === "edit"}
+                        disabled={!supportsPainting}
+                        onClick={() => onModeChange?.("edit")}
+                      >
+                        {messages.publicEvent.editMode}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={mode === "view" ? "secondary" : "ghost"}
+                        className="h-7 px-3"
+                        aria-pressed={mode === "view"}
+                        onClick={() => onModeChange?.("view")}
+                      >
+                        {messages.publicEvent.viewMode}
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
               </div>
 
               {usesDateWindowing ? (

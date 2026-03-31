@@ -23,12 +23,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { formatMeetingWindowLabels } from "@/lib/availability";
 import { useI18n } from "@/lib/i18n/context";
 import type { ManageEventView, PublicEventSnapshot } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { useViewerTimezone } from "@/lib/viewer-timezone";
 
 type ManageEventClientProps = {
   initialView: ManageEventView;
+  timezones?: string[];
 };
 
 type PendingAction =
@@ -43,8 +46,11 @@ type RefreshSnapshotOptions = {
   preserveDirtyTitle?: boolean;
 };
 
-export function ManageEventClient({ initialView }: ManageEventClientProps) {
-  const { messages, format, plural } = useI18n();
+export function ManageEventClient({
+  initialView,
+  timezones = [],
+}: ManageEventClientProps) {
+  const { messages, format, plural, locale } = useI18n();
   const [snapshot, setSnapshot] = useState<PublicEventSnapshot>(initialView.snapshot);
   const [title, setTitle] = useState(initialView.snapshot.title);
   const [requestedActiveParticipantId, setRequestedActiveParticipantId] = useState<string | null>(
@@ -69,6 +75,38 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
   const visibleSuggestions = savedFinalSlot
     ? snapshot.suggestions.filter((suggestion) => suggestion.slotStart !== savedFinalSlot.slotStart)
     : snapshot.suggestions;
+  const {
+    viewerTimezone,
+    viewerTimezoneSelectValue,
+    setViewerTimezonePreference,
+  } = useViewerTimezone(snapshot.timezone, timezones);
+  const savedFinalSlotLocalLabel = useMemo(() => {
+    if (!savedFinalSlot) {
+      return null;
+    }
+
+    return formatMeetingWindowLabels({
+      slotStart: savedFinalSlot.slotStart,
+      slotEnd: savedFinalSlot.slotEnd,
+      locale,
+      timezone: snapshot.timezone,
+      viewerTimezone,
+    }).localLabel;
+  }, [locale, savedFinalSlot, snapshot.timezone, viewerTimezone]);
+  const visibleSuggestionsWithLocalLabels = useMemo(
+    () =>
+      visibleSuggestions.map((suggestion) => ({
+        ...suggestion,
+        localLabel: formatMeetingWindowLabels({
+          slotStart: suggestion.slotStart,
+          slotEnd: suggestion.slotEnd,
+          locale,
+          timezone: snapshot.timezone,
+          viewerTimezone,
+        }).localLabel,
+      })),
+    [locale, snapshot.timezone, viewerTimezone, visibleSuggestions],
+  );
 
   const refreshSnapshot = useCallback(
     async ({ preserveDirtyTitle = false }: RefreshSnapshotOptions = {}) => {
@@ -294,7 +332,7 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
     );
   }
 
-  const bestWindowsCard = hasAnyAvailability && visibleSuggestions.length > 0 ? (
+  const bestWindowsCard = hasAnyAvailability && visibleSuggestionsWithLocalLabels.length > 0 ? (
     <Card>
       <CardHeader className="p-4 pb-2">
         <CardTitle className="text-sm">{messages.manageEvent.bestWindowsTitle}</CardTitle>
@@ -305,12 +343,19 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-2 p-4 pt-0">
-        {visibleSuggestions.map((suggestion, index) => (
+        {visibleSuggestionsWithLocalLabels.map((suggestion, index) => (
           <div key={suggestion.slotStart} className="rounded-md border bg-muted/20 px-3 py-2">
             <p className="text-[11px] font-medium text-muted-foreground">
               {format(messages.common.option, { count: index + 1 })}
             </p>
             <p className="mt-1 text-sm font-semibold text-foreground">{suggestion.label}</p>
+            {suggestion.localLabel ? (
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                {format(messages.publicEvent.yourTimezone, {
+                  label: suggestion.localLabel,
+                })}
+              </p>
+            ) : null}
             <p className="mt-1 text-[11px] text-muted-foreground">
               {plural(messages.manageEvent.peopleAvailable, suggestion.availableCount)}
             </p>
@@ -353,6 +398,13 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
               {messages.common.fixedDate}
             </p>
             <p className="mt-1 text-sm font-semibold text-foreground">{savedFinalSlot.label}</p>
+            {savedFinalSlotLocalLabel ? (
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                {format(messages.publicEvent.yourTimezone, {
+                  label: savedFinalSlotLocalLabel,
+                })}
+              </p>
+            ) : null}
             <p className="mt-1 text-[11px] text-muted-foreground">
               {plural(messages.publicEvent.fullWindowFree, savedFinalSlot.availableCount)}
             </p>
@@ -566,6 +618,10 @@ export function ManageEventClient({ initialView }: ManageEventClientProps) {
             showStatusBadge={false}
             showTitleBlock={false}
             showFixedDateAction
+            timezones={timezones}
+            viewerTimezone={viewerTimezone}
+            viewerTimezoneSelectValue={viewerTimezoneSelectValue}
+            onViewerTimezoneChange={setViewerTimezonePreference}
             isFixedDateActionPending={
               pendingAction === "closeEvent" || pendingAction === "updateFixedDate"
             }

@@ -172,6 +172,8 @@ export const en = {
       one: "{count} participant",
       other: "{count} participants",
     },
+    viewerTimezoneLabel: "Display timezone",
+    viewerTimezoneAutomatic: "Automatic",
     timesShownIn: "Times shown in {timezone}",
     timesShownInDualTimezone:
       "Host: {hostTimezone} ({hostLabel}) · You: {viewerTimezone} ({viewerLabel})",
@@ -771,6 +773,8 @@ export const de: Messages = {
       one: "{count} teilnehmende Person",
       other: "{count} Teilnehmende",
     },
+    viewerTimezoneLabel: "Anzeige-Zeitzone",
+    viewerTimezoneAutomatic: "Automatisch",
     timesShownIn: "Zeiten angezeigt in {timezone}",
     timesShownInDualTimezone:
       "Host: {hostTimezone} ({hostLabel}) · Du: {viewerTimezone} ({viewerLabel})",
