@@ -1129,7 +1129,8 @@ export function EventHeatmap({
                           return (
                             <div
                               key={`${date.dateKey}-${timeRow.id}`}
-                              className={cn("min-w-[84px] bg-background", cellHeightClass)}
+                              className={cn("bg-background", cellHeightClass)}
+                              style={{ minWidth: `${dayColumnMinWidth}px` }}
                             />
                           );
                         }
@@ -1178,7 +1179,7 @@ export function EventHeatmap({
                             data-final-slot-window={isInFinalSlotWindow ? "true" : undefined}
                             data-final-slot-start={isFinalSlotStart ? "true" : undefined}
                             className={cn(
-                              "min-w-[84px] border-0 transition-colors focus-visible:relative focus-visible:z-20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0",
+                              "border-0 transition-colors focus-visible:relative focus-visible:z-20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0",
                               cellHeightClass,
                               mode === "edit" && supportsPainting
                                 ? "cursor-crosshair touch-none hover:brightness-[0.98]"
@@ -1190,12 +1191,15 @@ export function EventHeatmap({
                               getActiveViewSelectionClass(isActiveViewSlot),
                               getFinalizedSlotClass(isInFinalSlotWindow),
                             )}
-                            style={getParticipantHighlightStyle({
-                              isHighlighted: isHighlightedParticipantAvailable,
-                              participantColor: activeParticipantId
-                                ? participantColorById.get(activeParticipantId)
-                                : undefined,
-                            })}
+                            style={{
+                              minWidth: `${dayColumnMinWidth}px`,
+                              ...getParticipantHighlightStyle({
+                                isHighlighted: isHighlightedParticipantAvailable,
+                                participantColor: activeParticipantId
+                                  ? participantColorById.get(activeParticipantId)
+                                  : undefined,
+                              }),
+                            }}
                             onPointerDown={(event) =>
                               handleCellPointerDown(
                                 event,
