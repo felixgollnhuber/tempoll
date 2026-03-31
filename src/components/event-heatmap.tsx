@@ -140,7 +140,13 @@ function getParticipantHighlightStyle({
   }
 
   return {
-    backgroundImage: `linear-gradient(135deg, transparent 0%, transparent 56%, ${participantColor}99 56%, ${participantColor}99 69%, transparent 69%, transparent 100%)`,
+    backgroundColor: `${participantColor}1f`,
+    backgroundImage: [
+      `linear-gradient(135deg, ${participantColor}bf 0%, ${participantColor}bf 20%, transparent 20%, transparent 50%, ${participantColor}bf 50%, ${participantColor}bf 70%, transparent 70%, transparent 100%)`,
+      `linear-gradient(to bottom, ${participantColor}2e, ${participantColor}2e)`,
+    ].join(", "),
+    backgroundBlendMode: "normal",
+    boxShadow: `inset 0 0 0 1px ${participantColor}, inset 0 0 0 2px ${participantColor}66`,
   };
 }
 
