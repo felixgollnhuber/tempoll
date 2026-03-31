@@ -7,5 +7,5 @@ export type CreateEventDefaults = {
 export const defaultCreateEventDefaults: CreateEventDefaults = {
   dayStartMinutes: 9 * 60,
   dayEndMinutes: 18 * 60,
-  slotMinutes: 30,
+  slotMinutes: 60,
 };
