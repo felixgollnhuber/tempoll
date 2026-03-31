@@ -7,6 +7,18 @@ import type { ManageEventView, PublicEventSnapshot } from "@/lib/types";
 import { renderWithI18n } from "@/test/render-with-i18n";
 import { ManageEventClient } from "./manage-event-client";
 
+const mockedGetViewerTimezone = vi.hoisted(() => vi.fn(() => "Europe/Vienna"));
+const defaultTimezones = ["Europe/Vienna", "America/New_York", "UTC"];
+
+vi.mock("@/lib/availability", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/availability")>();
+
+  return {
+    ...actual,
+    getViewerTimezone: mockedGetViewerTimezone,
+  };
+});
+
 vi.mock("sonner", () => ({
   toast: {
     error: vi.fn(),
@@ -185,6 +197,8 @@ function installManageFetchMock(view: ManageEventView) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockedGetViewerTimezone.mockReturnValue("Europe/Vienna");
+  window.localStorage.clear();
 });
 
 describe("ManageEventClient", () => {
@@ -235,6 +249,50 @@ describe("ManageEventClient", () => {
     expect(heatmapLayout).toHaveClass("grid-cols-1");
     expect(heatmapLayout?.className).not.toContain("xl:grid-cols-[minmax(0,1fr)_250px]");
     expect(document.body.innerHTML).not.toContain("lg:grid-cols-[minmax(0,1fr)_22rem]");
+  });
+
+  it("shows the shared timezone selector on the organizer heatmap", () => {
+    const view = createManageView();
+    renderWithI18n(<ManageEventClient initialView={view} timezones={defaultTimezones} />);
+
+    expect(screen.getByRole("combobox", { name: "Display timezone" })).toBeInTheDocument();
+    expect(screen.queryByText(/Host: Europe\/Vienna/)).not.toBeInTheDocument();
+  });
+
+  it("updates organizer heatmap labels and best windows after a manual timezone override", async () => {
+    const user = userEvent.setup();
+    const view = createManageView();
+
+    renderWithI18n(<ManageEventClient initialView={view} timezones={defaultTimezones} />);
+
+    await user.click(screen.getByRole("combobox", { name: "Display timezone" }));
+    await user.click(screen.getByRole("option", { name: /America\/New_York/ }));
+
+    expect(screen.getByRole("combobox", { name: "Display timezone" })).toHaveTextContent(
+      "America/New_York",
+    );
+    expect(screen.getByText("03:00")).toBeInTheDocument();
+    expect(screen.queryByText("09:00 / 03:00")).not.toBeInTheDocument();
+    expect(screen.getByText("Thu, Apr 2 · 03:00–04:00")).toBeInTheDocument();
+  });
+
+  it("shows local fixed-date labels on the organizer page after a manual timezone override", async () => {
+    const user = userEvent.setup();
+    const finalizedSlot = buildPublishedFinalizedSlot(
+      createManageView().snapshot,
+      "2026-04-02T07:00:00.000Z",
+    );
+    const view = createManageView({
+      status: "CLOSED",
+      finalizedSlot,
+    });
+
+    renderWithI18n(<ManageEventClient initialView={view} timezones={defaultTimezones} />);
+
+    await user.click(screen.getByRole("combobox", { name: "Display timezone" }));
+    await user.click(screen.getByRole("option", { name: /America\/New_York/ }));
+
+    expect(screen.getByText("Thu, Apr 2 · 03:00–04:00")).toBeInTheDocument();
   });
 
   it("closes the event directly from the selected slot without requiring a separate save", async () => {
@@ -415,11 +473,20 @@ describe("ManageEventClient", () => {
 
     expect(participantRow).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText("Highlighting")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", {
-        name: /Thu, Apr 2 09:00 · 2\/2 available/i,
-      }),
-    ).toHaveAttribute("data-highlighted-participant-availability", "true");
+    const participantColorDot = participantRow?.querySelector('[data-slot="participant-color-dot"]');
+    expect(participantColorDot).not.toBeNull();
+    expect(participantColorDot).toHaveClass("size-3", "shrink-0", "rounded-full");
+    const highlightedCell = screen.getByRole("button", {
+      name: /Thu, Apr 2 09:00 · 2\/2 available/i,
+    });
+
+    expect(highlightedCell).toHaveAttribute("data-highlighted-participant-availability", "true");
+
+    const highlightStyle = highlightedCell.getAttribute("style") ?? "";
+    expect(highlightStyle).toContain("repeating-linear-gradient");
+    expect(highlightStyle).toContain("color-mix");
+    expect(highlightStyle).toContain("outline");
+    expect(highlightStyle).not.toContain("box-shadow");
   });
 
   it("hides best windows before anyone has entered availability", () => {

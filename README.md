@@ -233,8 +233,8 @@ Health checks stay available at `/api/health`, even while setup is incomplete.
 DataFast tracking is disabled by default. It is enabled only when **both** variables are set:
 
 ```env
-DATAFAST_WEBSITE_ID=dfid_8DiCXWOXKydljn0usEGZE
-DATAFAST_DOMAIN=tempoll.app
+DATAFAST_WEBSITE_ID=dfid_your_website_id
+DATAFAST_DOMAIN=your-domain.com
 ```
 
 Implementation details in this repository:

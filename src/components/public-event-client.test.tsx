@@ -1,9 +1,22 @@
-import { fireEvent, screen, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PublicEventClient } from "./public-event-client";
 import { renderWithI18n } from "@/test/render-with-i18n";
 import type { PublicEventSnapshot } from "@/lib/types";
+
+const mockedGetViewerTimezone = vi.hoisted(() => vi.fn(() => "Europe/Vienna"));
+const defaultTimezones = ["Europe/Vienna", "America/New_York", "UTC"];
+
+vi.mock("@/lib/availability", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/availability")>();
+
+  return {
+    ...actual,
+    getViewerTimezone: mockedGetViewerTimezone,
+  };
+});
 
 function createSnapshot(options?: {
   status?: PublicEventSnapshot["status"];
@@ -140,9 +153,12 @@ function setViewportWidth(width: number) {
 
 beforeEach(() => {
   setViewportWidth(1024);
+  mockedGetViewerTimezone.mockReturnValue("Europe/Vienna");
+  window.localStorage.clear();
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -164,9 +180,309 @@ describe("PublicEventClient", () => {
     expect(screen.getByRole("button", { name: "Bearbeiten" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Ansehen" })).toBeInTheDocument();
     expect(screen.getByText("Verfügbarkeit")).toBeInTheDocument();
-    expect(screen.getByText("Board teilen")).toBeInTheDocument();
-    expect(screen.getByText("https://tempoll.app/e/test-event")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Öffentliche URL kopieren" })).toBeInTheDocument();
+    // Share card appears in both the mobile slot and the xl+ sidebar slot.
+    expect(screen.getAllByText("Board teilen")).toHaveLength(2);
+    expect(screen.getAllByText("https://tempoll.app/e/test-event")).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Öffentliche URL kopieren" })).toHaveLength(2);
+  });
+
+  it("keeps a mobile spacing wrapper around sidebar cards", () => {
+    renderWithI18n(
+      <PublicEventClient
+        slug="test-event"
+        shareUrl="https://tempoll.app/e/test-event"
+        initialSnapshot={createSnapshot()}
+        initialSession={{
+          participantId: "p1",
+          displayName: "Felix",
+        }}
+      />,
+    );
+
+    const mobileSidebar = document.querySelector<HTMLElement>(
+      '[data-slot="event-heatmap-mobile-sidebar"]',
+    );
+
+    expect(mobileSidebar).not.toBeNull();
+    expect(mobileSidebar).toHaveClass("space-y-4");
+    expect(within(mobileSidebar!).getByText("Share this board")).toBeInTheDocument();
+    expect(within(mobileSidebar!).getByText("Best matching windows")).toBeInTheDocument();
+  });
+
+  it("shows only the projected viewer timezone when it differs", () => {
+    mockedGetViewerTimezone.mockReturnValue("America/New_York");
+
+    renderWithI18n(
+      <PublicEventClient
+        slug="test-event"
+        shareUrl="https://tempoll.app/e/test-event"
+        initialSnapshot={createSnapshot()}
+        initialSession={{
+          participantId: "p1",
+          displayName: "Felix",
+        }}
+      />,
+    );
+
+    expect(screen.queryByText(/Host: Europe\/Vienna/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Times shown in .*America\/New_York/)).toBeInTheDocument();
+    expect(screen.getByText("03:00")).toBeInTheDocument();
+    expect(screen.queryByText("09:00 / 03:00")).not.toBeInTheDocument();
+  });
+
+  it("shows a timezone selector even when the detected timezone matches the event timezone", async () => {
+    const user = userEvent.setup();
+
+    renderWithI18n(
+      <PublicEventClient
+        slug="test-event"
+        shareUrl="https://tempoll.app/e/test-event"
+        initialSnapshot={createSnapshot()}
+        initialSession={{
+          participantId: "p1",
+          displayName: "Felix",
+        }}
+        timezones={defaultTimezones}
+      />,
+    );
+
+    const timezoneSelect = screen.getByRole("combobox", {
+      name: "Display timezone",
+    });
+
+    expect(timezoneSelect).toBeInTheDocument();
+    expect(timezoneSelect).toHaveTextContent("Automatic");
+
+    await user.click(timezoneSelect);
+    await user.click(screen.getByRole("option", { name: /America\/New_York/ }));
+
+    expect(screen.getByRole("combobox", { name: "Display timezone" })).toHaveTextContent(
+      "America/New_York",
+    );
+    expect(screen.queryByText(/Host: Europe\/Vienna/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Times shown in .*America\/New_York/)).toBeInTheDocument();
+    expect(screen.getByText("03:00")).toBeInTheDocument();
+    expect(screen.queryByText("09:00 / 03:00")).not.toBeInTheDocument();
+  });
+
+  it("renders local suggestion labels after a manual timezone override", async () => {
+    const user = userEvent.setup();
+    const snapshot = createSnapshot({ withCurrentUser: false });
+    snapshot.suggestions = [
+      {
+        slotStart: "2026-03-30T07:00:00.000Z",
+        slotEnd: "2026-03-30T08:00:00.000Z",
+        dateKey: "2026-03-30",
+        label: "Mon, Mar 30 · 09:00–10:00",
+        localLabel: null,
+        availableCount: 2,
+        participantIds: ["p1", "p2"],
+      },
+    ];
+
+    renderWithI18n(
+      <PublicEventClient
+        slug="test-event"
+        initialSnapshot={snapshot}
+        initialSession={null}
+        timezones={defaultTimezones}
+      />,
+    );
+
+    await user.click(screen.getByRole("combobox", { name: "Display timezone" }));
+    await user.click(screen.getByRole("option", { name: /America\/New_York/ }));
+
+    expect(screen.getAllByText("Mon, Mar 30 · 03:00–04:00")).toHaveLength(2);
+  });
+
+  it("renders local fixed-date labels after a manual timezone override", async () => {
+    const user = userEvent.setup();
+    const snapshot = createSnapshot({
+      status: "CLOSED",
+      finalizedSlot: {
+        slotStart: "2026-03-30T07:00:00.000Z",
+        slotEnd: "2026-03-30T08:00:00.000Z",
+        dateKey: "2026-03-30",
+        label: "Mon, Mar 30 · 09:00–10:00",
+        localLabel: null,
+        availableCount: 2,
+        participantIds: ["p1", "p2"],
+      },
+    });
+
+    renderWithI18n(
+      <PublicEventClient
+        slug="test-event"
+        initialSnapshot={snapshot}
+        initialSession={null}
+        timezones={defaultTimezones}
+      />,
+    );
+
+    await user.click(screen.getByRole("combobox", { name: "Display timezone" }));
+    await user.click(screen.getByRole("option", { name: /America\/New_York/ }));
+
+    expect(screen.getAllByText("Mon, Mar 30 · 03:00–04:00")).toHaveLength(2);
+  });
+
+  it("reads a stored timezone override on remount", async () => {
+    const user = userEvent.setup();
+    const props = {
+      slug: "test-event",
+      shareUrl: "https://tempoll.app/e/test-event",
+      initialSnapshot: createSnapshot(),
+      initialSession: {
+        participantId: "p1",
+        displayName: "Felix",
+      },
+      timezones: defaultTimezones,
+    };
+    const firstRender = renderWithI18n(<PublicEventClient {...props} />);
+
+    await user.click(screen.getByRole("combobox", { name: "Display timezone" }));
+    await user.click(screen.getByRole("option", { name: /America\/New_York/ }));
+
+    firstRender.unmount();
+
+    renderWithI18n(<PublicEventClient {...props} />);
+
+    expect(screen.getByRole("combobox", { name: "Display timezone" })).toHaveTextContent(
+      "America/New_York",
+    );
+    expect(screen.getByText(/Times shown in .*America\/New_York/)).toBeInTheDocument();
+  });
+
+  it("keeps repeated fallback-hour slots distinct and saves canonical slot starts", async () => {
+    vi.useFakeTimers();
+    const initialSnapshot: PublicEventSnapshot = {
+      id: "event_dst",
+      slug: "test-event",
+      title: "DST Event",
+      timezone: "Europe/Vienna",
+      status: "OPEN",
+      slotMinutes: 60,
+      meetingDurationMinutes: 60,
+      dayStartMinutes: 2 * 60,
+      dayEndMinutes: 4 * 60,
+      dates: [{ dateKey: "2026-10-25", label: "Sun, Oct 25" }],
+      timeRows: [{ minutes: 2 * 60, label: "02:00" }],
+      slots: [
+        {
+          slotStart: "2026-10-25T00:00:00.000Z",
+          dateKey: "2026-10-25",
+          minutes: 2 * 60,
+          availabilityCount: 1,
+          participantIds: ["p1"],
+          selectedByCurrentUser: true,
+        },
+        {
+          slotStart: "2026-10-25T01:00:00.000Z",
+          dateKey: "2026-10-25",
+          minutes: 2 * 60,
+          availabilityCount: 0,
+          participantIds: [],
+          selectedByCurrentUser: false,
+        },
+      ],
+      participants: [
+        {
+          id: "p1",
+          displayName: "Felix",
+          color: "#ef7f3b",
+          selectedSlotCount: 1,
+          isCurrentUser: true,
+        },
+      ],
+      suggestions: [],
+      finalizedSlot: null,
+      currentParticipant: {
+        id: "p1",
+        displayName: "Felix",
+        color: "#ef7f3b",
+        selectedSlotCount: 1,
+        isCurrentUser: true,
+      },
+    };
+    const savedSnapshot: PublicEventSnapshot = {
+      ...initialSnapshot,
+      slots: initialSnapshot.slots.map((slot) =>
+        slot.slotStart === "2026-10-25T01:00:00.000Z"
+          ? {
+              ...slot,
+              availabilityCount: 1,
+              participantIds: ["p1"],
+              selectedByCurrentUser: true,
+            }
+          : slot,
+      ),
+      participants: [
+        {
+          id: "p1",
+          displayName: "Felix",
+          color: "#ef7f3b",
+          selectedSlotCount: 2,
+          isCurrentUser: true,
+        },
+      ],
+      currentParticipant: {
+        id: "p1",
+        displayName: "Felix",
+        color: "#ef7f3b",
+        selectedSlotCount: 2,
+        isCurrentUser: true,
+      },
+    };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === "/api/events/test-event/availability") {
+        expect(init?.method).toBe("PUT");
+        return {
+          ok: true,
+          json: async () => ({ snapshot: savedSnapshot }),
+        };
+      }
+
+      throw new Error(`Unhandled fetch call: ${String(input)}`);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    renderWithI18n(
+      <PublicEventClient
+        slug="test-event"
+        initialSnapshot={initialSnapshot}
+        initialSession={{
+          participantId: "p1",
+          displayName: "Felix",
+        }}
+        timezones={defaultTimezones}
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: /Sun, Oct 25 02:00 CEST · 1\/1 available/i }),
+    ).toBeInTheDocument();
+
+    const secondHourSlot = screen.getByRole("button", {
+      name: /Sun, Oct 25 02:00 CET · nobody available/i,
+    });
+
+    fireEvent.pointerDown(secondHourSlot, {
+      pointerId: 1,
+      isPrimary: true,
+    });
+    fireEvent.pointerUp(secondHourSlot, {
+      pointerId: 1,
+      isPrimary: true,
+    });
+    await vi.advanceTimersByTimeAsync(600);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
+    expect(JSON.parse(String(requestInit?.body))).toMatchObject({
+      selectedSlotStarts: ["2026-10-25T00:00:00.000Z", "2026-10-25T01:00:00.000Z"],
+    });
+
+    vi.useRealTimers();
   });
 
   it("hides best matching windows before anyone has selected availability", () => {
@@ -358,9 +674,16 @@ describe("PublicEventClient", () => {
 
     expect(participantButton).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText("Gabriel highlighted")).toBeInTheDocument();
+    const participantColorDot = participantButton.querySelector('[data-slot="participant-color-dot"]');
+    expect(participantColorDot).not.toBeNull();
+    expect(participantColorDot).toHaveClass("size-2.5", "shrink-0", "rounded-full");
     expect(availableCell).toHaveAttribute("data-highlighted-participant-availability", "true");
     expect(unavailableCell).not.toHaveAttribute("data-highlighted-participant-availability");
-    expect(availableCell.getAttribute("style")).toContain("linear-gradient");
+    const highlightStyle = availableCell.getAttribute("style") ?? "";
+    expect(highlightStyle).toContain("repeating-linear-gradient");
+    expect(highlightStyle).toContain("color-mix");
+    expect(highlightStyle).toContain("outline");
+    expect(highlightStyle).not.toContain("box-shadow");
 
     fireEvent.click(participantButton);
 
@@ -496,9 +819,11 @@ describe("PublicEventClient", () => {
       />,
     );
 
-    expect(screen.getByText("Fixed date")).toBeInTheDocument();
+    // "Fixed date" title appears in both the mobile slot and the xl+ sidebar slot.
+    expect(screen.getAllByText("Fixed date")).toHaveLength(2);
     expect(screen.queryByText("Best matching windows")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Add to calendar (.ics)" })).toHaveAttribute(
+    // "Add to calendar" link appears in both slots.
+    expect(screen.getAllByRole("link", { name: "Add to calendar (.ics)" })[0]).toHaveAttribute(
       "href",
       "/api/events/test-event/ics",
     );
@@ -516,5 +841,47 @@ describe("PublicEventClient", () => {
     expect(firstCell.className).toContain("bg-amber-100");
     expect(secondCell.className).toContain("bg-amber-100");
     expect(firstCell.className).toBe(secondCell.className);
+  });
+
+  it("renders the share card in the DOM on mobile viewports", () => {
+    setViewportWidth(390);
+
+    renderWithI18n(
+      <PublicEventClient
+        slug="test-event"
+        shareUrl="https://tempoll.app/e/test-event"
+        initialSnapshot={createSnapshot()}
+        initialSession={null}
+      />,
+    );
+
+    // The share card appears in both the mobile slot and the xl+ sidebar slot,
+    // so the URL and copy button are present in the DOM at any viewport width.
+    expect(screen.getAllByText("https://tempoll.app/e/test-event")).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Copy public URL" })).toHaveLength(2);
+  });
+
+  it("uses narrower day columns on mobile viewports to show more days at once", async () => {
+    setViewportWidth(390);
+
+    renderWithI18n(
+      <PublicEventClient
+        slug="test-event"
+        shareUrl="https://tempoll.app/e/test-event"
+        initialSnapshot={createSnapshot({ dayCount: 7 })}
+        initialSession={null}
+      />,
+      { locale: "de" },
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Verfügbarkeit")).toBeInTheDocument();
+      const heatmapGrid = document.querySelector<HTMLElement>(
+        '[data-slot="event-heatmap-grid"]',
+      );
+
+      expect(heatmapGrid).not.toBeNull();
+      expect(heatmapGrid?.style.gridTemplateColumns).toContain("minmax(72px, 1fr)");
+    });
   });
 });

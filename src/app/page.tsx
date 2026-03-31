@@ -36,7 +36,6 @@ export async function generateMetadata(): Promise<Metadata> {
   const { messages } = await getServerI18n();
 
   return {
-    title: messages.metadata.homeTitle,
     description: messages.metadata.description,
   };
 }

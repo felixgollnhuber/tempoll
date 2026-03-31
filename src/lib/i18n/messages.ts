@@ -51,9 +51,8 @@ export const en = {
   appChrome: {
     newEvent: "New event",
     recentEvents: "Recent events",
-    footerDescription:
-      "{appName} is a free scheduling board with live availability heatmaps, and self-hostable if you want it.",
-    featureRequest: "Feature request or suggestion",
+    openSource: "Open source on GitHub",
+    featureRequest: "Open an issue on GitHub",
     imprint: "Imprint",
     privacy: "Privacy",
   },
@@ -173,7 +172,11 @@ export const en = {
       one: "{count} participant",
       other: "{count} participants",
     },
+    viewerTimezoneLabel: "Display timezone",
+    viewerTimezoneAutomatic: "Automatic",
     timesShownIn: "Times shown in {timezone}",
+    timesShownInDualTimezone:
+      "Host: {hostTimezone} ({hostLabel}) · You: {viewerTimezone} ({viewerLabel})",
     legend: "Legend",
     legendEmpty: "empty",
     legendSomeOverlap: "some overlap",
@@ -646,9 +649,8 @@ export const de: Messages = {
   appChrome: {
     newEvent: "Neues Event",
     recentEvents: "Letzte Events",
-    footerDescription:
-      "{appName} ist ein kostenloses Planungsboard mit Live-Heatmaps und bei Bedarf auch selbst hostbar.",
-    featureRequest: "Feature-Wunsch oder Vorschlag",
+    openSource: "Open Source auf GitHub",
+    featureRequest: "Issue auf GitHub eröffnen",
     imprint: "Impressum",
     privacy: "Datenschutz",
   },
@@ -771,7 +773,11 @@ export const de: Messages = {
       one: "{count} teilnehmende Person",
       other: "{count} Teilnehmende",
     },
+    viewerTimezoneLabel: "Anzeige-Zeitzone",
+    viewerTimezoneAutomatic: "Automatisch",
     timesShownIn: "Zeiten angezeigt in {timezone}",
+    timesShownInDualTimezone:
+      "Host: {hostTimezone} ({hostLabel}) · Du: {viewerTimezone} ({viewerLabel})",
     legend: "Legende",
     legendEmpty: "leer",
     legendSomeOverlap: "einige Überschneidungen",

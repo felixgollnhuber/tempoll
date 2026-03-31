@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { ManageEventClient } from "@/components/manage-event-client";
 import { RecentEventTracker } from "@/components/recent-event-tracker";
+import { getSupportedTimezones } from "@/lib/constants";
 import { getManageEventView } from "@/lib/event-service";
 import { getServerI18n } from "@/lib/i18n/server";
 import { buildSocialImages, buildSocialTitle } from "@/lib/site-metadata";
@@ -58,6 +59,7 @@ export async function generateMetadata({ params }: ManagePageProps): Promise<Met
 export default async function ManagePage({ params }: ManagePageProps) {
   const { token } = await params;
   const { locale } = await getServerI18n();
+  const timezones = getSupportedTimezones();
   const view = await getManageEventView(token, locale);
 
   if (!view) {
@@ -72,7 +74,7 @@ export default async function ManagePage({ params }: ManagePageProps) {
         publicUrl={`/e/${view.snapshot.slug}`}
         manageUrl={`/manage/${token}`}
       />
-      <ManageEventClient initialView={view} />
+      <ManageEventClient initialView={view} timezones={timezones} />
     </main>
   );
 }

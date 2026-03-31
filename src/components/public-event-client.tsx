@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2Icon } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { CopyButton } from "@/components/copy-button";
@@ -10,13 +10,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { formatMeetingWindowLabels } from "@/lib/availability";
 import { useI18n } from "@/lib/i18n/context";
+import { buildTimezoneOptions } from "@/lib/timezone-options";
 import type { PublicEventSnapshot, RealtimeEventPayload } from "@/lib/types";
+import { useViewerTimezone } from "@/lib/viewer-timezone";
 
 type PublicEventClientProps = {
   slug: string;
   shareUrl?: string;
   initialSnapshot: PublicEventSnapshot;
+  timezones?: string[];
   initialSession:
     | {
         participantId: string;
@@ -38,7 +42,7 @@ function getInitialMode(hasEditableSession: boolean): BoardMode {
 
 function getSelectedMap(snapshot: PublicEventSnapshot) {
   return snapshot.slots.reduce<DraftSelection>((acc, slot) => {
-    acc[`${slot.dateKey}-${slot.minutes}`] = slot.selectedByCurrentUser;
+    acc[slot.slotStart] = slot.selectedByCurrentUser;
     return acc;
   }, {});
 }
@@ -53,9 +57,10 @@ export function PublicEventClient({
   slug,
   shareUrl,
   initialSnapshot,
+  timezones = [],
   initialSession,
 }: PublicEventClientProps) {
-  const { messages, format, plural } = useI18n();
+  const { messages, format, plural, locale } = useI18n();
   const publicShareUrl = shareUrl ?? `/e/${initialSnapshot.slug}`;
   const saveAvailabilityFallback = messages.errors.routeFallbacks.saveAvailability;
   const initialHasEditableSession = Boolean(initialSession && initialSnapshot.status === "OPEN");
@@ -74,6 +79,15 @@ export function PublicEventClient({
   const saveInFlightRef = useRef(false);
   const queuedSelectedSlotStartsRef = useRef<string[] | null>(null);
   const lastSavedSignatureRef = useRef(getSelectedSlotStarts(initialSnapshot).join("|"));
+  const {
+    viewerTimezone,
+    viewerTimezoneSelectValue,
+    setViewerTimezonePreference,
+  } = useViewerTimezone(snapshot.timezone, timezones);
+  const timezoneOptions = useMemo(
+    () => buildTimezoneOptions(timezones, snapshot.dates[0]?.dateKey),
+    [snapshot.dates, timezones],
+  );
 
   const applySnapshot = useCallback((nextSnapshot: PublicEventSnapshot) => {
     setSnapshot(nextSnapshot);
@@ -83,6 +97,31 @@ export function PublicEventClient({
   const canEdit = Boolean(session && snapshot.status === "OPEN");
   const hasAnyAvailability = snapshot.participants.some(
     (participant) => participant.selectedSlotCount > 0,
+  );
+  const finalizedSlotDisplayLabel = useMemo(() => {
+    if (!snapshot.finalizedSlot) {
+      return null;
+    }
+
+    return formatMeetingWindowLabels({
+      slotStart: snapshot.finalizedSlot.slotStart,
+      slotEnd: snapshot.finalizedSlot.slotEnd,
+      locale,
+      timezone: viewerTimezone,
+    }).label;
+  }, [locale, snapshot.finalizedSlot, viewerTimezone]);
+  const suggestionsWithDisplayLabels = useMemo(
+    () =>
+      snapshot.suggestions.map((suggestion) => ({
+        ...suggestion,
+        displayLabel: formatMeetingWindowLabels({
+          slotStart: suggestion.slotStart,
+          slotEnd: suggestion.slotEnd,
+          locale,
+          timezone: viewerTimezone,
+        }).label,
+      })),
+    [locale, snapshot.suggestions, viewerTimezone],
   );
 
   const fetchSnapshot = useCallback(async () => {
@@ -127,7 +166,7 @@ export function PublicEventClient({
 
     const handle = window.setTimeout(async () => {
       const selectedSlotStarts = snapshot.slots
-        .filter((slot) => selectedMap[`${slot.dateKey}-${slot.minutes}`])
+        .filter((slot) => selectedMap[slot.slotStart])
         .map((slot) => slot.slotStart);
 
       queuedSelectedSlotStartsRef.current = selectedSlotStarts;
@@ -251,24 +290,23 @@ export function PublicEventClient({
   }
 
   const updateCell = useCallback(
-    (dateKey: string, minutes: number, nextValue?: boolean) => {
+    (slotStart: string, nextValue?: boolean) => {
       if (!canEdit) {
         return false;
       }
 
-      const key = `${dateKey}-${minutes}`;
       let didChange = false;
 
       setSelectedMap((current) => {
-        const targetValue = nextValue ?? !current[key];
-        if (current[key] === targetValue) {
+        const targetValue = nextValue ?? !current[slotStart];
+        if (current[slotStart] === targetValue) {
           return current;
         }
 
         didChange = true;
         return {
           ...current,
-          [key]: targetValue,
+          [slotStart]: targetValue,
         };
       });
 
@@ -310,16 +348,9 @@ export function PublicEventClient({
             {messages.publicEvent.fixedDateDescription}
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-2 p-4 pt-0">
+          <CardContent className="space-y-2 p-4 pt-0">
           <div className="rounded-md border bg-muted/20 px-3 py-2">
-            <p className="text-sm font-semibold text-foreground">{snapshot.finalizedSlot.label}</p>
-            {snapshot.finalizedSlot.localLabel ? (
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                {format(messages.publicEvent.yourTimezone, {
-                  label: snapshot.finalizedSlot.localLabel,
-                })}
-              </p>
-            ) : null}
+            <p className="text-sm font-semibold text-foreground">{finalizedSlotDisplayLabel}</p>
             <p className="mt-1 text-[11px] text-muted-foreground">
               {plural(messages.publicEvent.fullWindowFree, snapshot.finalizedSlot.availableCount)}
             </p>
@@ -340,21 +371,14 @@ export function PublicEventClient({
               duration: snapshot.meetingDurationMinutes,
             })}
           </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2 p-4 pt-0">
-          {snapshot.suggestions.map((suggestion, index) => (
+          </CardHeader>
+          <CardContent className="space-y-2 p-4 pt-0">
+          {suggestionsWithDisplayLabels.map((suggestion, index) => (
             <div key={suggestion.slotStart} className="rounded-md border bg-muted/20 px-3 py-2">
               <p className="text-[11px] font-medium text-muted-foreground">
                 {format(messages.common.option, { count: index + 1 })}
               </p>
-              <p className="mt-1 text-sm font-semibold text-foreground">{suggestion.label}</p>
-              {suggestion.localLabel ? (
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  {format(messages.publicEvent.yourTimezone, {
-                    label: suggestion.localLabel,
-                  })}
-                </p>
-              ) : null}
+              <p className="mt-1 text-sm font-semibold text-foreground">{suggestion.displayLabel}</p>
               <p className="mt-1 text-[11px] text-muted-foreground">
                 {plural(messages.publicEvent.fullWindowFree, suggestion.availableCount)}
               </p>
@@ -412,6 +436,10 @@ export function PublicEventClient({
         finalSlotStart={snapshot.finalizedSlot?.slotStart ?? null}
         sessionBadgeLabel={session?.displayName ?? null}
         sidebarTopContent={sidebarTopContent}
+        timezoneOptions={timezoneOptions}
+        viewerTimezone={viewerTimezone}
+        viewerTimezoneSelectValue={viewerTimezoneSelectValue}
+        onViewerTimezoneChange={setViewerTimezonePreference}
       />
     </div>
   );

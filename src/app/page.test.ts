@@ -20,11 +20,11 @@ describe("Home metadata", () => {
     });
   });
 
-  it("keeps the home copy product-focused and free-to-use", async () => {
+  it("uses the root default title and keeps the home description", async () => {
     const { generateMetadata } = await import("./page");
     const metadata = await generateMetadata();
 
-    expect(metadata.title).toBe("Free scheduling");
+    expect(metadata.title).toBeUndefined();
     expect(metadata.description).toContain("Free scheduling");
     expect(metadata.description).toContain("just a name");
   });

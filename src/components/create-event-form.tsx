@@ -9,7 +9,7 @@ import {
   SparklesIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -29,10 +29,10 @@ import {
 import { Separator } from "@/components/ui/separator";
 import {
   defaultCreateEventDefaults,
-  readCreateEventDefaults,
-  saveCreateEventDefaults,
 } from "@/lib/create-event-defaults";
+import { meetingDurationOptions, slotMinuteOptions } from "@/lib/constants";
 import { useI18n } from "@/lib/i18n/context";
+import { buildTimezoneOptions } from "@/lib/timezone-options";
 import { cn } from "@/lib/utils";
 import { createEventCreateSchema } from "@/lib/validators";
 
@@ -141,22 +141,6 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
     defaultCreateEventDefaults.dayEndMinutes,
   );
 
-  useEffect(() => {
-    const storedDefaults = readCreateEventDefaults();
-    const supportsTimeOption = (minutes: number) =>
-      timeOptions.some((option) => option.value === minutes);
-
-    if (supportsTimeOption(storedDefaults.dayStartMinutes)) {
-      setDayStartMinutes(storedDefaults.dayStartMinutes);
-    }
-
-    if (supportsTimeOption(storedDefaults.dayEndMinutes)) {
-      setDayEndMinutes(storedDefaults.dayEndMinutes);
-    }
-
-    setSlotMinutes(storedDefaults.slotMinutes);
-  }, [timeOptions]);
-
   const selectedDates =
     dateRange?.from && dateRange?.to
       ? eachDayOfInterval({
@@ -175,9 +159,25 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
   );
   const selectedRangeDays = getRangeDays(dateRange);
   const draftRangeDays = getRangeDays(draftDateRange);
+  const timezoneOptions = useMemo(
+    () =>
+      buildTimezoneOptions(
+        timezones,
+        format(dateRange?.from ?? startOfToday(), "yyyy-MM-dd"),
+      ),
+    [dateRange?.from, timezones],
+  );
+  const selectedTimezoneOption = useMemo(
+    () => timezoneOptions.find((option) => option.value === timezone) ?? null,
+    [timezone, timezoneOptions],
+  );
 
   const getTimeLabel = (minutes: number) =>
-    timeOptions.find((option) => option.value === minutes)?.label ?? String(minutes);
+    timeOptions.find((option) => option.value === minutes)?.label ??
+    (minutes === 24 * 60 ? "24:00" : String(minutes));
+
+  const startTimeOptions = timeOptions.filter((option) => option.value < dayEndMinutes);
+  const endTimeOptions = timeOptions.filter((option) => option.value > dayStartMinutes);
 
   function clearErrors(...fields: EventField[]) {
     setErrorMessage(null);
@@ -302,17 +302,12 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
       }
 
       toast.success(messages.createEvent.created);
-      saveCreateEventDefaults({
-        dayStartMinutes,
-        dayEndMinutes,
-        slotMinutes,
-      });
       router.push(`/manage/${payload.manageKey}`);
     });
   }
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
       <Card>
         <CardHeader className="space-y-2">
           <CardTitle className="text-2xl">{messages.createEvent.eventDetailsTitle}</CardTitle>
@@ -346,7 +341,7 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
               ) : null}
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor={eventFieldIds.timezone}>{messages.createEvent.timezoneLabel}</Label>
                 <Select
@@ -368,9 +363,9 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
                     <SelectValue placeholder={messages.createEvent.timezonePlaceholder} />
                   </SelectTrigger>
                   <SelectContent className="max-h-80">
-                    {timezones.map((timezoneOption) => (
-                      <SelectItem key={timezoneOption} value={timezoneOption}>
-                        {timezoneOption}
+                    {timezoneOptions.map((timezoneOption) => (
+                      <SelectItem key={timezoneOption.value} value={timezoneOption.value}>
+                        {timezoneOption.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -482,7 +477,7 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
 
             <Separator />
 
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor={eventFieldIds.dayStartMinutes}>{messages.createEvent.dailyStartLabel}</Label>
                 <Select
@@ -506,7 +501,7 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
                     <SelectValue placeholder={messages.createEvent.dailyStartPlaceholder} />
                   </SelectTrigger>
                   <SelectContent className="max-h-80">
-                    {timeOptions.map((option) => (
+                    {startTimeOptions.map((option) => (
                       <SelectItem key={option.value} value={String(option.value)}>
                         {option.label}
                       </SelectItem>
@@ -541,7 +536,7 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
                     <SelectValue placeholder={messages.createEvent.dailyEndPlaceholder} />
                   </SelectTrigger>
                   <SelectContent className="max-h-80">
-                    {timeOptions.map((option) => (
+                    {endTimeOptions.map((option) => (
                       <SelectItem key={option.value} value={String(option.value)}>
                         {option.label}
                       </SelectItem>
@@ -576,7 +571,7 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
                     <SelectValue placeholder={messages.createEvent.slotSizePlaceholder} />
                   </SelectTrigger>
                   <SelectContent>
-                    {[15, 30, 60].map((minutes) => (
+                    {slotMinuteOptions.map((minutes) => (
                       <SelectItem key={minutes} value={String(minutes)}>
                         {formatMessage(messages.createEvent.minutesShort, { count: minutes })}
                       </SelectItem>
@@ -617,7 +612,7 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
                     <SelectValue placeholder={messages.createEvent.meetingDurationPlaceholder} />
                   </SelectTrigger>
                   <SelectContent>
-                    {[30, 60, 90, 120].map((minutes) => (
+                    {meetingDurationOptions.map((minutes) => (
                       <SelectItem key={minutes} value={String(minutes)}>
                         {formatMessage(messages.createEvent.minutesShort, { count: minutes })}
                       </SelectItem>
@@ -653,7 +648,9 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
           <CardContent className="space-y-4">
             <div className="space-y-1">
               <p className="text-xl font-semibold">{title || messages.createEvent.untitledEvent}</p>
-              <p className="text-sm text-muted-foreground">{timezone}</p>
+              <p className="text-sm text-muted-foreground">
+                {selectedTimezoneOption?.label ?? timezone}
+              </p>
             </div>
             <Separator />
             <dl className="space-y-3 text-sm">
