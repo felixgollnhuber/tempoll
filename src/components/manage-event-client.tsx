@@ -474,6 +474,7 @@ export function ManageEventClient({
             >
               <div className="flex items-start gap-3">
                 <span
+                  data-slot="participant-color-dot"
                   className="mt-1 size-3 shrink-0 rounded-full shadow-sm"
                   style={{ background: participant.color }}
                 />
@@ -489,7 +490,7 @@ export function ManageEventClient({
                       </p>
                     </div>
                     {isActive ? (
-                      <span className="text-[11px] font-medium text-muted-foreground">
+                      <span className="shrink-0 text-[11px] font-medium text-muted-foreground">
                         {messages.publicEvent.participantHighlighting}
                       </span>
                     ) : null}

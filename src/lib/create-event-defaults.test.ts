@@ -9,7 +9,7 @@ describe("create event defaults", () => {
     expect(defaultCreateEventDefaults).toEqual({
       dayStartMinutes: 9 * 60,
       dayEndMinutes: 18 * 60,
-      slotMinutes: 30,
+      slotMinutes: 60,
     });
   });
 });
