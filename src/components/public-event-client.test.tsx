@@ -5,6 +5,17 @@ import { PublicEventClient } from "./public-event-client";
 import { renderWithI18n } from "@/test/render-with-i18n";
 import type { PublicEventSnapshot } from "@/lib/types";
 
+const mockedGetViewerTimezone = vi.hoisted(() => vi.fn(() => "Europe/Vienna"));
+
+vi.mock("@/lib/availability", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/availability")>();
+
+  return {
+    ...actual,
+    getViewerTimezone: mockedGetViewerTimezone,
+  };
+});
+
 function createSnapshot(options?: {
   status?: PublicEventSnapshot["status"];
   withCurrentUser?: boolean;
@@ -140,6 +151,7 @@ function setViewportWidth(width: number) {
 
 beforeEach(() => {
   setViewportWidth(1024);
+  mockedGetViewerTimezone.mockReturnValue("Europe/Vienna");
 });
 
 afterEach(() => {
@@ -191,6 +203,26 @@ describe("PublicEventClient", () => {
     expect(mobileSidebar).toHaveClass("space-y-4");
     expect(within(mobileSidebar!).getByText("Share this board")).toBeInTheDocument();
     expect(within(mobileSidebar!).getByText("Best matching windows")).toBeInTheDocument();
+  });
+
+  it("shows host and viewer timezone labels side-by-side when they differ", () => {
+    mockedGetViewerTimezone.mockReturnValue("America/New_York");
+
+    renderWithI18n(
+      <PublicEventClient
+        slug="test-event"
+        shareUrl="https://tempoll.app/e/test-event"
+        initialSnapshot={createSnapshot()}
+        initialSession={{
+          participantId: "p1",
+          displayName: "Felix",
+        }}
+      />,
+    );
+
+    expect(screen.getByText(/Host: Europe\/Vienna/)).toBeInTheDocument();
+    expect(screen.getByText(/You: America\/New_York/)).toBeInTheDocument();
+    expect(screen.getByText("09:00 / 03:00")).toBeInTheDocument();
   });
 
   it("hides best matching windows before anyone has selected availability", () => {

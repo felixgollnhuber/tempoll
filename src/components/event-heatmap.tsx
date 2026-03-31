@@ -21,7 +21,7 @@ import {
   useState,
 } from "react";
 
-import { buildFinalizedSlot, getAllowedFinalSlotStarts } from "@/lib/availability";
+import { buildFinalizedSlot, getAllowedFinalSlotStarts, getViewerTimezone } from "@/lib/availability";
 import { useI18n } from "@/lib/i18n/context";
 import type { PublicEventSnapshot, SnapshotParticipant } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -169,6 +169,18 @@ function isMajorTimeLabel(minutes: number) {
   return minutes % 60 === 0;
 }
 
+function getTimeZoneShortName(timezone: string, locale: string, date: Date) {
+  const formatter = new Intl.DateTimeFormat(locale, {
+    timeZone: timezone,
+    timeZoneName: "short",
+  });
+  const timeZonePart = formatter
+    .formatToParts(date)
+    .find((part) => part.type === "timeZoneName")?.value;
+
+  return timeZonePart ?? timezone;
+}
+
 function getSelectedMap(snapshot: PublicEventSnapshot) {
   return snapshot.slots.reduce<DraftSelection>((acc, slot) => {
     acc[slotKey(slot.dateKey, slot.minutes)] = slot.selectedByCurrentUser;
@@ -293,6 +305,7 @@ export function EventHeatmap({
   );
   const [gridContainerWidth, setGridContainerWidth] = useState(0);
   const [visibleDateStartIndex, setVisibleDateStartIndex] = useState(0);
+  const [viewerTimezone, setViewerTimezone] = useState<string | null>(null);
   const gridContainerRef = useRef<HTMLDivElement | null>(null);
   const paintSessionRef = useRef<PaintSession | null>(null);
   const effectiveSelectedMap = selectedMap ?? getSelectedMap(snapshot);
@@ -335,6 +348,10 @@ export function EventHeatmap({
       setActiveSlotKey(null);
     }
   }, [mode]);
+
+  useEffect(() => {
+    setViewerTimezone(getViewerTimezone());
+  }, []);
 
   const measureGridContainer = useCallback(() => {
     const nextWidth = gridContainerRef.current?.clientWidth || window.innerWidth;
@@ -470,6 +487,76 @@ export function EventHeatmap({
     usesDateWindowing &&
     clampedVisibleDateStartIndex + visibleDates.length < snapshot.dates.length;
   const visibleRangeLabel = useMemo(() => getVisibleRangeLabel(visibleDates), [visibleDates]);
+  const referenceDateKey = visibleDates[0]?.dateKey ?? snapshot.dates[0]?.dateKey;
+  const referenceSlotStart = useMemo(() => {
+    if (!referenceDateKey) {
+      return null;
+    }
+
+    return (
+      snapshot.slots.find(
+        (slot) => slot.dateKey === referenceDateKey && slot.minutes === snapshot.dayStartMinutes,
+      )?.slotStart ?? null
+    );
+  }, [referenceDateKey, snapshot.dayStartMinutes, snapshot.slots]);
+  const timezoneLabels = useMemo(() => {
+    const referenceDate = referenceSlotStart ? new Date(referenceSlotStart) : new Date();
+
+    return {
+      host: getTimeZoneShortName(snapshot.timezone, locale, referenceDate),
+      viewer: viewerTimezone ? getTimeZoneShortName(viewerTimezone, locale, referenceDate) : null,
+    };
+  }, [locale, referenceSlotStart, snapshot.timezone, viewerTimezone]);
+  const dualTimeLabelsByMinutes = useMemo(() => {
+    if (!viewerTimezone || viewerTimezone === snapshot.timezone) {
+      return new Map<number, string>();
+    }
+
+    if (visibleDates.length === 0) {
+      return new Map<number, string>();
+    }
+
+    const majorTimeRows = snapshot.timeRows.filter((timeRow) => isMajorTimeLabel(timeRow.minutes));
+    if (majorTimeRows.length === 0) {
+      return new Map<number, string>();
+    }
+
+    const formatter = new Intl.DateTimeFormat(locale, {
+      timeZone: viewerTimezone,
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    });
+
+    return new Map(
+      majorTimeRows.map((timeRow) => {
+        const viewerTimes = new Set<string>();
+        for (const date of visibleDates) {
+          const slot = slotMap.get(slotKey(date.dateKey, timeRow.minutes));
+          if (slot) {
+            viewerTimes.add(formatter.format(new Date(slot.slotStart)));
+          }
+        }
+
+        if (viewerTimes.size === 0) {
+          return [timeRow.minutes, timeRow.label];
+        }
+
+        if (viewerTimes.size === 1) {
+          const [viewerTime] = viewerTimes;
+          return [timeRow.minutes, `${timeRow.label} / ${viewerTime}`];
+        }
+
+        // DST transition within visible range: show the extent of viewer times
+        const sorted = [...viewerTimes].sort((a, b) => {
+          const [ah = 0, am = 0] = a.split(":").map(Number);
+          const [bh = 0, bm = 0] = b.split(":").map(Number);
+          return ah * 60 + am - (bh * 60 + bm);
+        });
+        return [timeRow.minutes, `${timeRow.label} / ${sorted[0]}–${sorted[sorted.length - 1]}`];
+      }),
+    );
+  }, [locale, slotMap, snapshot.timeRows, snapshot.timezone, viewerTimezone, visibleDates]);
   const activeParticipant =
     activeParticipantId
       ? snapshot.participants.find((participant) => participant.id === activeParticipantId) ?? null
@@ -793,9 +880,16 @@ export function EventHeatmap({
                   <div>
                     <CardTitle className="text-2xl">{snapshot.title}</CardTitle>
                     <CardDescription className="mt-1 text-xs">
-                      {format(messages.publicEvent.timesShownIn, {
-                        timezone: snapshot.timezone,
-                      })}
+                      {viewerTimezone && viewerTimezone !== snapshot.timezone
+                        ? format(messages.publicEvent.timesShownInDualTimezone, {
+                            hostTimezone: snapshot.timezone,
+                            hostLabel: timezoneLabels.host,
+                            viewerTimezone,
+                            viewerLabel: timezoneLabels.viewer ?? viewerTimezone,
+                          })
+                        : format(messages.publicEvent.timesShownIn, {
+                            timezone: snapshot.timezone,
+                          })}
                     </CardDescription>
                   </div>
                 ) : null}
@@ -981,7 +1075,9 @@ export function EventHeatmap({
                           cellHeightClass,
                         )}
                       >
-                        {isMajorTimeLabel(timeRow.minutes) ? timeRow.label : ""}
+                        {isMajorTimeLabel(timeRow.minutes)
+                          ? dualTimeLabelsByMinutes.get(timeRow.minutes) ?? timeRow.label
+                          : ""}
                       </div>
                       {visibleDates.map((date) => {
                         const key = slotKey(date.dateKey, timeRow.minutes);
