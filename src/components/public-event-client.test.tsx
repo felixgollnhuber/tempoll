@@ -538,9 +538,16 @@ describe("PublicEventClient", () => {
 
     expect(participantButton).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText("Gabriel highlighted")).toBeInTheDocument();
+    const participantColorDot = participantButton.querySelector('[data-slot="participant-color-dot"]');
+    expect(participantColorDot).not.toBeNull();
+    expect(participantColorDot).toHaveClass("size-2.5", "shrink-0", "rounded-full");
     expect(availableCell).toHaveAttribute("data-highlighted-participant-availability", "true");
     expect(unavailableCell).not.toHaveAttribute("data-highlighted-participant-availability");
-    expect(availableCell.getAttribute("style")).toContain("linear-gradient");
+    const highlightStyle = availableCell.getAttribute("style") ?? "";
+    expect(highlightStyle).toContain("repeating-linear-gradient");
+    expect(highlightStyle).toContain("color-mix");
+    expect(highlightStyle).toContain("outline");
+    expect(highlightStyle).not.toContain("box-shadow");
 
     fireEvent.click(participantButton);
 

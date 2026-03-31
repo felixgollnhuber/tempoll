@@ -141,6 +141,10 @@ function getFinalizedSlotClass(isInFinalSlotWindow: boolean) {
   return "bg-amber-100 ring-1 ring-inset ring-amber-600/80";
 }
 
+function withOverlayAlpha(color: string, alphaPercent: number) {
+  return `color-mix(in oklab, ${color} ${alphaPercent}%, transparent)`;
+}
+
 function getParticipantHighlightStyle({
   isHighlighted,
   participantColor,
@@ -153,13 +157,12 @@ function getParticipantHighlightStyle({
   }
 
   return {
-    backgroundColor: `${participantColor}1f`,
     backgroundImage: [
-      `linear-gradient(135deg, ${participantColor}bf 0%, ${participantColor}bf 20%, transparent 20%, transparent 50%, ${participantColor}bf 50%, ${participantColor}bf 70%, transparent 70%, transparent 100%)`,
-      `linear-gradient(to bottom, ${participantColor}2e, ${participantColor}2e)`,
+      `repeating-linear-gradient(135deg, ${withOverlayAlpha(participantColor, 88)} 0 7px, transparent 7px 14px)`,
+      `linear-gradient(${withOverlayAlpha(participantColor, 24)}, ${withOverlayAlpha(participantColor, 24)})`,
     ].join(", "),
-    backgroundBlendMode: "normal",
-    boxShadow: `inset 0 0 0 1px ${participantColor}, inset 0 0 0 2px ${participantColor}66`,
+    outline: `2px solid ${withOverlayAlpha(participantColor, 92)}`,
+    outlineOffset: "-2px",
   };
 }
 
@@ -817,12 +820,13 @@ export function EventHeatmap({
             )}
             onClick={() => toggleParticipantHighlight(participant.id)}
           >
-            <div className="flex items-center gap-3">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
               <span
-                className="size-2.5 rounded-full shadow-sm"
+                data-slot="participant-color-dot"
+                className="size-2.5 shrink-0 rounded-full shadow-sm"
                 style={{ background: participant.color }}
               />
-              <div>
+              <div className="min-w-0">
                 <p className="text-sm font-medium text-foreground">{getParticipantLabel(participant)}</p>
                 <p className="text-[11px] text-muted-foreground">
                   {plural(
@@ -833,7 +837,7 @@ export function EventHeatmap({
               </div>
             </div>
             {activeParticipantId === participant.id ? (
-              <span className="text-[11px] font-medium text-muted-foreground">
+              <span className="shrink-0 text-[11px] font-medium text-muted-foreground">
                 {messages.publicEvent.participantHighlighting}
               </span>
             ) : null}
