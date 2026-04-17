@@ -23,6 +23,47 @@ function cloneNotification(notification: NotificationRecord | null) {
   return notification ? structuredClone(notification) : null;
 }
 
+function notificationMatchesWhere(
+  notification: NotificationRecord,
+  where: Record<string, unknown>,
+) {
+  return Object.entries(where).every(([key, value]) => {
+    const currentValue = (notification as Record<string, unknown>)[key];
+
+    if (currentValue instanceof Date && value instanceof Date) {
+      return currentValue.getTime() === value.getTime();
+    }
+
+    return currentValue === value;
+  });
+}
+
+function applyNotificationUpdate(
+  notification: NotificationRecord,
+  data: Record<string, unknown>,
+) {
+  const next: NotificationRecord = {
+    ...notification,
+    updatedAt: new Date(),
+  };
+
+  for (const [key, value] of Object.entries(data)) {
+    if (key === "pendingParticipantIds" && value && typeof value === "object" && "set" in value) {
+      next.pendingParticipantIds = [...((value as { set: string[] }).set ?? [])];
+      continue;
+    }
+
+    if (key === "pendingChangeCount" && value && typeof value === "object" && "increment" in value) {
+      next.pendingChangeCount += Number((value as { increment?: number }).increment ?? 0);
+      continue;
+    }
+
+    (next as Record<string, unknown>)[key] = value;
+  }
+
+  return next;
+}
+
 function createBaseEvent() {
   return {
     id: "event_1",
@@ -134,29 +175,32 @@ const prisma = {
           throw new Error(`Missing notification ${where.eventId}`);
         }
 
-        const next: NotificationRecord = {
-          ...existing,
-          updatedAt: new Date(),
-        };
-
-        for (const [key, value] of Object.entries(data)) {
-          if (key === "pendingParticipantIds" && value && typeof value === "object" && "set" in value) {
-            next.pendingParticipantIds = [...((value as { set: string[] }).set ?? [])];
-            continue;
-          }
-
-          if (key === "pendingChangeCount" && value && typeof value === "object" && "increment" in value) {
-            next.pendingChangeCount += Number(
-              (value as { increment?: number }).increment ?? 0,
-            );
-            continue;
-          }
-
-          (next as Record<string, unknown>)[key] = value;
-        }
+        const next = applyNotificationUpdate(existing, data);
 
         store.notifications.set(where.eventId, next);
         return cloneNotification(next);
+      },
+    ),
+    updateMany: vi.fn(
+      async ({
+        where,
+        data,
+      }: {
+        where: Record<string, unknown>;
+        data: Record<string, unknown>;
+      }) => {
+        let count = 0;
+
+        for (const [eventId, notification] of store.notifications.entries()) {
+          if (!notificationMatchesWhere(notification, where)) {
+            continue;
+          }
+
+          store.notifications.set(eventId, applyNotificationUpdate(notification, data));
+          count += 1;
+        }
+
+        return { count };
       },
     ),
   },
@@ -361,5 +405,86 @@ describe("availability notifications", () => {
     await vi.advanceTimersByTimeAsync(5 * 60 * 1000 + 1);
 
     expect(sendEmail).not.toHaveBeenCalled();
+  });
+
+  it("keeps newer pending changes when another edit lands during digest delivery", async () => {
+    sendEmail.mockImplementationOnce(async () => {
+      const notification = store.notifications.get("event_1");
+      if (!notification) {
+        throw new Error("Missing notification");
+      }
+
+      store.notifications.set("event_1", {
+        ...notification,
+        pendingFlushAfterAt: new Date("2026-04-01T09:10:00.000Z"),
+        pendingParticipantIds: ["participant_1", "participant_2"],
+        pendingChangeCount: 2,
+        updatedAt: new Date("2026-04-01T09:05:00.000Z"),
+      });
+
+      return {
+        data: {
+          id: "email_3",
+        },
+        error: null,
+      };
+    });
+
+    const { queueAvailabilityDigest } = await import("./availability-notifications");
+
+    await queueAvailabilityDigest({
+      eventId: "event_1",
+      participantId: "participant_1",
+      recipientEmail: "owner@example.com",
+    });
+
+    await vi.advanceTimersByTimeAsync(5 * 60 * 1000 + 1);
+
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+    expect(store.notifications.get("event_1")?.pendingFlushAfterAt).toEqual(
+      new Date("2026-04-01T09:10:00.000Z"),
+    );
+    expect(store.notifications.get("event_1")?.pendingParticipantIds).toEqual([
+      "participant_1",
+      "participant_2",
+    ]);
+    expect(store.notifications.get("event_1")?.pendingChangeCount).toBe(2);
+    expect(store.notifications.get("event_1")?.lastSentAt).toBeInstanceOf(Date);
+
+    await vi.advanceTimersByTimeAsync(5 * 60 * 1000 + 1);
+
+    expect(sendEmail).toHaveBeenCalledTimes(2);
+    expect(store.notifications.get("event_1")?.pendingFlushAfterAt).toBeNull();
+    expect(store.notifications.get("event_1")?.pendingChangeCount).toBe(0);
+  });
+
+  it("invalidates the previously emailed organizer token when the recipient changes", async () => {
+    store.notifications.set("event_1", {
+      eventId: "event_1",
+      recipientEmail: "owner@example.com",
+      emailManageTokenHash: "previous-email-token-hash",
+      pendingSinceAt: new Date("2026-04-01T09:00:00.000Z"),
+      pendingFlushAfterAt: new Date("2026-04-01T09:05:00.000Z"),
+      pendingParticipantIds: ["participant_1"],
+      pendingChangeCount: 1,
+      lastSentAt: null,
+      createdAt: new Date("2026-04-01T09:00:00.000Z"),
+      updatedAt: new Date("2026-04-01T09:00:00.000Z"),
+    });
+
+    const { updateNotificationRecipient } = await import("./availability-notifications");
+
+    const notification = await updateNotificationRecipient("event_1", "new-owner@example.com");
+
+    expect(store.notifications.get("event_1")?.recipientEmail).toBe("new-owner@example.com");
+    expect(store.notifications.get("event_1")?.emailManageTokenHash).toBeNull();
+    expect(store.notifications.get("event_1")?.pendingFlushAfterAt).toEqual(
+      new Date("2026-04-01T09:05:00.000Z"),
+    );
+    expect(notification.recipientEmail).toBe("new-owner@example.com");
+    expect(notification.pendingDigest).toEqual({
+      participantCount: 1,
+      flushAfterAt: "2026-04-01T09:05:00.000Z",
+    });
   });
 });

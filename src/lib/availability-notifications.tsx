@@ -535,34 +535,48 @@ async function flushAvailabilityDigest(eventId: string) {
   }
 
   const event = await getEventForDigest(eventId);
-  if (!event?.availabilityNotification?.recipientEmail || !event.availabilityNotification.pendingFlushAfterAt) {
+  const notification = event?.availabilityNotification;
+
+  if (!event || !notification?.recipientEmail || !notification.pendingFlushAfterAt) {
     clearDigestTimer(eventId);
     return;
   }
 
-  if (event.availabilityNotification.pendingFlushAfterAt.getTime() > Date.now()) {
-    scheduleDigestTimer(eventId, event.availabilityNotification.pendingFlushAfterAt);
+  if (notification.pendingFlushAfterAt.getTime() > Date.now()) {
+    scheduleDigestTimer(eventId, notification.pendingFlushAfterAt);
     return;
   }
 
   const { rawEmailManageToken, subject, html, text } = await buildAvailabilityDigestEmail(event);
-  const previousEmailManageTokenHash = event.availabilityNotification.emailManageTokenHash;
+  const previousEmailManageTokenHash = notification.emailManageTokenHash;
   const emailManageTokenHash = hashSecret(rawEmailManageToken);
+  const digestRecipientEmail = notification.recipientEmail;
+  const digestPendingFlushAfterAt = notification.pendingFlushAfterAt;
+  const digestPendingChangeCount = notification.pendingChangeCount;
 
-  await prisma.eventAvailabilityNotification.update({
+  const claimResult = await prisma.eventAvailabilityNotification.updateMany({
     where: {
       eventId,
+      recipientEmail: digestRecipientEmail,
+      emailManageTokenHash: previousEmailManageTokenHash,
+      pendingFlushAfterAt: digestPendingFlushAfterAt,
+      pendingChangeCount: digestPendingChangeCount,
     },
     data: {
       emailManageTokenHash,
     },
   });
 
+  if (claimResult.count === 0) {
+    await reschedulePendingDigest(eventId);
+    return;
+  }
+
   try {
     const resend = getResendClient();
     const sendResult = await resend.emails.send({
       from: `${notificationConfig.resendFromName ?? appConfig.appName} <${notificationConfig.resendFromEmail!}>`,
-      to: [event.availabilityNotification.recipientEmail],
+      to: [digestRecipientEmail],
       subject,
       html,
       text,
@@ -576,12 +590,17 @@ async function flushAvailabilityDigest(eventId: string) {
       );
     }
 
-    await prisma.eventAvailabilityNotification.update({
+    const digestSentAt = new Date();
+    const clearResult = await prisma.eventAvailabilityNotification.updateMany({
       where: {
         eventId,
+        recipientEmail: digestRecipientEmail,
+        emailManageTokenHash,
+        pendingFlushAfterAt: digestPendingFlushAfterAt,
+        pendingChangeCount: digestPendingChangeCount,
       },
       data: {
-        lastSentAt: new Date(),
+        lastSentAt: digestSentAt,
         pendingSinceAt: null,
         pendingFlushAfterAt: null,
         pendingParticipantIds: {
@@ -590,12 +609,30 @@ async function flushAvailabilityDigest(eventId: string) {
         pendingChangeCount: 0,
       },
     });
+
+    if (clearResult.count === 0) {
+      await prisma.eventAvailabilityNotification.updateMany({
+        where: {
+          eventId,
+        },
+        data: {
+          lastSentAt: digestSentAt,
+        },
+      });
+
+      await reschedulePendingDigest(eventId);
+      return;
+    }
   } catch (error) {
     const nextFlushAfterAt = new Date(Date.now() + DIGEST_QUIET_PERIOD_MS);
 
-    await prisma.eventAvailabilityNotification.update({
+    const retryResult = await prisma.eventAvailabilityNotification.updateMany({
       where: {
         eventId,
+        recipientEmail: digestRecipientEmail,
+        emailManageTokenHash,
+        pendingFlushAfterAt: digestPendingFlushAfterAt,
+        pendingChangeCount: digestPendingChangeCount,
       },
       data: {
         emailManageTokenHash: previousEmailManageTokenHash,
@@ -603,7 +640,12 @@ async function flushAvailabilityDigest(eventId: string) {
       },
     });
 
-    scheduleDigestTimer(eventId, nextFlushAfterAt);
+    if (retryResult.count > 0) {
+      scheduleDigestTimer(eventId, nextFlushAfterAt);
+    } else {
+      await reschedulePendingDigest(eventId);
+    }
+
     console.error("[availability-notifications] Failed to send digest", error);
     return;
   }
@@ -802,16 +844,20 @@ export async function updateNotificationRecipient(eventId: string, notificationE
     },
     select: {
       eventId: true,
+      recipientEmail: true,
     },
   });
 
   if (existing) {
+    const recipientEmailChanged = existing.recipientEmail !== recipientEmail;
+
     await prisma.eventAvailabilityNotification.update({
       where: {
         eventId,
       },
       data: {
         recipientEmail,
+        emailManageTokenHash: recipientEmailChanged ? null : undefined,
       },
     });
   } else {
