@@ -129,6 +129,12 @@ export const en = {
     slotSizePlaceholder: "Choose slot size",
     meetingDurationLabel: "Meeting duration",
     meetingDurationPlaceholder: "Choose duration",
+    notificationEmailLabel: "Organizer email alerts",
+    notificationEmailPlaceholder: "owner@company.com",
+    notificationEmailDescription:
+      "Optional. Get one email after 5 quiet minutes when participants finish updating availability.",
+    notificationEmailUnavailable:
+      "Email alerts are not available on this host yet.",
     createButton: "Create event",
     genericSettingsError: "Please check your event settings.",
     createFailed: "Unable to create the event.",
@@ -252,6 +258,8 @@ export const en = {
     eventReopened: "Event reopened",
     participantRenamed: "Participant renamed",
     participantRemoved: "Participant removed",
+    notificationEmailSaved: "Email alerts updated",
+    notificationEmailCleared: "Email alerts turned off",
     titleLabel: "Title",
     saveTitle: "Save title",
     eventStatusTitle: "Event status",
@@ -272,6 +280,19 @@ export const en = {
     openPublicEvent: "Open public event",
     copyPublicUrl: "Copy public URL",
     copyOrganizerUrl: "Copy organizer URL",
+    emailAlertsTitle: "Email alerts",
+    emailAlertsDescription:
+      "Get one digest after 5 quiet minutes when participants finish updating availability.",
+    emailAlertsUnavailable:
+      "Email alerts are not available on this host right now.",
+    emailAlertsRecipientLabel: "Send alerts to",
+    emailAlertsSave: "Save email",
+    emailAlertsClear: "Turn off alerts",
+    emailAlertsPending: "A digest is queued for {timestamp}.",
+    emailAlertsLastSent: "Last digest sent {timestamp}.",
+    emailAlertsIdle: "No digest is queued right now.",
+    emailAlertsPrivateLinkNote:
+      "Each email includes a fresh private organizer link. Treat it as sensitive.",
     bestWindowsTitle: "Best windows right now",
     fixedDatePublishedDescription:
       "This is the published fixed date for the closed event.",
@@ -542,6 +563,7 @@ export const en = {
       manageKeyInvalid: "Event not found.",
       finalSlotRequired: "Pick a fixed date before closing this event.",
       finalSlotInvalid: "Pick a valid fixed date that fits the full meeting duration.",
+      notificationDeliveryUnavailable: "Email alerts are not available on this host.",
     },
     rateLimit: {
       eventCreate: "Too many event creation attempts. Please wait a few minutes and try again.",
@@ -727,6 +749,12 @@ export const de: Messages = {
     slotSizePlaceholder: "Slot-Größe wählen",
     meetingDurationLabel: "Meeting-Dauer",
     meetingDurationPlaceholder: "Dauer wählen",
+    notificationEmailLabel: "Organizer-E-Mail-Benachrichtigungen",
+    notificationEmailPlaceholder: "[PRIVATE_EMAIL]",
+    notificationEmailDescription:
+      "Optional. Erhalte eine E-Mail, nachdem Teilnehmende ihre Verfügbarkeit 5 ruhige Minuten lang nicht mehr geändert haben.",
+    notificationEmailUnavailable:
+      "E-Mail-Benachrichtigungen sind auf diesem Host noch nicht verfügbar.",
     createButton: "Event erstellen",
     genericSettingsError: "Bitte prüfe deine Event-Einstellungen.",
     createFailed: "Das Event konnte nicht erstellt werden.",
@@ -858,6 +886,8 @@ export const de: Messages = {
     eventReopened: "Event wieder geöffnet",
     participantRenamed: "Teilnehmende Person umbenannt",
     participantRemoved: "Teilnehmende Person entfernt",
+    notificationEmailSaved: "E-Mail-Benachrichtigungen aktualisiert",
+    notificationEmailCleared: "E-Mail-Benachrichtigungen ausgeschaltet",
     titleLabel: "Titel",
     saveTitle: "Titel speichern",
     eventStatusTitle: "Eventstatus",
@@ -879,6 +909,19 @@ export const de: Messages = {
     openPublicEvent: "Öffentliches Event öffnen",
     copyPublicUrl: "Öffentliche URL kopieren",
     copyOrganizerUrl: "Organizer-URL kopieren",
+    emailAlertsTitle: "E-Mail-Benachrichtigungen",
+    emailAlertsDescription:
+      "Erhalte eine Sammelmail, nachdem Teilnehmende ihre Verfügbarkeit 5 ruhige Minuten lang nicht mehr geändert haben.",
+    emailAlertsUnavailable:
+      "E-Mail-Benachrichtigungen sind auf diesem Host gerade nicht verfügbar.",
+    emailAlertsRecipientLabel: "Benachrichtigungen senden an",
+    emailAlertsSave: "E-Mail speichern",
+    emailAlertsClear: "Benachrichtigungen ausschalten",
+    emailAlertsPending: "Eine Sammelmail ist für {timestamp} eingeplant.",
+    emailAlertsLastSent: "Letzte Sammelmail gesendet {timestamp}.",
+    emailAlertsIdle: "Im Moment ist keine Sammelmail eingeplant.",
+    emailAlertsPrivateLinkNote:
+      "Jede E-Mail enthält einen frischen privaten Organizer-Link. Behandle ihn als sensibel.",
     bestWindowsTitle: "Beste Zeitfenster im Moment",
     fixedDatePublishedDescription:
       "Das ist der veröffentlichte feste Termin für das geschlossene Event.",
@@ -1165,6 +1208,8 @@ export const de: Messages = {
         "Wähle ein fixes Datum aus, bevor du dieses Event schließt.",
       finalSlotInvalid:
         "Wähle ein gültiges fixes Datum, das zur gesamten Meeting-Dauer passt.",
+      notificationDeliveryUnavailable:
+        "E-Mail-Benachrichtigungen sind auf diesem Host nicht verfügbar.",
     },
     rateLimit: {
       eventCreate:

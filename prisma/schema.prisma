@@ -28,6 +28,7 @@ model Event {
   dates                  EventDate[]
   participants           Participant[]
   availabilitySlots      AvailabilitySlot[]
+  availabilityNotification EventAvailabilityNotification?
 }
 
 model EventDate {
@@ -68,4 +69,20 @@ model AvailabilitySlot {
 
   @@id([participantId, slotStartAt])
   @@index([eventId, slotStartAt])
+}
+
+model EventAvailabilityNotification {
+  eventId              String   @id
+  recipientEmail       String?
+  emailManageTokenHash String?
+  pendingSinceAt       DateTime?
+  pendingFlushAfterAt  DateTime?
+  pendingParticipantIds String[] @default([])
+  pendingChangeCount   Int      @default(0)
+  lastSentAt           DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  event                Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([pendingFlushAfterAt])
 }

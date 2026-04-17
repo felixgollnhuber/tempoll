@@ -22,6 +22,45 @@ describe("POST /api/events", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getClientIp.mockReturnValue("127.0.0.1");
+    createEvent.mockResolvedValue({
+      slug: "sprint-planning",
+      manageKey: "manage-key-123",
+    });
+  });
+
+  it("passes the optional notification email through to event creation", async () => {
+    const { POST } = await import("./route");
+    const response = await POST(
+      new Request("https://tempoll.example.com/api/events", {
+        method: "POST",
+        body: JSON.stringify({
+          title: "Sprint Planning",
+          timezone: "Europe/Vienna",
+          dates: ["2026-03-30"],
+          dayStartMinutes: 540,
+          dayEndMinutes: 600,
+          slotMinutes: 30,
+          meetingDurationMinutes: 60,
+          notificationEmail: "owner@example.com",
+        }),
+        headers: {
+          "Accept-Language": "en-US",
+          "Content-Type": "application/json",
+        },
+      }),
+    );
+
+    expect(createEvent).toHaveBeenCalledWith({
+      title: "Sprint Planning",
+      timezone: "Europe/Vienna",
+      dates: ["2026-03-30"],
+      dayStartMinutes: 540,
+      dayEndMinutes: 600,
+      slotMinutes: 30,
+      meetingDurationMinutes: 60,
+      notificationEmail: "owner@example.com",
+    });
+    expect(response.status).toBe(201);
   });
 
   it("returns a 429 with Retry-After when the create-event limit is exceeded", async () => {

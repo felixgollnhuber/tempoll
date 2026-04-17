@@ -42,10 +42,12 @@ type CreateEventFormProps = {
     value: number;
     label: string;
   }>;
+  notificationsConfigured: boolean;
 };
 
 const eventFieldOrder = [
   "title",
+  "notificationEmail",
   "timezone",
   "dates",
   "dayStartMinutes",
@@ -59,6 +61,7 @@ type EventFormErrors = Partial<Record<EventField, string>>;
 
 const eventFieldIds: Record<EventField, string> = {
   title: "title",
+  notificationEmail: "notification-email",
   timezone: "timezone-trigger",
   dates: "date-range-trigger",
   dayStartMinutes: "day-start-trigger",
@@ -100,7 +103,11 @@ function getRangeDays(range: DateRange | undefined) {
   }).length;
 }
 
-export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps) {
+export function CreateEventForm({
+  timezones,
+  timeOptions,
+  notificationsConfigured,
+}: CreateEventFormProps) {
   const router = useRouter();
   const { messages, plural, format: formatMessage, dateFnsLocale, locale } = useI18n();
   const [isPending, startTransition] = useTransition();
@@ -108,6 +115,7 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
   const [fieldErrors, setFieldErrors] = useState<EventFormErrors>({});
   const [isRangePickerOpen, setIsRangePickerOpen] = useState(false);
   const [title, setTitle] = useState("");
+  const [notificationEmail, setNotificationEmail] = useState("");
   const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
     const tomorrow = addDays(new Date(), 1);
     return {
@@ -261,6 +269,7 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
 
     const parsed = createEventCreateSchema(messages).safeParse({
       title,
+      notificationEmail: notificationsConfigured ? notificationEmail : undefined,
       timezone,
       dates: selectedDates,
       dayStartMinutes,
@@ -340,6 +349,46 @@ export function CreateEventForm({ timezones, timeOptions }: CreateEventFormProps
                 </p>
               ) : null}
             </div>
+
+            {notificationsConfigured ? (
+              <div className="space-y-2">
+                <Label htmlFor={eventFieldIds.notificationEmail}>
+                  {messages.createEvent.notificationEmailLabel}
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  {messages.createEvent.notificationEmailDescription}
+                </p>
+                <Input
+                  id={eventFieldIds.notificationEmail}
+                  type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  placeholder={messages.createEvent.notificationEmailPlaceholder}
+                  value={notificationEmail}
+                  aria-invalid={fieldErrors.notificationEmail ? true : undefined}
+                  aria-describedby={
+                    fieldErrors.notificationEmail ? "notification-email-error" : undefined
+                  }
+                  className={cn(
+                    fieldErrors.notificationEmail &&
+                      "border-destructive focus-visible:ring-destructive/20",
+                  )}
+                  onChange={(event) => {
+                    setNotificationEmail(event.target.value);
+                    clearErrors("notificationEmail");
+                  }}
+                />
+                {fieldErrors.notificationEmail ? (
+                  <p id="notification-email-error" className="text-sm text-destructive">
+                    {fieldErrors.notificationEmail}
+                  </p>
+                ) : null}
+              </div>
+            ) : (
+              <div className="rounded-md border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+                {messages.createEvent.notificationEmailUnavailable}
+              </div>
+            )}
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">

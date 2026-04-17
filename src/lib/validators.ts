@@ -7,6 +7,17 @@ const dateKeyRegex = /^\d{4}-\d{2}-\d{2}$/;
 const slotMinuteSet = new Set<number>(slotMinuteOptions);
 const meetingDurationSet = new Set<number>(meetingDurationOptions);
 
+function createOptionalEmailSchema(messages: Messages) {
+  return z
+    .string()
+    .trim()
+    .max(320, messages.validation.setup.validEmail)
+    .refine((value) => value.length === 0 || z.string().email().safeParse(value).success, {
+      message: messages.validation.setup.validEmail,
+    })
+    .transform((value) => value || undefined);
+}
+
 export function createEventCreateSchema(messages: Messages) {
   return z
     .object({
@@ -38,6 +49,7 @@ export function createEventCreateSchema(messages: Messages) {
         .refine((value) => meetingDurationSet.has(value), {
           message: messages.validation.eventCreate.supportedMeetingDuration,
         }),
+      notificationEmail: createOptionalEmailSchema(messages).optional(),
     })
     .superRefine((data, ctx) => {
       if (data.dayEndMinutes <= data.dayStartMinutes) {
@@ -103,6 +115,10 @@ export function createManageUpdateSchema(messages: Messages) {
         .trim()
         .min(2, messages.validation.participantCreate.nameMin)
         .max(32, messages.validation.participantCreate.nameMax),
+    }),
+    z.object({
+      action: z.literal("updateNotificationEmail"),
+      notificationEmail: createOptionalEmailSchema(messages).optional(),
     }),
   ]);
 }

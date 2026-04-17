@@ -30,9 +30,16 @@ const defaultTimeOptions = [
   { value: 24 * 60, label: "24:00" },
 ];
 
-function renderCreateEventForm(locale: AppLocale = "en") {
+function renderCreateEventForm(
+  locale: AppLocale = "en",
+  { notificationsConfigured = true }: { notificationsConfigured?: boolean } = {},
+) {
   return renderWithI18n(
-    <CreateEventForm timezones={defaultTimezones} timeOptions={defaultTimeOptions} />,
+    <CreateEventForm
+      timezones={defaultTimezones}
+      timeOptions={defaultTimeOptions}
+      notificationsConfigured={notificationsConfigured}
+    />,
     { locale },
   );
 }
@@ -124,6 +131,7 @@ describe("CreateEventForm", () => {
       <CreateEventForm
         timezones={["Europe/Vienna", "America/New_York", "UTC"]}
         timeOptions={defaultTimeOptions}
+        notificationsConfigured={true}
       />,
     );
 
@@ -181,6 +189,43 @@ describe("CreateEventForm", () => {
       dayEndMinutes: 17 * 60,
       slotMinutes: 15,
     });
+  });
+
+  it("submits the optional notification email when alerts are available", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        manageKey: "manage-key-123",
+      }),
+    });
+    global.fetch = fetchMock as typeof fetch;
+
+    renderCreateEventForm();
+
+    await user.type(screen.getByLabelText("Event title"), "Sprint planning");
+    await user.type(screen.getByLabelText("Organizer email alerts"), "owner@example.com");
+    await user.click(screen.getByRole("button", { name: "Create event" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const payload = JSON.parse(String(requestInit.body)) as {
+      notificationEmail?: string;
+    };
+
+    expect(payload.notificationEmail).toBe("owner@example.com");
+  });
+
+  it("shows an unavailable note instead of the email field when alerts are disabled", () => {
+    renderCreateEventForm("en", {
+      notificationsConfigured: false,
+    });
+
+    expect(screen.queryByLabelText("Organizer email alerts")).not.toBeInTheDocument();
+    expect(screen.getByText("Email alerts are not available on this host yet.")).toBeInTheDocument();
   });
 
   it("offers meeting durations up to 6 hours", async () => {

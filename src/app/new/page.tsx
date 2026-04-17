@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { CreateEventForm } from "@/components/create-event-form";
 import { buildTimeOptions } from "@/lib/availability";
+import { isNotificationDeliveryConfigured } from "@/lib/config";
 import { getSupportedTimezones } from "@/lib/constants";
 import { getServerI18n } from "@/lib/i18n/server";
 
@@ -31,6 +32,7 @@ export default async function NewEventPage() {
       <CreateEventForm
         timezones={getSupportedTimezones()}
         timeOptions={buildTimeOptions(30)}
+        notificationsConfigured={isNotificationDeliveryConfigured()}
       />
     </main>
   );

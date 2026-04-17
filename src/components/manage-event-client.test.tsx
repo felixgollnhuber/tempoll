@@ -29,15 +29,29 @@ vi.mock("sonner", () => ({
 function createManageView(options?: {
   status?: "OPEN" | "CLOSED";
   finalizedSlot?: ManageEventView["snapshot"]["finalizedSlot"];
+  recipientEmail?: string | null;
+  notificationsConfigured?: boolean;
 }): ManageEventView {
   const status = options?.status ?? "OPEN";
   const finalizedSlot = options?.finalizedSlot ?? null;
+  const recipientEmail =
+    options && "recipientEmail" in options ? options.recipientEmail ?? null : "owner@example.com";
 
   return {
     manageKey: "cmn8tbq86000001pbddo4sxf.a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6",
     shareUrl: "https://tempoll.app/e/test-event-xeqlxw",
     manageUrl:
       "https://tempoll.app/manage/cmn8tbq86000001pbddo4sxf.a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6",
+    notification: {
+      isConfigured: options?.notificationsConfigured ?? true,
+      recipientEmail,
+      quietPeriodMinutes: 5,
+      lastSentAt: "2026-04-01T08:00:00.000Z",
+      pendingDigest: {
+        participantCount: 2,
+        flushAfterAt: "2026-04-02T07:35:00.000Z",
+      },
+    },
     snapshot: {
       id: "event_1",
       slug: "test-event-xeqlxw",
@@ -138,6 +152,7 @@ function buildPublishedFinalizedSlot(
 
 function installManageFetchMock(view: ManageEventView) {
   let currentSnapshot = structuredClone(view.snapshot) as PublicEventSnapshot;
+  let currentNotification = structuredClone(view.notification);
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
 
@@ -155,7 +170,8 @@ function installManageFetchMock(view: ManageEventView) {
         | { action: "updateTitle"; title: string }
         | { action: "closeEvent"; finalSlotStart: string }
         | { action: "updateFixedDate"; finalSlotStart: string }
-        | { action: "reopenEvent" };
+        | { action: "reopenEvent" }
+        | { action: "updateNotificationEmail"; notificationEmail?: string };
 
       switch (payload.action) {
         case "updateTitle":
@@ -179,11 +195,18 @@ function installManageFetchMock(view: ManageEventView) {
             finalizedSlot: null,
           };
           break;
+        case "updateNotificationEmail":
+          currentNotification = {
+            ...currentNotification,
+            recipientEmail: payload.notificationEmail?.trim().toLowerCase() || null,
+            pendingDigest: payload.notificationEmail ? currentNotification.pendingDigest : null,
+          };
+          break;
       }
 
       return {
         ok: true,
-        json: async () => ({ ok: true }),
+        json: async () => ({ ok: true, notification: currentNotification }),
       };
     }
 
@@ -216,6 +239,7 @@ describe("ManageEventClient", () => {
 
     const eventStatusHeading = screen.getByText("Event status");
     const shareLinksHeading = screen.getByText("Share links");
+    const emailAlertsHeading = screen.getByText("Email alerts");
     const bestWindowsHeading = screen.getByText("Best windows right now");
     const participantsHeading = screen.getByText("Participants");
     const availabilityHeading = screen.getByText("Availability");
@@ -227,6 +251,10 @@ describe("ManageEventClient", () => {
     ).toBeTruthy();
     expect(
       shareLinksHeading.compareDocumentPosition(availabilityHeading) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      emailAlertsHeading.compareDocumentPosition(availabilityHeading) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(
@@ -416,6 +444,49 @@ describe("ManageEventClient", () => {
       action: "updateTitle",
       title: "Updated team sync",
     });
+  });
+
+  it("shows email alert scheduling details in the organizer sidebar", () => {
+    const view = createManageView();
+    renderWithI18n(<ManageEventClient initialView={view} />);
+
+    expect(screen.getByText("Email alerts")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("owner@example.com")).toBeInTheDocument();
+    expect(screen.getByText("Each email includes a fresh private organizer link. Treat it as sensitive.")).toBeInTheDocument();
+  });
+
+  it("saves the organizer notification email without refreshing the snapshot", async () => {
+    const user = userEvent.setup();
+    const view = createManageView({
+      recipientEmail: null,
+    });
+    const fetchMock = installManageFetchMock(view);
+    renderWithI18n(<ManageEventClient initialView={view} />);
+
+    const input = screen.getByLabelText("Send alerts to");
+    await user.type(input, "owner@example.com");
+    await user.click(screen.getByRole("button", { name: "Save email" }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Send alerts to")).toHaveValue("owner@example.com");
+    });
+
+    const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(requestInit.body))).toMatchObject({
+      action: "updateNotificationEmail",
+      notificationEmail: "owner@example.com",
+    });
+  });
+
+  it("shows an unavailable note when email alerts are disabled on the host", () => {
+    const view = createManageView({
+      notificationsConfigured: false,
+      recipientEmail: null,
+    });
+    renderWithI18n(<ManageEventClient initialView={view} />);
+
+    expect(screen.getByText("Email alerts are not available on this host right now.")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Send alerts to")).not.toBeInTheDocument();
   });
 
   it("shows the saved fixed date with an .ics export link", () => {
