@@ -145,6 +145,13 @@ const prisma = {
             continue;
           }
 
+          if (key === "pendingChangeCount" && value && typeof value === "object" && "increment" in value) {
+            next.pendingChangeCount += Number(
+              (value as { increment?: number }).increment ?? 0,
+            );
+            continue;
+          }
+
           (next as Record<string, unknown>)[key] = value;
         }
 
@@ -158,6 +165,11 @@ const prisma = {
       where.id === "event_1" ? getEventWithNotification() : null,
     ),
   },
+  $transaction: vi.fn(
+    async (
+      callback: (tx: typeof prisma) => Promise<unknown>,
+    ) => callback(prisma),
+  ),
 };
 
 vi.mock("@/lib/prisma", () => ({
@@ -316,5 +328,38 @@ describe("availability notifications", () => {
     expect(sendEmail).toHaveBeenCalledTimes(2);
     expect(store.notifications.get("event_1")?.pendingFlushAfterAt).toBeNull();
     expect(store.notifications.get("event_1")?.lastSentAt).toBeInstanceOf(Date);
+  });
+
+  it("does not restore a cleared recipient email from a stale availability save", async () => {
+    store.notifications.set("event_1", {
+      eventId: "event_1",
+      recipientEmail: null,
+      emailManageTokenHash: null,
+      pendingSinceAt: null,
+      pendingFlushAfterAt: null,
+      pendingParticipantIds: [],
+      pendingChangeCount: 0,
+      lastSentAt: null,
+      createdAt: new Date("2026-04-01T09:00:00.000Z"),
+      updatedAt: new Date("2026-04-01T09:00:00.000Z"),
+    });
+
+    const { queueAvailabilityDigest } = await import("./availability-notifications");
+
+    await queueAvailabilityDigest({
+      eventId: "event_1",
+      participantId: "participant_1",
+      recipientEmail: "stale@example.com",
+    });
+
+    const notification = store.notifications.get("event_1");
+    expect(notification?.recipientEmail).toBeNull();
+    expect(notification?.pendingFlushAfterAt).toBeNull();
+    expect(notification?.pendingParticipantIds).toEqual([]);
+    expect(notification?.pendingChangeCount).toBe(0);
+
+    await vi.advanceTimersByTimeAsync(5 * 60 * 1000 + 1);
+
+    expect(sendEmail).not.toHaveBeenCalled();
   });
 });

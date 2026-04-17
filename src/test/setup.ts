@@ -18,6 +18,7 @@ class MockResizeObserver {
 
 afterEach(() => {
   cleanup();
+  localStorageStore.clear();
 });
 
 Object.defineProperty(globalThis, "EventSource", {

@@ -126,11 +126,11 @@ export function ManageEventClient({
   );
   const notificationTimestampFormatter = useMemo(
     () =>
-      new Intl.DateTimeFormat(undefined, {
+      new Intl.DateTimeFormat(locale, {
         dateStyle: "medium",
         timeStyle: "short",
       }),
-    [],
+    [locale],
   );
   const pendingDigestSummary = notification.pendingDigest
     ? format(messages.manageEvent.emailAlertsPending, {

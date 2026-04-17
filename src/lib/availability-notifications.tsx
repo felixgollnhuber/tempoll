@@ -12,6 +12,7 @@ import type { ManageEventNotificationState } from "@/lib/types";
 
 const DIGEST_QUIET_PERIOD_MINUTES = notificationConfig.quietPeriodMinutes;
 const DIGEST_QUIET_PERIOD_MS = DIGEST_QUIET_PERIOD_MINUTES * 60 * 1000;
+const MAX_DIGEST_QUEUE_ATTEMPTS = 3;
 
 type NotificationRow = {
   recipientEmail: string | null;
@@ -665,82 +666,82 @@ export async function queueAvailabilityDigest(options: {
 
   const now = new Date();
   const flushAfterAt = new Date(now.getTime() + DIGEST_QUIET_PERIOD_MS);
-  const existing = await prisma.eventAvailabilityNotification.findUnique({
-    where: {
-      eventId: options.eventId,
-    },
-    select: {
-      pendingSinceAt: true,
-      pendingParticipantIds: true,
-      pendingChangeCount: true,
-    },
-  });
-
-  const data = {
-    recipientEmail,
-    pendingSinceAt: existing?.pendingSinceAt ?? now,
-    pendingFlushAfterAt: flushAfterAt,
-    pendingParticipantIds: {
-      set: Array.from(new Set([...(existing?.pendingParticipantIds ?? []), options.participantId])),
-    },
-    pendingChangeCount: (existing?.pendingChangeCount ?? 0) + 1,
-  };
-
-  if (existing) {
-    await prisma.eventAvailabilityNotification.update({
-      where: {
-        eventId: options.eventId,
-      },
-      data,
-    });
-  } else {
+  for (let attempt = 1; attempt <= MAX_DIGEST_QUEUE_ATTEMPTS; attempt += 1) {
     try {
-      await prisma.eventAvailabilityNotification.create({
-        data: {
-          eventId: options.eventId,
-          recipientEmail,
-          pendingSinceAt: now,
-          pendingFlushAfterAt: flushAfterAt,
-          pendingParticipantIds: [options.participantId],
-          pendingChangeCount: 1,
+      const shouldScheduleDigest = await prisma.$transaction(
+        async (tx) => {
+          const existing = await tx.eventAvailabilityNotification.findUnique({
+            where: {
+              eventId: options.eventId,
+            },
+            select: {
+              recipientEmail: true,
+              pendingSinceAt: true,
+              pendingParticipantIds: true,
+            },
+          });
+
+          if (existing) {
+            if (!existing.recipientEmail) {
+              return false;
+            }
+
+            await tx.eventAvailabilityNotification.update({
+              where: {
+                eventId: options.eventId,
+              },
+              data: {
+                pendingSinceAt: existing.pendingSinceAt ?? now,
+                pendingFlushAfterAt: flushAfterAt,
+                pendingParticipantIds: {
+                  set: Array.from(
+                    new Set([...existing.pendingParticipantIds, options.participantId]),
+                  ),
+                },
+                pendingChangeCount: {
+                  increment: 1,
+                },
+              },
+            });
+
+            return true;
+          }
+
+          await tx.eventAvailabilityNotification.create({
+            data: {
+              eventId: options.eventId,
+              recipientEmail,
+              pendingSinceAt: now,
+              pendingFlushAfterAt: flushAfterAt,
+              pendingParticipantIds: [options.participantId],
+              pendingChangeCount: 1,
+            },
+          });
+
+          return true;
         },
-      });
-    } catch (error) {
-      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") {
-        throw error;
+        {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        },
+      );
+
+      if (shouldScheduleDigest) {
+        scheduleDigestTimer(options.eventId, flushAfterAt);
+      } else {
+        clearDigestTimer(options.eventId);
       }
 
-      const current = await prisma.eventAvailabilityNotification.findUnique({
-        where: {
-          eventId: options.eventId,
-        },
-        select: {
-          pendingSinceAt: true,
-          pendingParticipantIds: true,
-          pendingChangeCount: true,
-        },
-      });
+      return;
+    } catch (error) {
+      const isRetryableConcurrencyError =
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        (error.code === "P2002" || error.code === "P2034");
 
-      await prisma.eventAvailabilityNotification.update({
-        where: {
-          eventId: options.eventId,
-        },
-        data: {
-          recipientEmail,
-          pendingSinceAt: current?.pendingSinceAt ?? now,
-          pendingFlushAfterAt: flushAfterAt,
-          pendingParticipantIds: {
-            set: Array.from(
-              new Set([...(current?.pendingParticipantIds ?? []), options.participantId]),
-            ),
-          },
-          pendingChangeCount: (current?.pendingChangeCount ?? 0) + 1,
-        },
-      });
+      if (!isRetryableConcurrencyError || attempt === MAX_DIGEST_QUEUE_ATTEMPTS) {
+        throw error;
+      }
     }
   }
-
-  scheduleDigestTimer(options.eventId, flushAfterAt);
 }
 
 export async function updateNotificationRecipient(eventId: string, notificationEmail?: string) {
