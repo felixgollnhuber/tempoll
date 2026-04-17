@@ -251,6 +251,7 @@ function AvailabilityDigestEmail({
             <div
               style={{
                 padding: "28px 32px",
+                backgroundColor: accent,
                 background:
                   "linear-gradient(135deg, rgba(14, 134, 144, 0.96), rgba(16, 112, 126, 0.92))",
                 color: "#ffffff",
@@ -275,6 +276,7 @@ function AvailabilityDigestEmail({
                   margin: "18px 0 8px",
                   fontSize: "30px",
                   lineHeight: 1.15,
+                  color: "#ffffff",
                 }}
               >
                 Availability changed on {eventTitle}
@@ -314,7 +316,9 @@ function AvailabilityDigestEmail({
                 >
                   Event timezone
                 </p>
-                <p style={{ margin: 0, fontSize: "16px", fontWeight: 600 }}>{eventTimezone}</p>
+                <p style={{ margin: 0, fontSize: "16px", fontWeight: 600, color: strong }}>
+                  {eventTimezone}
+                </p>
               </div>
 
               <div style={{ marginBottom: "22px" }}>
@@ -340,7 +344,9 @@ function AvailabilityDigestEmail({
                       padding: "18px 20px",
                     }}
                   >
-                    <p style={{ margin: 0, fontSize: "18px", fontWeight: 700 }}>{finalizedSlotLabel}</p>
+                    <p style={{ margin: 0, fontSize: "18px", fontWeight: 700, color: "#ffffff" }}>
+                      {finalizedSlotLabel}
+                    </p>
                     <p
                       style={{
                         margin: "8px 0 0",
@@ -376,7 +382,7 @@ function AvailabilityDigestEmail({
                       >
                         Option {index + 1}
                       </p>
-                      <p style={{ margin: 0, fontSize: "17px", fontWeight: 650 }}>{label}</p>
+                      <p style={{ margin: 0, fontSize: "17px", fontWeight: 650, color: strong }}>{label}</p>
                     </div>
                   ))
                 )}
