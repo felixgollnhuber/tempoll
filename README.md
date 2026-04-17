@@ -57,6 +57,7 @@ The project is built for two audiences:
 - No required login. Public participants join with a name only.
 - Private organizer management URL, separate from the public event URL.
 - Realtime collaborative heatmap powered by Postgres `LISTEN/NOTIFY` and Server-Sent Events.
+- Optional Resend-powered organizer digest emails with five-minute quiet-period batching.
 - Ranked best meeting windows based on shared overlap.
 - Date-range based event creation. One range expands into concrete event dates internally.
 - Browser-local recent events history, including private organizer links clearly marked as sensitive.
@@ -227,6 +228,9 @@ Health checks stay available at `/api/health`, even while setup is incomplete.
 | `TEMPOLL_DB_NAME` | Compose/Coolify | Bundled Postgres database name. |
 | `TEMPOLL_DB_USER` | Compose/Coolify | Bundled Postgres database user. |
 | `SERVICE_PASSWORD_TEMPOLL_DB` | Compose/Coolify | Bundled Postgres password secret. Use an underscore, not a hyphen. |
+| `RESEND_API_KEY` | Optional | Enables organizer email digests when set together with `RESEND_FROM_EMAIL`. |
+| `RESEND_FROM_EMAIL` | Optional | Verified sender address for organizer digest emails. |
+| `RESEND_FROM_NAME` | Optional | Friendly sender name for organizer digest emails. Defaults to `tempoll`. |
 
 ### Optional DataFast analytics (cookieless)
 
@@ -244,6 +248,23 @@ Implementation details in this repository:
 - Event endpoint proxied through `POST /api/datafast/events`
 - Organizer routes (`/manage/[token]`) are filtered and not forwarded to DataFast
 - CSP already allows `https://datafa.st` in `script-src` and `connect-src`
+
+### Optional Resend organizer digests
+
+Organizer alert emails are disabled by default. They turn on only when both of these server-side variables are set:
+
+```env
+RESEND_API_KEY=re_...
+RESEND_FROM_EMAIL=notifications@example.com
+RESEND_FROM_NAME=tempoll
+```
+
+Notes for operators:
+
+- `/setup` intentionally does not collect, render, or export any mail secrets.
+- The create flow and organizer manage page expose the email field only when the host is configured for delivery.
+- Availability edits are batched into one digest after five quiet minutes instead of sending on every slot toggle.
+- Digest emails include a private organizer CTA. Treat those inboxes as sensitive.
 
 ### Optional legal and privacy variables
 
@@ -307,6 +328,7 @@ The Prisma schema is intentionally small:
 - Participant editing is tied to an HTTP-only cookie scoped to that event.
 - Recent event history is stored only in the browser, never synced to the server.
 - Organizer URLs are stored locally on purpose and should always be treated as sensitive.
+- Organizer digest emails may include a private manage link, so the recipient mailbox becomes part of that trust boundary.
 
 ### Realtime model
 

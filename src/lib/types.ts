@@ -6,6 +6,7 @@ export type EventCreateInput = {
   dayEndMinutes: number;
   slotMinutes: number;
   meetingDurationMinutes: number;
+  notificationEmail?: string;
 };
 
 export type ParticipantSession = {
@@ -106,9 +107,23 @@ export type CreateEventResult = {
   manageKey: string;
 };
 
+export type ManageEventNotificationState = {
+  isConfigured: boolean;
+  recipientEmail: string | null;
+  quietPeriodMinutes: number;
+  lastSentAt: string | null;
+  pendingDigest:
+    | {
+        participantCount: number;
+        flushAfterAt: string;
+      }
+    | null;
+};
+
 export type ManageEventView = {
   manageKey: string;
   shareUrl: string;
   manageUrl: string;
   snapshot: PublicEventSnapshot;
+  notification: ManageEventNotificationState;
 };

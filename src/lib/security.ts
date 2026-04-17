@@ -92,6 +92,7 @@ function getLocalizedAppErrorMessage(
     manage_key_invalid: messages.errors.app.manageKeyInvalid,
     final_slot_required: messages.errors.app.finalSlotRequired,
     final_slot_invalid: messages.errors.app.finalSlotInvalid,
+    notification_delivery_unavailable: messages.errors.app.notificationDeliveryUnavailable,
     event_create_rate_limited: messages.errors.rateLimit.eventCreate,
     event_join_rate_limited: messages.errors.rateLimit.joinEvent,
     availability_ip_rate_limited: messages.errors.rateLimit.availabilityIp,

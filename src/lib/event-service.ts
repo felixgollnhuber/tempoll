@@ -1,6 +1,12 @@
 import { Prisma } from "@prisma/client";
 
-import { appConfig } from "@/lib/config";
+import {
+  buildManageEventNotificationState,
+  ensureAvailabilityDigestSchedulerStarted,
+  queueAvailabilityDigest,
+  updateNotificationRecipient,
+} from "@/lib/availability-notifications";
+import { appConfig, isNotificationDeliveryConfigured } from "@/lib/config";
 import type { AppLocale } from "@/lib/i18n/locale";
 import { prisma } from "@/lib/prisma";
 import {
@@ -23,7 +29,7 @@ import {
   parseParticipantCookieValue,
   pickParticipantColor,
 } from "@/lib/tokens";
-import { conflict, notFound, unauthorized } from "@/lib/errors";
+import { conflict, notFound, serviceUnavailable, unauthorized } from "@/lib/errors";
 import type {
   AvailabilityBatchMutation,
   CreateEventResult,
@@ -53,6 +59,7 @@ type EventWithRelations = Prisma.EventGetPayload<{
         };
       };
     };
+    availabilityNotification: true;
   };
 }>;
 
@@ -77,6 +84,7 @@ async function getEventWithRelationsBySlug(slug: string) {
           },
         },
       },
+      availabilityNotification: true,
     },
   });
 }
@@ -102,6 +110,7 @@ async function getEventWithRelationsById(id: string) {
           },
         },
       },
+      availabilityNotification: true,
     },
   });
 }
@@ -182,6 +191,10 @@ async function getParticipantByEditLink(slug: string, participantId: string, tok
 }
 
 export async function createEvent(input: EventCreateInput): Promise<CreateEventResult> {
+  if (input.notificationEmail && !isNotificationDeliveryConfigured()) {
+    throw serviceUnavailable("notification_delivery_unavailable");
+  }
+
   let slug = makeSlug(input.title);
   while (await prisma.event.findUnique({ where: { slug }, select: { id: true } })) {
     slug = makeSlug(input.title);
@@ -205,6 +218,13 @@ export async function createEvent(input: EventCreateInput): Promise<CreateEventR
           data: input.dates.map((dateKey) => ({ dateKey })),
         },
       },
+      availabilityNotification: input.notificationEmail
+        ? {
+            create: {
+              recipientEmail: input.notificationEmail.trim().toLowerCase(),
+            },
+          }
+        : undefined,
     },
     select: {
       id: true,
@@ -223,6 +243,8 @@ export async function getPublicEventSnapshot(
   locale: AppLocale,
   cookieValue?: string,
 ) {
+  await ensureAvailabilityDigestSchedulerStarted();
+
   const [event, participant] = await Promise.all([
     getEventWithRelationsBySlug(slug),
     getParticipantForSession(slug, cookieValue),
@@ -333,6 +355,16 @@ async function verifyParticipantMutation(slug: string, cookieValue?: string) {
               dateKey: "asc",
             },
           },
+          availabilityNotification: {
+            select: {
+              recipientEmail: true,
+            },
+          },
+        },
+      },
+      availabilitySlots: {
+        select: {
+          slotStartAt: true,
         },
       },
     },
@@ -355,6 +387,8 @@ export async function saveAvailability(
   mutation: AvailabilityBatchMutation,
   cookieValue?: string,
 ) {
+  await ensureAvailabilityDigestSchedulerStarted();
+
   const participant = await verifyParticipantMutation(slug, cookieValue);
   const allowedSlots = getAllowedSlotStarts({
     dates: participant.event.dates.map((date) => date.dateKey),
@@ -368,6 +402,33 @@ export async function saveAvailability(
   const invalidSlot = uniqueSlotStarts.find((slotStart) => !allowedSlots.has(slotStart));
   if (invalidSlot) {
     throw conflict("invalid_slots");
+  }
+
+  const currentSelectionSignature = participant.availabilitySlots
+    .map((slot) => slot.slotStartAt.toISOString())
+    .sort()
+    .join("|");
+  const nextSelectionSignature = [...uniqueSlotStarts].sort().join("|");
+  const didAvailabilityChange = currentSelectionSignature !== nextSelectionSignature;
+
+  if (!didAvailabilityChange) {
+    await prisma.participant.update({
+      where: {
+        id: participant.id,
+      },
+      data: {
+        lastSeenAt: new Date(),
+      },
+    });
+
+    const event = await getEventWithRelationsById(participant.eventId);
+    if (!event) {
+      throw notFound("event_not_found");
+    }
+
+    return {
+      snapshot: toSnapshot(event, locale, participant.id),
+    };
   }
 
   await prisma.$transaction([
@@ -408,6 +469,14 @@ export async function saveAvailability(
     participantId: participant.id,
   });
 
+  if (participant.event.availabilityNotification?.recipientEmail) {
+    await queueAvailabilityDigest({
+      eventId: participant.eventId,
+      participantId: participant.id,
+      recipientEmail: participant.event.availabilityNotification.recipientEmail,
+    });
+  }
+
   return {
     snapshot: toSnapshot(event, locale, participant.id),
   };
@@ -425,7 +494,9 @@ async function verifyManageKey(manageKey: string) {
   }
 
   if (event.manageTokenHash !== hashSecret(parsed.token)) {
-    throw notFound("manage_key_invalid");
+    if (event.availabilityNotification?.emailManageTokenHash !== hashSecret(parsed.token)) {
+      throw notFound("manage_key_invalid");
+    }
   }
 
   return event;
@@ -436,6 +507,8 @@ export async function getManageEventView(
   locale: AppLocale,
 ): Promise<ManageEventView | null> {
   try {
+    await ensureAvailabilityDigestSchedulerStarted();
+
     const event = await verifyManageKey(manageKey);
     const snapshot = toSnapshot(event, locale);
 
@@ -444,6 +517,7 @@ export async function getManageEventView(
       shareUrl: buildPublicEventUrl(event.slug),
       manageUrl: buildManageUrl(manageKey),
       snapshot,
+      notification: buildManageEventNotificationState(event.availabilityNotification),
     };
   } catch {
     return null;
@@ -472,6 +546,10 @@ export async function updateManagedEvent(
         action: "renameParticipant";
         participantId: string;
         displayName: string;
+      }
+    | {
+        action: "updateNotificationEmail";
+        notificationEmail?: string;
       },
 ) {
   const event = await verifyManageKey(manageKey);
@@ -561,11 +639,26 @@ export async function updateManagedEvent(
     }
   }
 
+  if (input.action === "updateNotificationEmail") {
+    const notification = await updateNotificationRecipient(event.id, input.notificationEmail);
+
+    await publishEventUpdate({
+      eventId: event.id,
+      kind: "event-updated",
+    });
+
+    return {
+      notification,
+    };
+  }
+
   await publishEventUpdate({
     eventId: event.id,
     kind: input.action === "renameParticipant" ? "participant-renamed" : "event-updated",
     participantId: input.action === "renameParticipant" ? input.participantId : undefined,
   });
+
+  return {};
 }
 
 export async function deleteParticipant(manageKey: string, participantId: string) {

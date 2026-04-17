@@ -41,6 +41,17 @@ export const appConfig = {
   sessionMaxAgeSeconds: 60 * 60 * 24 * 30,
 };
 
+export const notificationConfig = {
+  quietPeriodMinutes: 5,
+  resendApiKey: getEnv("RESEND_API_KEY"),
+  resendFromEmail: getEnv("RESEND_FROM_EMAIL"),
+  resendFromName: getEnv("RESEND_FROM_NAME") ?? "tempoll",
+};
+
+export function isNotificationDeliveryConfigured() {
+  return Boolean(notificationConfig.resendApiKey && notificationConfig.resendFromEmail);
+}
+
 export function getDatabaseUrl() {
   const databaseUrl = getEnv("DATABASE_URL");
 

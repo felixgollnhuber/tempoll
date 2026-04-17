@@ -16,6 +16,7 @@ const prisma = {
 };
 
 const publishEventUpdate = vi.fn();
+const updateNotificationRecipient = vi.fn();
 
 vi.mock("@/lib/prisma", () => ({
   prisma,
@@ -23,6 +24,19 @@ vi.mock("@/lib/prisma", () => ({
 
 vi.mock("@/lib/realtime", () => ({
   publishEventUpdate,
+}));
+
+vi.mock("@/lib/availability-notifications", () => ({
+  ensureAvailabilityDigestSchedulerStarted: vi.fn(),
+  queueAvailabilityDigest: vi.fn(),
+  buildManageEventNotificationState: vi.fn(() => ({
+    isConfigured: true,
+    recipientEmail: null,
+    quietPeriodMinutes: 5,
+    lastSentAt: null,
+    pendingDigest: null,
+  })),
+  updateNotificationRecipient,
 }));
 
 function createManagedEvent() {
@@ -48,6 +62,7 @@ function createManagedEvent() {
         createdAt: new Date("2026-03-28T10:00:00.000Z"),
       },
     ],
+    availabilityNotification: null,
     participants: [],
   };
 }
@@ -59,6 +74,13 @@ describe("updateManagedEvent", () => {
     prisma.event.findUnique.mockResolvedValue(createManagedEvent());
     prisma.event.update.mockResolvedValue(undefined);
     publishEventUpdate.mockResolvedValue(undefined);
+    updateNotificationRecipient.mockResolvedValue({
+      isConfigured: true,
+      recipientEmail: "owner@example.com",
+      quietPeriodMinutes: 5,
+      lastSentAt: null,
+      pendingDigest: null,
+    });
   });
 
   it("stores a valid fixed date when closing an event", async () => {
@@ -131,5 +153,36 @@ describe("updateManagedEvent", () => {
         title: "Renamed sync",
       },
     });
+  });
+
+  it("updates organizer notification email settings", async () => {
+    const { updateManagedEvent } = await import("./event-service");
+
+    const result = await updateManagedEvent("event_1.secret", {
+      action: "updateNotificationEmail",
+      notificationEmail: "owner@example.com",
+    });
+
+    expect(updateNotificationRecipient).toHaveBeenCalledWith("event_1", "owner@example.com");
+    expect(result).toEqual({
+      notification: {
+        isConfigured: true,
+        recipientEmail: "owner@example.com",
+        quietPeriodMinutes: 5,
+        lastSentAt: null,
+        pendingDigest: null,
+      },
+    });
+  });
+
+  it("clears organizer notification email settings", async () => {
+    const { updateManagedEvent } = await import("./event-service");
+
+    await updateManagedEvent("event_1.secret", {
+      action: "updateNotificationEmail",
+      notificationEmail: "",
+    });
+
+    expect(updateNotificationRecipient).toHaveBeenCalledWith("event_1", "");
   });
 });

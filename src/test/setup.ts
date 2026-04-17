@@ -18,6 +18,7 @@ class MockResizeObserver {
 
 afterEach(() => {
   cleanup();
+  localStorageStore.clear();
 });
 
 Object.defineProperty(globalThis, "EventSource", {
@@ -54,5 +55,26 @@ Object.defineProperties(HTMLElement.prototype, {
     configurable: true,
     writable: true,
     value() {},
+  },
+});
+
+const localStorageStore = new Map<string, string>();
+
+Object.defineProperty(window, "localStorage", {
+  configurable: true,
+  writable: true,
+  value: {
+    getItem(key: string) {
+      return localStorageStore.has(key) ? localStorageStore.get(key)! : null;
+    },
+    setItem(key: string, value: string) {
+      localStorageStore.set(key, value);
+    },
+    removeItem(key: string) {
+      localStorageStore.delete(key);
+    },
+    clear() {
+      localStorageStore.clear();
+    },
   },
 });

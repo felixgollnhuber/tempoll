@@ -26,7 +26,11 @@ import { Label } from "@/components/ui/label";
 import { formatMeetingWindowLabels } from "@/lib/availability";
 import { useI18n } from "@/lib/i18n/context";
 import { buildTimezoneOptions } from "@/lib/timezone-options";
-import type { ManageEventView, PublicEventSnapshot } from "@/lib/types";
+import type {
+  ManageEventNotificationState,
+  ManageEventView,
+  PublicEventSnapshot,
+} from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useViewerTimezone } from "@/lib/viewer-timezone";
 
@@ -41,7 +45,8 @@ type PendingAction =
   | "updateFixedDate"
   | "reopenEvent"
   | "renameParticipant"
-  | "removeParticipant";
+  | "removeParticipant"
+  | "updateNotificationEmail";
 
 type RefreshSnapshotOptions = {
   preserveDirtyTitle?: boolean;
@@ -53,6 +58,12 @@ export function ManageEventClient({
 }: ManageEventClientProps) {
   const { messages, format, plural, locale } = useI18n();
   const [snapshot, setSnapshot] = useState<PublicEventSnapshot>(initialView.snapshot);
+  const [notification, setNotification] = useState<ManageEventNotificationState>(
+    initialView.notification,
+  );
+  const [notificationEmail, setNotificationEmail] = useState(
+    initialView.notification.recipientEmail ?? "",
+  );
   const [title, setTitle] = useState(initialView.snapshot.title);
   const [requestedActiveParticipantId, setRequestedActiveParticipantId] = useState<string | null>(
     null,
@@ -72,6 +83,9 @@ export function ManageEventClient({
   );
   const savedFinalSlot = snapshot.status === "CLOSED" ? snapshot.finalizedSlot : null;
   const isTitleDirty = title !== snapshot.title;
+  const normalizedNotificationEmail = notificationEmail.trim().toLowerCase();
+  const isNotificationEmailDirty =
+    normalizedNotificationEmail !== (notification.recipientEmail ?? "");
   const manageActionUrl = `/api/manage/${initialView.manageKey}`;
   const visibleSuggestions = savedFinalSlot
     ? snapshot.suggestions.filter((suggestion) => suggestion.slotStart !== savedFinalSlot.slotStart)
@@ -110,6 +124,26 @@ export function ManageEventClient({
       })),
     [locale, viewerTimezone, visibleSuggestions],
   );
+  const notificationTimestampFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat(locale, {
+        dateStyle: "medium",
+        timeStyle: "short",
+      }),
+    [locale],
+  );
+  const pendingDigestSummary = notification.pendingDigest
+    ? format(messages.manageEvent.emailAlertsPending, {
+        timestamp: notificationTimestampFormatter.format(
+          new Date(notification.pendingDigest.flushAfterAt),
+        ),
+      })
+    : messages.manageEvent.emailAlertsIdle;
+  const lastSentSummary = notification.lastSentAt
+    ? format(messages.manageEvent.emailAlertsLastSent, {
+        timestamp: notificationTimestampFormatter.format(new Date(notification.lastSentAt)),
+      })
+    : null;
 
   const refreshSnapshot = useCallback(
     async ({ preserveDirtyTitle = false }: RefreshSnapshotOptions = {}) => {
@@ -151,7 +185,10 @@ export function ManageEventClient({
       successMessage: string;
       errorMessage: string;
       preserveDirtyTitleOnRefresh?: boolean;
-      onSuccess?: () => Promise<void> | void;
+      onSuccess?: (payload: {
+        error?: string;
+        notification?: ManageEventNotificationState;
+      }) => Promise<void> | void;
     },
   ) {
     setPendingAction(action);
@@ -159,7 +196,10 @@ export function ManageEventClient({
     startTransition(async () => {
       try {
         const response = await request();
-        const payload = (await response.json()) as { error?: string };
+        const payload = (await response.json()) as {
+          error?: string;
+          notification?: ManageEventNotificationState;
+        };
         if (!response.ok) {
           toast.error(payload.error ?? errorMessage);
           return;
@@ -168,7 +208,7 @@ export function ManageEventClient({
         toast.success(successMessage);
 
         if (onSuccess) {
-          await onSuccess();
+          await onSuccess(payload);
           return;
         }
 
@@ -330,6 +370,37 @@ export function ManageEventClient({
           await refreshSnapshot({
             preserveDirtyTitle: true,
           });
+        },
+      },
+    );
+  }
+
+  function saveNotificationEmail(nextEmail = notificationEmail) {
+    performManageAction(
+      "updateNotificationEmail",
+      () =>
+        fetch(manageActionUrl, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            action: "updateNotificationEmail",
+            notificationEmail: nextEmail,
+          }),
+        }),
+      {
+        successMessage: nextEmail.trim()
+          ? messages.manageEvent.notificationEmailSaved
+          : messages.manageEvent.notificationEmailCleared,
+        errorMessage: messages.errors.routeFallbacks.updateEvent,
+        onSuccess: (payload) => {
+          if (!payload.notification) {
+            return;
+          }
+
+          setNotification(payload.notification);
+          setNotificationEmail(payload.notification.recipientEmail ?? "");
         },
       },
     );
@@ -588,6 +659,64 @@ export function ManageEventClient({
                 </div>
                 <CopyButton value={initialView.manageUrl} label={messages.manageEvent.copyOrganizerUrl} />
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>{messages.manageEvent.emailAlertsTitle}</CardTitle>
+              <CardDescription>{messages.manageEvent.emailAlertsDescription}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {notification.isConfigured ? (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="notification-email">
+                      {messages.manageEvent.emailAlertsRecipientLabel}
+                    </Label>
+                    <Input
+                      id="notification-email"
+                      type="email"
+                      inputMode="email"
+                      autoComplete="email"
+                      value={notificationEmail}
+                      placeholder={messages.createEvent.notificationEmailPlaceholder}
+                      onChange={(event) => setNotificationEmail(event.target.value)}
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      onClick={() => saveNotificationEmail()}
+                      disabled={isPending || !isNotificationEmailDirty}
+                    >
+                      {pendingAction === "updateNotificationEmail" ? (
+                        <Loader2Icon className="size-4 animate-spin" />
+                      ) : null}
+                      {messages.manageEvent.emailAlertsSave}
+                    </Button>
+                    {notification.recipientEmail ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => saveNotificationEmail("")}
+                        disabled={isPending}
+                      >
+                        {messages.manageEvent.emailAlertsClear}
+                      </Button>
+                    ) : null}
+                  </div>
+                  <div className="rounded-md border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+                    <p>{pendingDigestSummary}</p>
+                    {lastSentSummary ? <p className="mt-2">{lastSentSummary}</p> : null}
+                    <p className="mt-2">{messages.manageEvent.emailAlertsPrivateLinkNote}</p>
+                  </div>
+                </>
+              ) : (
+                <div className="rounded-md border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+                  {messages.manageEvent.emailAlertsUnavailable}
+                </div>
+              )}
             </CardContent>
           </Card>
 

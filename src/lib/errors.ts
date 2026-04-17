@@ -91,3 +91,13 @@ export function tooManyRequests(
     },
   });
 }
+
+export function serviceUnavailable(
+  code = "service_unavailable",
+  options?: {
+    params?: Record<string, string | number>;
+    headers?: Record<string, string>;
+  },
+) {
+  return new AppError(503, code, options);
+}

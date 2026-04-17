@@ -29,10 +29,10 @@ export async function PATCH(request: Request, { params }: Context) {
     const json = await request.json();
     const input = createManageUpdateSchema(i18n.messages).parse(json);
 
-    await updateManagedEvent(token, input);
+    const result = await updateManagedEvent(token, input);
 
     return NextResponse.json(
-      { ok: true },
+      { ok: true, ...result },
       {
         headers: MANAGE_RESPONSE_HEADERS,
       },
