@@ -25,6 +25,7 @@ model Event {
   isOnlineMeeting        Boolean            @default(false)
   meetingLink            String?
   timezone               String
+  fullDayStartMinutes    Int?
   slotMinutes            Int                @default(30)
   meetingDurationMinutes Int                @default(60)
   dayStartMinutes        Int

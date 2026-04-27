@@ -9,6 +9,16 @@ const meetingDurationSet = new Set<number>(meetingDurationOptions);
 const fullDayDateLimit = 366;
 const availabilitySelectionLimit = 3000;
 
+const optionalFullDayStartMinutesSchema = z.preprocess(
+  (value) => (value === null || value === undefined || value === "" ? undefined : value),
+  z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(23 * 60 + 30)
+    .optional(),
+);
+
 function createOptionalEmailSchema(messages: Messages) {
   return z
     .string()
@@ -63,6 +73,7 @@ export function createEventCreateSchema(messages: Messages) {
       dates: z
         .array(z.string().regex(dateKeyRegex, messages.validation.eventCreate.validCalendarDates))
         .min(1, messages.validation.eventCreate.chooseStartAndEndDate),
+      fullDayStartMinutes: optionalFullDayStartMinutesSchema,
       dayStartMinutes: z
         .number()
         .int()

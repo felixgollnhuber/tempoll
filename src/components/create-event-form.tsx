@@ -62,6 +62,7 @@ const eventFieldOrder = [
   "timezone",
   "dates",
   "weekdays",
+  "fullDayStartMinutes",
   "dayStartMinutes",
   "dayEndMinutes",
   "slotMinutes",
@@ -81,6 +82,7 @@ const eventFieldIds: Record<EventField, string> = {
   timezone: "timezone-trigger",
   dates: "date-range-trigger",
   weekdays: "weekday-filter",
+  fullDayStartMinutes: "full-day-start-trigger",
   dayStartMinutes: "day-start-trigger",
   dayEndMinutes: "day-end-trigger",
   slotMinutes: "slot-size-trigger",
@@ -224,6 +226,7 @@ export function CreateEventForm({
   const [dayEndMinutes, setDayEndMinutes] = useState(
     defaultCreateEventDefaults.dayEndMinutes,
   );
+  const [fullDayStartMinutes, setFullDayStartMinutes] = useState<number | undefined>(undefined);
   const [selectedWeekdays, setSelectedWeekdays] = useState<number[]>(
     defaultSelectedWeekdays,
   );
@@ -385,6 +388,7 @@ export function CreateEventForm({
       notificationEmail: notificationsConfigured ? notificationEmail : undefined,
       timezone,
       dates: selectedDates,
+      fullDayStartMinutes: eventType === "full_day" ? fullDayStartMinutes : undefined,
       dayStartMinutes,
       dayEndMinutes,
       slotMinutes,
@@ -1027,7 +1031,64 @@ export function CreateEventForm({
               </div>
                 </div>
               </>
-            ) : null}
+            ) : (
+              <>
+                <Separator />
+
+                <div className="max-w-md space-y-2">
+                  <Label htmlFor={eventFieldIds.fullDayStartMinutes}>
+                    {messages.createEvent.fullDayStartTimeLabel}
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    {messages.createEvent.fullDayStartTimeDescription}
+                  </p>
+                  <Select
+                    value={
+                      fullDayStartMinutes === undefined
+                        ? "none"
+                        : String(fullDayStartMinutes)
+                    }
+                    onValueChange={(value) => {
+                      setFullDayStartMinutes(value === "none" ? undefined : Number(value));
+                      clearErrors("fullDayStartMinutes");
+                    }}
+                  >
+                    <SelectTrigger
+                      id={eventFieldIds.fullDayStartMinutes}
+                      aria-invalid={fieldErrors.fullDayStartMinutes ? true : undefined}
+                      aria-describedby={
+                        fieldErrors.fullDayStartMinutes
+                          ? "full-day-start-error"
+                          : undefined
+                      }
+                      className={cn(
+                        fieldErrors.fullDayStartMinutes &&
+                          "border-destructive focus:ring-destructive/20",
+                      )}
+                    >
+                      <SelectValue placeholder={messages.createEvent.fullDayStartTimePlaceholder} />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-80">
+                      <SelectItem value="none">
+                        {messages.createEvent.fullDayStartTimePlaceholder}
+                      </SelectItem>
+                      {timeOptions
+                        .filter((option) => option.value < 24 * 60)
+                        .map((option) => (
+                          <SelectItem key={option.value} value={String(option.value)}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  {fieldErrors.fullDayStartMinutes ? (
+                    <p id="full-day-start-error" className="text-sm text-destructive">
+                      {fieldErrors.fullDayStartMinutes}
+                    </p>
+                  ) : null}
+                </div>
+              </>
+            )}
 
             {errorMessage ? <p className="text-sm text-destructive">{errorMessage}</p> : null}
 
@@ -1091,6 +1152,13 @@ export function CreateEventForm({
                     </dd>
                   </div>
                 </>
+              ) : fullDayStartMinutes !== undefined ? (
+                <div className="flex items-center justify-between gap-4">
+                  <dt className="text-muted-foreground">
+                    {messages.createEvent.previewFields.startTime}
+                  </dt>
+                  <dd className="font-medium">{getTimeLabel(fullDayStartMinutes)}</dd>
+                </div>
               ) : null}
             </dl>
           </CardContent>

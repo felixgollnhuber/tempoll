@@ -37,6 +37,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
 import {
   Select,
   SelectContent,
@@ -1027,29 +1028,21 @@ export function EventHeatmap({
                     </Select>
                   </div>
                   {showModeToggle ? (
-                    <div className="inline-flex rounded-md border bg-muted/30 p-1">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={mode === "edit" ? "secondary" : "ghost"}
-                        className="h-7 px-3"
-                        aria-pressed={mode === "edit"}
+                    <SegmentedControl>
+                      <SegmentedControlItem
+                        active={mode === "edit"}
                         disabled={!supportsPainting}
                         onClick={() => onModeChange?.("edit")}
                       >
                         {messages.publicEvent.editMode}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={mode === "view" ? "secondary" : "ghost"}
-                        className="h-7 px-3"
-                        aria-pressed={mode === "view"}
+                      </SegmentedControlItem>
+                      <SegmentedControlItem
+                        active={mode === "view"}
                         onClick={() => onModeChange?.("view")}
                       >
                         {messages.publicEvent.viewMode}
-                      </Button>
-                    </div>
+                      </SegmentedControlItem>
+                    </SegmentedControl>
                   ) : null}
                 </div>
               </div>

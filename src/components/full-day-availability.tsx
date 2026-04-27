@@ -24,8 +24,11 @@ import { EventMetaDetails } from "@/components/event-meta-details";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import type { BoardMode } from "@/components/event-heatmap";
+import { formatFullDayDateLabel, minutesToLabel } from "@/lib/availability";
+import type { AppLocale } from "@/lib/i18n/locale";
 import { useI18n } from "@/lib/i18n/context";
 import type { PublicEventSnapshot, SnapshotParticipant, SnapshotSlot } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -179,8 +182,13 @@ function getDisabledDayStyle(): CSSProperties {
   };
 }
 
-function getDayLabel(snapshot: PublicEventSnapshot, slot: SnapshotSlot) {
-  return snapshot.dates.find((date) => date.dateKey === slot.dateKey)?.label ?? slot.dateKey;
+function getDayLabel(snapshot: PublicEventSnapshot, slot: SnapshotSlot, locale: AppLocale) {
+  return formatFullDayDateLabel({
+    dateKey: slot.dateKey,
+    fullDayStartMinutes: snapshot.fullDayStartMinutes,
+    timezone: snapshot.timezone,
+    locale,
+  });
 }
 
 function getDayElementFromPoint(clientX: number, clientY: number) {
@@ -267,7 +275,7 @@ export function FullDayAvailability({
   onActiveParticipantChange,
   description,
 }: FullDayAvailabilityProps) {
-  const { messages, format, plural, intlLocale } = useI18n();
+  const { messages, format, plural, intlLocale, locale } = useI18n();
   const [activeSlotStart, setActiveSlotStart] = useState<string | null>(null);
   const [internalActiveParticipantId, setInternalActiveParticipantId] = useState<string | null>(
     null,
@@ -342,7 +350,7 @@ export function FullDayAvailability({
   const activeSlotDetails = activeSlot
     ? {
         slot: activeSlot,
-        dateLabel: getDayLabel(snapshot, activeSlot),
+        dateLabel: getDayLabel(snapshot, activeSlot, locale),
         availableParticipants: snapshot.participants.filter((participant) =>
           activeSlot.participantIds.includes(participant.id),
         ),
@@ -354,6 +362,10 @@ export function FullDayAvailability({
     : null;
   const shouldShowFixedDateAction = showFixedDateAction && Boolean(onFixedDateAction);
   const supportsPainting = supportsEditing && Boolean(onUpdateDay);
+  const fullDayStartTimeLabel =
+    snapshot.fullDayStartMinutes === null || snapshot.fullDayStartMinutes === undefined
+      ? null
+      : minutesToLabel(snapshot.fullDayStartMinutes);
 
   useEffect(() => {
     const handleResize = () => {
@@ -367,7 +379,7 @@ export function FullDayAvailability({
   }, []);
 
   function getAvailabilityTitle(slot: SnapshotSlot) {
-    const dateLabel = getDayLabel(snapshot, slot);
+    const dateLabel = getDayLabel(snapshot, slot, locale);
     const availableNames = slot.participantIds
       .map((participantId) => participantNamesById.get(participantId))
       .filter(Boolean) as string[];
@@ -738,7 +750,11 @@ export function FullDayAvailability({
                   <div>
                     <CardTitle className="text-2xl">{snapshot.title}</CardTitle>
                     <CardDescription className="mt-1 text-xs">
-                      {snapshot.timezone}
+                      {fullDayStartTimeLabel
+                        ? `${snapshot.timezone} · ${format(messages.publicEvent.fullDayStartsAt, {
+                            time: fullDayStartTimeLabel,
+                          })}`
+                        : snapshot.timezone}
                     </CardDescription>
                     <EventMetaDetails snapshot={snapshot} className="mt-2" />
                   </div>
@@ -761,8 +777,8 @@ export function FullDayAvailability({
           </CardHeader>
           <CardContent className="min-w-0 p-4 pt-0">
             <div className="space-y-3">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="space-y-1">
+              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
+                <div className="min-w-0 space-y-1">
                   <CardTitle className="text-base">{messages.publicEvent.availabilityTitle}</CardTitle>
                   <CardDescription className="text-xs">
                     {description ??
@@ -771,36 +787,28 @@ export function FullDayAvailability({
                         : messages.publicEvent.fullDayAvailabilityDescriptionView)}
                   </CardDescription>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 md:flex-nowrap md:justify-end">
                   {showModeToggle ? (
-                    <div className="inline-flex rounded-md border bg-muted/30 p-1">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={mode === "edit" ? "secondary" : "ghost"}
-                        className="h-7 px-3"
-                        aria-pressed={mode === "edit"}
+                    <SegmentedControl>
+                      <SegmentedControlItem
+                        active={mode === "edit"}
                         disabled={!canEdit}
                         onClick={() => onModeChange?.("edit")}
                       >
                         {messages.publicEvent.editMode}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={mode === "view" ? "secondary" : "ghost"}
-                        className="h-7 px-3"
-                        aria-pressed={mode === "view"}
+                      </SegmentedControlItem>
+                      <SegmentedControlItem
+                        active={mode === "view"}
                         onClick={() => onModeChange?.("view")}
                       >
                         {messages.publicEvent.viewMode}
-                      </Button>
-                    </div>
+                      </SegmentedControlItem>
+                    </SegmentedControl>
                   ) : null}
                   {showSidebar ? (
                     <Sheet>
                       <SheetTrigger asChild>
-                        <Button variant="outline" size="sm" className="xl:hidden">
+                        <Button variant="outline" size="sm" className="shrink-0 xl:hidden">
                           {messages.common.participants}
                         </Button>
                       </SheetTrigger>

@@ -102,6 +102,48 @@ describe("GET /api/events/[slug]/ics", () => {
     expect(body).not.toContain("DTSTART;TZID=");
   });
 
+  it("returns a timed calendar file for closed full-day events with a start time", async () => {
+    getPublicEventSnapshot.mockResolvedValue({
+      snapshot: {
+        slug: "class-reunion",
+        title: "Class Reunion",
+        eventType: "full_day",
+        timezone: "Europe/Vienna",
+        fullDayStartMinutes: 18 * 60,
+        meetingDurationMinutes: 180,
+        status: "CLOSED",
+        finalizedSlot: {
+          slotStart: "2026-04-01T22:00:00.000Z",
+          slotEnd: "2026-04-02T17:00:00.000Z",
+          dateKey: "2026-04-02",
+          label: "Thu, Apr 2 · 18:00",
+          localLabel: null,
+          availableCount: 2,
+          participantIds: ["p1", "p2"],
+        },
+      },
+    });
+
+    const { GET } = await import("./route");
+    const response = await GET(
+      new Request("https://tempoll.example.com/api/events/class-reunion/ics", {
+        headers: {
+          "Accept-Language": "en-US",
+        },
+      }),
+      {
+        params: Promise.resolve({
+          slug: "class-reunion",
+        }),
+      },
+    );
+
+    const body = await response.text();
+    expect(body).toContain("DTSTART;TZID=Europe/Vienna:20260402T180000");
+    expect(body).toContain("DTEND;TZID=Europe/Vienna:20260402T190000");
+    expect(body).not.toContain("VALUE=DATE");
+  });
+
   it("returns 404 when no fixed date exists", async () => {
     getPublicEventSnapshot.mockResolvedValue({
       snapshot: {

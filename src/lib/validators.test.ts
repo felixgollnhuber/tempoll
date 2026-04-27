@@ -43,10 +43,14 @@ describe("validators", () => {
 
   it("allows full-day events with more than 31 days", () => {
     const result = createEventCreateSchema(messages).safeParse(
-      createEventInput("full_day", buildDateRange(90)),
+      {
+        ...createEventInput("full_day", buildDateRange(90)),
+        fullDayStartMinutes: 18 * 60,
+      },
     );
 
     expect(result.success).toBe(true);
+    expect(result.data?.fullDayStartMinutes).toBe(18 * 60);
   });
 
   it("rejects full-day events with extremely long date ranges", () => {

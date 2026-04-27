@@ -133,6 +133,7 @@ function toSnapshot(
     eventType,
     locale,
     timezone: event.timezone,
+    fullDayStartMinutes: event.fullDayStartMinutes,
     status: event.status,
     slotMinutes: event.slotMinutes,
     meetingDurationMinutes: event.meetingDurationMinutes,
@@ -219,6 +220,8 @@ export async function createEvent(input: EventCreateInput): Promise<CreateEventR
       isOnlineMeeting: input.isOnlineMeeting,
       meetingLink: input.isOnlineMeeting ? input.meetingLink : undefined,
       timezone: input.timezone,
+      fullDayStartMinutes:
+        input.eventType === "full_day" ? input.fullDayStartMinutes ?? null : null,
       slotMinutes: input.slotMinutes,
       meetingDurationMinutes: input.meetingDurationMinutes,
       dayStartMinutes: input.dayStartMinutes,

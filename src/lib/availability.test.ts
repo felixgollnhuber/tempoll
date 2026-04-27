@@ -204,6 +204,42 @@ describe("availability helpers", () => {
     });
   });
 
+  it("adds the optional start time to full-day suggestion labels", () => {
+    const firstDay = buildFullDaySlotStart("2026-04-10", "Europe/Vienna");
+
+    const snapshot = buildSnapshot({
+      id: "event_1",
+      slug: "class-reunion",
+      title: "Class Reunion",
+      eventType: "full_day",
+      locale: "en",
+      timezone: "Europe/Vienna",
+      fullDayStartMinutes: 18 * 60,
+      status: "OPEN",
+      slotMinutes: 30,
+      meetingDurationMinutes: 180,
+      dayStartMinutes: 9 * 60,
+      dayEndMinutes: 11 * 60,
+      dates: ["2026-04-10"],
+      finalSlotStart: null,
+      participants: [
+        {
+          id: "p1",
+          displayName: "Alice",
+          color: "red",
+          availabilitySlotStarts: [firstDay],
+        },
+      ],
+    });
+
+    expect(snapshot.fullDayStartMinutes).toBe(18 * 60);
+    expect(snapshot.suggestions[0]).toMatchObject({
+      slotStart: firstDay,
+      slotEnd: "2026-04-10T17:00:00.000Z",
+      label: "Fri, Apr 10 · 18:00",
+    });
+  });
+
   it("builds a finalized full-day slot from the stored day start", () => {
     const fullDaySlot = buildFullDaySlotStart("2026-04-10", "Europe/Vienna");
 

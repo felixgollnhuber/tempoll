@@ -155,6 +155,10 @@ export const en = {
     dailyStartPlaceholder: "Pick a start time",
     dailyEndLabel: "Daily end",
     dailyEndPlaceholder: "Pick an end time",
+    fullDayStartTimeLabel: "Start time",
+    fullDayStartTimeDescription:
+      "Optional. Participants still pick days only, but the final date can show a likely start time.",
+    fullDayStartTimePlaceholder: "No time",
     slotSizeLabel: "Slot size",
     slotSizePlaceholder: "Choose slot size",
     meetingDurationLabel: "Meeting duration",
@@ -176,6 +180,7 @@ export const en = {
       dateRange: "Date range",
       eventType: "Event type",
       daysShown: "Days shown",
+      startTime: "Start time",
       dailyWindow: "Daily window",
       granularity: "Granularity",
       rankedWindow: "Ranked window",
@@ -206,6 +211,7 @@ export const en = {
     },
     gridSummary: "{count}-minute grid",
     fullDaySummary: "Full-day poll",
+    fullDayStartsAt: "Likely starts at {time}",
     participantsSummary: {
       one: "{count} participant",
       other: "{count} participants",
@@ -891,6 +897,10 @@ export const de: Messages = {
     dailyStartPlaceholder: "Startzeit wählen",
     dailyEndLabel: "Tagesende",
     dailyEndPlaceholder: "Endzeit wählen",
+    fullDayStartTimeLabel: "Startzeit",
+    fullDayStartTimeDescription:
+      "Optional. Teilnehmende wählen weiterhin nur Tage, aber das finale Datum kann eine wahrscheinliche Startzeit anzeigen.",
+    fullDayStartTimePlaceholder: "Keine Uhrzeit",
     slotSizeLabel: "Slot-Größe",
     slotSizePlaceholder: "Slot-Größe wählen",
     meetingDurationLabel: "Meeting-Dauer",
@@ -913,6 +923,7 @@ export const de: Messages = {
       dateRange: "Datumsbereich",
       eventType: "Event-Art",
       daysShown: "Angezeigte Tage",
+      startTime: "Startzeit",
       dailyWindow: "Tägliches Zeitfenster",
       granularity: "Granularität",
       rankedWindow: "Geranktes Fenster",
@@ -945,6 +956,7 @@ export const de: Messages = {
     },
     gridSummary: "{count}-Minuten-Raster",
     fullDaySummary: "Ganztägige Umfrage",
+    fullDayStartsAt: "Beginnt wahrscheinlich um {time}",
     participantsSummary: {
       one: "{count} teilnehmende Person",
       other: "{count} Teilnehmende",
