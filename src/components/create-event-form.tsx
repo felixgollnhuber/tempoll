@@ -1,6 +1,6 @@
 "use client";
 
-import { addDays, eachDayOfInterval, format, isAfter, startOfToday } from "date-fns";
+import { addDays, addMonths, eachDayOfInterval, format, isAfter, startOfToday } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import {
   CalendarDaysIcon,
@@ -63,6 +63,7 @@ const eventFieldOrder = [
 
 type EventField = (typeof eventFieldOrder)[number];
 type EventFormErrors = Partial<Record<EventField, string>>;
+type EventType = "time_grid" | "full_day";
 
 const eventFieldIds: Record<EventField, string> = {
   eventType: "event-type",
@@ -92,6 +93,32 @@ const weekdayOptions = [
 const defaultSelectedWeekdays = weekdayOptions
   .filter((weekday) => weekday.defaultSelected)
   .map((weekday) => weekday.value);
+
+function getDefaultDateRange(eventType: EventType, today: Date): DateRange {
+  if (eventType === "full_day") {
+    return {
+      from: today,
+      to: addMonths(today, 1),
+    };
+  }
+
+  const tomorrow = addDays(today, 1);
+  return {
+    from: tomorrow,
+    to: addDays(tomorrow, 2),
+  };
+}
+
+function dateRangeMatchesByDay(left: DateRange | undefined, right: DateRange) {
+  if (!left?.from || !left?.to || !right.from || !right.to) {
+    return false;
+  }
+
+  return (
+    format(left.from, "yyyy-MM-dd") === format(right.from, "yyyy-MM-dd") &&
+    format(left.to, "yyyy-MM-dd") === format(right.to, "yyyy-MM-dd")
+  );
+}
 
 function sortWeekdays(values: number[]) {
   return [...values].sort(
@@ -171,23 +198,16 @@ export function CreateEventForm({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<EventFormErrors>({});
   const [isRangePickerOpen, setIsRangePickerOpen] = useState(false);
-  const [eventType, setEventType] = useState<"time_grid" | "full_day">("time_grid");
+  const [defaultDateRangeStart] = useState(() => startOfToday());
+  const [eventType, setEventType] = useState<EventType>("time_grid");
   const [title, setTitle] = useState("");
   const [notificationEmail, setNotificationEmail] = useState("");
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
-    const tomorrow = addDays(new Date(), 1);
-    return {
-      from: tomorrow,
-      to: addDays(tomorrow, 2),
-    };
-  });
-  const [draftDateRange, setDraftDateRange] = useState<DateRange | undefined>(() => {
-    const tomorrow = addDays(new Date(), 1);
-    return {
-      from: tomorrow,
-      to: addDays(tomorrow, 2),
-    };
-  });
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(() =>
+    getDefaultDateRange("time_grid", defaultDateRangeStart),
+  );
+  const [draftDateRange, setDraftDateRange] = useState<DateRange | undefined>(() =>
+    getDefaultDateRange("time_grid", defaultDateRangeStart),
+  );
   const [timezone, setTimezone] = useState(() => {
     const browserTimezone =
       typeof window !== "undefined"
@@ -324,6 +344,18 @@ export function CreateEventForm({
     clearErrors("weekdays", "dates");
   }
 
+  function selectEventType(nextEventType: EventType) {
+    const currentDefaultRange = getDefaultDateRange(eventType, defaultDateRangeStart);
+    if (dateRangeMatchesByDay(dateRange, currentDefaultRange)) {
+      const nextDefaultRange = getDefaultDateRange(nextEventType, defaultDateRangeStart);
+      setDateRange(nextDefaultRange);
+      setDraftDateRange(nextDefaultRange);
+      clearErrors("dates", "weekdays");
+    }
+
+    setEventType(nextEventType);
+  }
+
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setErrorMessage(null);
@@ -446,7 +478,7 @@ export function CreateEventForm({
                     eventType === "time_grid" && "border-primary bg-primary/8",
                   )}
                   onClick={() => {
-                    setEventType("time_grid");
+                    selectEventType("time_grid");
                     clearErrors("eventType");
                   }}
                 >
@@ -469,7 +501,7 @@ export function CreateEventForm({
                     eventType === "full_day" && "border-primary bg-primary/8",
                   )}
                   onClick={() => {
-                    setEventType("full_day");
+                    selectEventType("full_day");
                     clearErrors(
                       "eventType",
                       "dayStartMinutes",

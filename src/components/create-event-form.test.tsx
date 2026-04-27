@@ -293,6 +293,7 @@ describe("CreateEventForm", () => {
 
     expect(screen.queryByRole("combobox", { name: "Daily start" })).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "Slot size" })).not.toBeInTheDocument();
+    expect(screen.getAllByText("Apr 2, 2026 - May 2, 2026").length).toBeGreaterThan(0);
 
     await user.click(screen.getByRole("button", { name: "Create event" }));
 
@@ -307,7 +308,8 @@ describe("CreateEventForm", () => {
     };
 
     expect(payload.eventType).toBe("full_day");
-    expect(payload.dates).toEqual(["2026-04-03"]);
+    expect(payload.dates[0]).toBe("2026-04-02");
+    expect(payload.dates[payload.dates.length - 1]).toBe("2026-05-01");
   });
 
   it("submits the optional notification email when alerts are available", async () => {
