@@ -121,20 +121,26 @@ function buildFullDaySlotEnd(dateKey: string, timezone: string) {
   return buildFullDaySlotStart(addDaysToDateKey(dateKey, 1), timezone);
 }
 
-function buildTimedFullDaySlotEnd({
+const timedFullDayCalendarDurationMinutes = 60;
+
+export function buildTimedFullDaySlotWindow({
   dateKey,
   fullDayStartMinutes,
-  meetingDurationMinutes,
   timezone,
 }: {
   dateKey: string;
   fullDayStartMinutes: number;
-  meetingDurationMinutes: number;
   timezone: string;
 }) {
   const slotStart = buildSlotStart(dateKey, fullDayStartMinutes, timezone);
+  const slotEnd = new Date(
+    new Date(slotStart).getTime() + timedFullDayCalendarDurationMinutes * 60 * 1000,
+  ).toISOString();
 
-  return new Date(new Date(slotStart).getTime() + meetingDurationMinutes * 60 * 1000).toISOString();
+  return {
+    slotStart,
+    slotEnd,
+  };
 }
 
 function getDateKeyInTimezone(date: Date, timezone: string) {
@@ -592,12 +598,11 @@ export function buildFinalizedSlot({
       slotEnd:
         fullDayStartMinutes === null || fullDayStartMinutes === undefined
           ? buildFullDaySlotEnd(slot.dateKey, timezone)
-          : buildTimedFullDaySlotEnd({
+          : buildTimedFullDaySlotWindow({
               dateKey: slot.dateKey,
               fullDayStartMinutes,
-              meetingDurationMinutes,
               timezone,
-            }),
+            }).slotEnd,
       dateKey: slot.dateKey,
       label: formatFullDayDateLabel({
         dateKey: slot.dateKey,
@@ -730,7 +735,6 @@ export function buildSnapshot({
           locale,
           timezone,
           fullDayStartMinutes,
-          meetingDurationMinutes,
           slots,
         })
       : rankBestSuggestions({
@@ -794,14 +798,12 @@ export function buildSnapshot({
 function rankBestFullDaySuggestions({
   dates,
   fullDayStartMinutes,
-  meetingDurationMinutes,
   locale,
   timezone,
   slots,
 }: {
   dates: string[];
   fullDayStartMinutes?: number | null;
-  meetingDurationMinutes: number;
   locale: AppLocale;
   timezone: string;
   slots: SnapshotSlot[];
@@ -821,12 +823,11 @@ function rankBestFullDaySuggestions({
         slotEnd:
           fullDayStartMinutes === null || fullDayStartMinutes === undefined
             ? buildFullDaySlotEnd(slot.dateKey, timezone)
-            : buildTimedFullDaySlotEnd({
+            : buildTimedFullDaySlotWindow({
                 dateKey: slot.dateKey,
                 fullDayStartMinutes,
-                meetingDurationMinutes,
                 timezone,
-              }),
+              }).slotEnd,
         dateKey: slot.dateKey,
         label: formatFullDayDateLabel({
           dateKey: slot.dateKey,

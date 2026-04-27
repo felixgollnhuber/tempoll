@@ -110,7 +110,7 @@ describe("GET /api/events/[slug]/ics", () => {
         eventType: "full_day",
         timezone: "Europe/Vienna",
         fullDayStartMinutes: 18 * 60,
-        meetingDurationMinutes: 60,
+        meetingDurationMinutes: 180,
         status: "CLOSED",
         finalizedSlot: {
           slotStart: "2026-04-01T22:00:00.000Z",

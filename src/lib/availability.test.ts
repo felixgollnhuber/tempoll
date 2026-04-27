@@ -217,7 +217,7 @@ describe("availability helpers", () => {
       fullDayStartMinutes: 18 * 60,
       status: "OPEN",
       slotMinutes: 30,
-      meetingDurationMinutes: 60,
+      meetingDurationMinutes: 180,
       dayStartMinutes: 9 * 60,
       dayEndMinutes: 11 * 60,
       dates: ["2026-04-10"],

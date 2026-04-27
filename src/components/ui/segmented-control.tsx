@@ -22,11 +22,12 @@ export function SegmentedControlItem({
   active,
   className,
   ...props
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+}: Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "aria-pressed" | "type"> & {
   active?: boolean;
 }) {
   return (
     <button
+      {...props}
       type="button"
       data-slot="segmented-control-item"
       data-active={active ? "true" : undefined}
@@ -37,7 +38,6 @@ export function SegmentedControlItem({
         className,
       )}
       aria-pressed={active}
-      {...props}
     />
   );
 }

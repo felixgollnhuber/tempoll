@@ -27,7 +27,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import type { BoardMode } from "@/components/event-heatmap";
-import { minutesToLabel } from "@/lib/availability";
+import { formatFullDayDateLabel, minutesToLabel } from "@/lib/availability";
+import type { AppLocale } from "@/lib/i18n/locale";
 import { useI18n } from "@/lib/i18n/context";
 import type { PublicEventSnapshot, SnapshotParticipant, SnapshotSlot } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -181,12 +182,13 @@ function getDisabledDayStyle(): CSSProperties {
   };
 }
 
-function getDayLabel(snapshot: PublicEventSnapshot, slot: SnapshotSlot) {
-  const dateLabel = snapshot.dates.find((date) => date.dateKey === slot.dateKey)?.label ?? slot.dateKey;
-
-  return snapshot.fullDayStartMinutes === null || snapshot.fullDayStartMinutes === undefined
-    ? dateLabel
-    : `${dateLabel} · ${minutesToLabel(snapshot.fullDayStartMinutes)}`;
+function getDayLabel(snapshot: PublicEventSnapshot, slot: SnapshotSlot, locale: AppLocale) {
+  return formatFullDayDateLabel({
+    dateKey: slot.dateKey,
+    fullDayStartMinutes: snapshot.fullDayStartMinutes,
+    timezone: snapshot.timezone,
+    locale,
+  });
 }
 
 function getDayElementFromPoint(clientX: number, clientY: number) {
@@ -273,7 +275,7 @@ export function FullDayAvailability({
   onActiveParticipantChange,
   description,
 }: FullDayAvailabilityProps) {
-  const { messages, format, plural, intlLocale } = useI18n();
+  const { messages, format, plural, intlLocale, locale } = useI18n();
   const [activeSlotStart, setActiveSlotStart] = useState<string | null>(null);
   const [internalActiveParticipantId, setInternalActiveParticipantId] = useState<string | null>(
     null,
@@ -348,7 +350,7 @@ export function FullDayAvailability({
   const activeSlotDetails = activeSlot
     ? {
         slot: activeSlot,
-        dateLabel: getDayLabel(snapshot, activeSlot),
+        dateLabel: getDayLabel(snapshot, activeSlot, locale),
         availableParticipants: snapshot.participants.filter((participant) =>
           activeSlot.participantIds.includes(participant.id),
         ),
@@ -377,7 +379,7 @@ export function FullDayAvailability({
   }, []);
 
   function getAvailabilityTitle(slot: SnapshotSlot) {
-    const dateLabel = getDayLabel(snapshot, slot);
+    const dateLabel = getDayLabel(snapshot, slot, locale);
     const availableNames = slot.participantIds
       .map((participantId) => participantNamesById.get(participantId))
       .filter(Boolean) as string[];
