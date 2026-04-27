@@ -71,6 +71,8 @@
   },
   "pnpm": {
     "overrides": {
+      "postcss": "8.5.10",
+      "svix": "1.92.2",
       "@hono/node-server": "1.19.14",
       "defu": "6.1.7",
       "effect": "3.21.0",
