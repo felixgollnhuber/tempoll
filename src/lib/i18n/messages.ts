@@ -114,7 +114,7 @@ export const en = {
   createEvent: {
     eventDetailsTitle: "Event details",
     eventDetailsDescription:
-      "Set one date range, choose the daily window, and share a single link. Every day inside the selected range will appear on the availability grid.",
+      "Set one date range, choose available weekdays and the daily window, then share a single link.",
     titleLabel: "Event title",
     titlePlaceholder: "Design review, sprint planning, dinner with friends...",
     timezoneLabel: "Timezone",
@@ -122,7 +122,21 @@ export const en = {
     dateRangeLabel: "Date range",
     dateRangePlaceholder: "Choose a start and end date",
     dateRangeOpenTitle: "Choose event range",
-    dateRangeOpenDescription: "Weeks start on Monday. The whole interval will be shown.",
+    dateRangeOpenDescription: "Weeks start on Monday. Selected weekdays will appear on the grid.",
+    weekdays: {
+      label: "Available weekdays",
+      description:
+        "Choose which weekdays inside the selected date range should appear on the availability grid.",
+      options: {
+        monday: { shortLabel: "Mon", label: "Monday" },
+        tuesday: { shortLabel: "Tue", label: "Tuesday" },
+        wednesday: { shortLabel: "Wed", label: "Wednesday" },
+        thursday: { shortLabel: "Thu", label: "Thursday" },
+        friday: { shortLabel: "Fri", label: "Friday" },
+        saturday: { shortLabel: "Sat", label: "Saturday" },
+        sunday: { shortLabel: "Sun", label: "Sunday" },
+      },
+    },
     dailyStartLabel: "Daily start",
     dailyStartPlaceholder: "Pick a start time",
     dailyEndLabel: "Daily end",
@@ -156,7 +170,7 @@ export const en = {
       publicPage: "A public event page people can join without creating an account.",
       privatePage: "A private organizer page for renaming participants and closing the poll.",
       liveGrid:
-        "A live availability grid that fills every day between the chosen start and end date.",
+        "A live availability grid for the selected weekdays between the chosen start and end date.",
     },
     range: {
       selected: "{count} selected",
@@ -619,6 +633,7 @@ export const en = {
       endAfterStart: "End time must be later than start time.",
       durationMatchesSlot: "Meeting duration must align with slot size.",
       dateRangeRequired: "Choose a start and end date for the event.",
+      weekdayRequired: "Select at least one available weekday inside the date range.",
     },
     participantCreate: {
       nameMin: "Enter a name with at least 2 characters.",
@@ -759,7 +774,7 @@ export const de: Messages = {
   createEvent: {
     eventDetailsTitle: "Event-Details",
     eventDetailsDescription:
-      "Lege einen Datumsbereich fest, wähle das tägliche Zeitfenster und teile anschließend einen einzigen Link. Jeder Tag im ausgewählten Bereich erscheint im Verfügbarkeitsraster.",
+      "Lege einen Datumsbereich fest, wähle verfügbare Wochentage und das tägliche Zeitfenster und teile anschließend einen einzigen Link.",
     titleLabel: "Event-Titel",
     titlePlaceholder: "Design-Review, Sprint-Planung, Abendessen mit Freund:innen...",
     timezoneLabel: "Zeitzone",
@@ -767,7 +782,22 @@ export const de: Messages = {
     dateRangeLabel: "Datumsbereich",
     dateRangePlaceholder: "Start- und Enddatum wählen",
     dateRangeOpenTitle: "Event-Bereich wählen",
-    dateRangeOpenDescription: "Wochen beginnen am Montag. Das gesamte Intervall wird angezeigt.",
+    dateRangeOpenDescription:
+      "Wochen beginnen am Montag. Ausgewählte Wochentage erscheinen im Raster.",
+    weekdays: {
+      label: "Verfügbare Wochentage",
+      description:
+        "Wähle, welche Wochentage im ausgewählten Datumsbereich im Verfügbarkeitsraster erscheinen sollen.",
+      options: {
+        monday: { shortLabel: "Mo", label: "Montag" },
+        tuesday: { shortLabel: "Di", label: "Dienstag" },
+        wednesday: { shortLabel: "Mi", label: "Mittwoch" },
+        thursday: { shortLabel: "Do", label: "Donnerstag" },
+        friday: { shortLabel: "Fr", label: "Freitag" },
+        saturday: { shortLabel: "Sa", label: "Samstag" },
+        sunday: { shortLabel: "So", label: "Sonntag" },
+      },
+    },
     dailyStartLabel: "Tagesbeginn",
     dailyStartPlaceholder: "Startzeit wählen",
     dailyEndLabel: "Tagesende",
@@ -804,7 +834,7 @@ export const de: Messages = {
       privatePage:
         "Eine private Verwaltungsseite zum Umbenennen von Teilnehmenden und Schließen der Umfrage.",
       liveGrid:
-        "Ein Live-Verfügbarkeitsraster für jeden Tag zwischen dem gewählten Start- und Enddatum.",
+        "Ein Live-Verfügbarkeitsraster für die ausgewählten Wochentage zwischen Start- und Enddatum.",
     },
     range: {
       selected: "{count} ausgewählt",
@@ -1293,6 +1323,8 @@ export const de: Messages = {
       endAfterStart: "Die Endzeit muss nach der Startzeit liegen.",
       durationMatchesSlot: "Die Meeting-Dauer muss zur Slot-Größe passen.",
       dateRangeRequired: "Bitte wähle Start- und Enddatum für das Event.",
+      weekdayRequired:
+        "Wähle mindestens einen verfügbaren Wochentag innerhalb des Datumsbereichs.",
     },
     participantCreate: {
       nameMin: "Bitte gib einen Namen mit mindestens 2 Zeichen ein.",

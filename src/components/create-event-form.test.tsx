@@ -58,6 +58,9 @@ describe("CreateEventForm", () => {
     renderCreateEventForm("de");
 
     expect(screen.getByLabelText("Event-Titel")).toBeInTheDocument();
+    expect(screen.getByText("Verfügbare Wochentage")).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Montag" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Samstag" })).not.toBeChecked();
     expect(screen.getByRole("button", { name: "Event erstellen" })).toBeInTheDocument();
   });
 
@@ -65,6 +68,18 @@ describe("CreateEventForm", () => {
     renderCreateEventForm();
 
     expect(screen.getByRole("combobox", { name: "Slot size" })).toHaveTextContent("60 min");
+  });
+
+  it("defaults weekdays to Monday through Friday", () => {
+    renderCreateEventForm();
+
+    expect(screen.getByRole("checkbox", { name: "Monday" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Tuesday" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Wednesday" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Thursday" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Friday" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Saturday" })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Sunday" })).not.toBeChecked();
   });
 
   it("shows a friendly inline title validation message before submitting", () => {
@@ -189,6 +204,60 @@ describe("CreateEventForm", () => {
       dayEndMinutes: 17 * 60,
       slotMinutes: 15,
     });
+  });
+
+  it("submits only enabled weekdays from the selected date range", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-02T10:00:00.000Z"));
+
+    const user = userEvent.setup();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        manageKey: "manage-key-123",
+      }),
+    });
+    global.fetch = fetchMock as typeof fetch;
+
+    renderCreateEventForm();
+    vi.useRealTimers();
+
+    await user.type(screen.getByLabelText("Event title"), "Sprint planning");
+    await user.click(screen.getByRole("checkbox", { name: "Friday" }));
+    await user.click(screen.getByRole("checkbox", { name: "Sunday" }));
+    await user.click(screen.getByRole("button", { name: "Create event" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const payload = JSON.parse(String(requestInit.body)) as {
+      dates: string[];
+    };
+
+    expect(payload.dates).toEqual(["2026-04-05"]);
+  });
+
+  it("requires at least one enabled weekday inside the selected date range", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-02T10:00:00.000Z"));
+
+    const user = userEvent.setup();
+    const fetchMock = vi.fn();
+    global.fetch = fetchMock as typeof fetch;
+
+    renderCreateEventForm();
+    vi.useRealTimers();
+
+    await user.type(screen.getByLabelText("Event title"), "Sprint planning");
+    await user.click(screen.getByRole("checkbox", { name: "Friday" }));
+    await user.click(screen.getByRole("button", { name: "Create event" }));
+
+    expect(
+      screen.getByText("Select at least one available weekday inside the date range."),
+    ).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("submits the optional notification email when alerts are available", async () => {
