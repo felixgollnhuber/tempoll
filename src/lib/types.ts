@@ -8,6 +8,7 @@ export type EventCreateInput = {
   meetingLink?: string;
   timezone: string;
   dates: string[];
+  fullDayStartMinutes?: number;
   dayStartMinutes: number;
   dayEndMinutes: number;
   slotMinutes: number;
@@ -87,6 +88,7 @@ export type PublicEventSnapshot = {
   isOnlineMeeting: boolean;
   meetingLink: string | null;
   timezone: string;
+  fullDayStartMinutes?: number | null;
   status: "OPEN" | "CLOSED";
   slotMinutes: number;
   meetingDurationMinutes: number;

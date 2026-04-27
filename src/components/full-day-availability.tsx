@@ -24,8 +24,10 @@ import { EventMetaDetails } from "@/components/event-meta-details";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import type { BoardMode } from "@/components/event-heatmap";
+import { minutesToLabel } from "@/lib/availability";
 import { useI18n } from "@/lib/i18n/context";
 import type { PublicEventSnapshot, SnapshotParticipant, SnapshotSlot } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -180,7 +182,11 @@ function getDisabledDayStyle(): CSSProperties {
 }
 
 function getDayLabel(snapshot: PublicEventSnapshot, slot: SnapshotSlot) {
-  return snapshot.dates.find((date) => date.dateKey === slot.dateKey)?.label ?? slot.dateKey;
+  const dateLabel = snapshot.dates.find((date) => date.dateKey === slot.dateKey)?.label ?? slot.dateKey;
+
+  return snapshot.fullDayStartMinutes === null || snapshot.fullDayStartMinutes === undefined
+    ? dateLabel
+    : `${dateLabel} · ${minutesToLabel(snapshot.fullDayStartMinutes)}`;
 }
 
 function getDayElementFromPoint(clientX: number, clientY: number) {
@@ -354,6 +360,10 @@ export function FullDayAvailability({
     : null;
   const shouldShowFixedDateAction = showFixedDateAction && Boolean(onFixedDateAction);
   const supportsPainting = supportsEditing && Boolean(onUpdateDay);
+  const fullDayStartTimeLabel =
+    snapshot.fullDayStartMinutes === null || snapshot.fullDayStartMinutes === undefined
+      ? null
+      : minutesToLabel(snapshot.fullDayStartMinutes);
 
   useEffect(() => {
     const handleResize = () => {
@@ -738,7 +748,11 @@ export function FullDayAvailability({
                   <div>
                     <CardTitle className="text-2xl">{snapshot.title}</CardTitle>
                     <CardDescription className="mt-1 text-xs">
-                      {snapshot.timezone}
+                      {fullDayStartTimeLabel
+                        ? `${snapshot.timezone} · ${format(messages.publicEvent.fullDayStartsAt, {
+                            time: fullDayStartTimeLabel,
+                          })}`
+                        : snapshot.timezone}
                     </CardDescription>
                     <EventMetaDetails snapshot={snapshot} className="mt-2" />
                   </div>
@@ -761,8 +775,8 @@ export function FullDayAvailability({
           </CardHeader>
           <CardContent className="min-w-0 p-4 pt-0">
             <div className="space-y-3">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="space-y-1">
+              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
+                <div className="min-w-0 space-y-1">
                   <CardTitle className="text-base">{messages.publicEvent.availabilityTitle}</CardTitle>
                   <CardDescription className="text-xs">
                     {description ??
@@ -771,36 +785,28 @@ export function FullDayAvailability({
                         : messages.publicEvent.fullDayAvailabilityDescriptionView)}
                   </CardDescription>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 md:flex-nowrap md:justify-end">
                   {showModeToggle ? (
-                    <div className="inline-flex rounded-md border bg-muted/30 p-1">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={mode === "edit" ? "secondary" : "ghost"}
-                        className="h-7 px-3"
-                        aria-pressed={mode === "edit"}
+                    <SegmentedControl>
+                      <SegmentedControlItem
+                        active={mode === "edit"}
                         disabled={!canEdit}
                         onClick={() => onModeChange?.("edit")}
                       >
                         {messages.publicEvent.editMode}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={mode === "view" ? "secondary" : "ghost"}
-                        className="h-7 px-3"
-                        aria-pressed={mode === "view"}
+                      </SegmentedControlItem>
+                      <SegmentedControlItem
+                        active={mode === "view"}
                         onClick={() => onModeChange?.("view")}
                       >
                         {messages.publicEvent.viewMode}
-                      </Button>
-                    </div>
+                      </SegmentedControlItem>
+                    </SegmentedControl>
                   ) : null}
                   {showSidebar ? (
                     <Sheet>
                       <SheetTrigger asChild>
-                        <Button variant="outline" size="sm" className="xl:hidden">
+                        <Button variant="outline" size="sm" className="shrink-0 xl:hidden">
                           {messages.common.participants}
                         </Button>
                       </SheetTrigger>

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getPublicEventSnapshot } from "@/lib/event-service";
+import { buildSlotStart } from "@/lib/availability";
 import { createI18n, getLocaleFromRequest } from "@/lib/i18n/server";
 import { buildEventCalendarFile } from "@/lib/ics";
 import { PUBLIC_NO_STORE_HEADERS, mergeHeaders } from "@/lib/security";
@@ -29,6 +30,23 @@ export async function GET(request: Request, { params }: Context) {
     );
   }
 
+  const isTimedFullDayEvent =
+    event.snapshot.eventType === "full_day" &&
+    event.snapshot.fullDayStartMinutes !== null &&
+    event.snapshot.fullDayStartMinutes !== undefined;
+  const slotStart = isTimedFullDayEvent
+    ? buildSlotStart(
+        event.snapshot.finalizedSlot.dateKey,
+        event.snapshot.fullDayStartMinutes ?? 0,
+        event.snapshot.timezone,
+      )
+    : event.snapshot.finalizedSlot.slotStart;
+  const slotEnd = isTimedFullDayEvent
+    ? new Date(
+        new Date(slotStart).getTime() + event.snapshot.meetingDurationMinutes * 60 * 1000,
+      ).toISOString()
+    : event.snapshot.finalizedSlot.slotEnd;
+
   const body = buildEventCalendarFile({
     slug: event.snapshot.slug,
     title: event.snapshot.title,
@@ -36,10 +54,12 @@ export async function GET(request: Request, { params }: Context) {
     isOnlineMeeting: event.snapshot.isOnlineMeeting,
     meetingLink: event.snapshot.meetingLink,
     timezone: event.snapshot.timezone,
-    slotStart: event.snapshot.finalizedSlot.slotStart,
-    slotEnd: event.snapshot.finalizedSlot.slotEnd,
+    slotStart,
+    slotEnd,
     allDayDateKey:
-      event.snapshot.eventType === "full_day" ? event.snapshot.finalizedSlot.dateKey : null,
+      event.snapshot.eventType === "full_day" && !isTimedFullDayEvent
+        ? event.snapshot.finalizedSlot.dateKey
+        : null,
     url: buildPublicEventUrl(event.snapshot.slug),
   });
 

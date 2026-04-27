@@ -47,6 +47,7 @@ function createManagedEvent() {
     title: "Team Sync",
     type: "TIME_GRID" as const,
     timezone: "Europe/Vienna",
+    fullDayStartMinutes: null,
     slotMinutes: 30,
     meetingDurationMinutes: 60,
     dayStartMinutes: 9 * 60,
@@ -191,6 +192,7 @@ describe("updateManagedEvent", () => {
       isOnlineMeeting: false,
       timezone: "Europe/Vienna",
       dates: ["2026-04-02", "2026-04-03"],
+      fullDayStartMinutes: 18 * 60,
       dayStartMinutes: 9 * 60,
       dayEndMinutes: 11 * 60,
       slotMinutes: 30,
@@ -201,6 +203,7 @@ describe("updateManagedEvent", () => {
       expect.objectContaining({
         data: expect.objectContaining({
           type: "FULL_DAY",
+          fullDayStartMinutes: 18 * 60,
           title: "Offsite Days",
           dates: {
             createMany: {
