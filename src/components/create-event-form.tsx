@@ -8,8 +8,11 @@ import {
   ChevronDownIcon,
   CheckIcon,
   Clock3Icon,
+  LinkIcon,
   Loader2Icon,
+  MapPinIcon,
   SparklesIcon,
+  VideoIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
@@ -52,6 +55,9 @@ type CreateEventFormProps = {
 const eventFieldOrder = [
   "eventType",
   "title",
+  "location",
+  "isOnlineMeeting",
+  "meetingLink",
   "notificationEmail",
   "timezone",
   "dates",
@@ -68,6 +74,9 @@ type EventFormErrors = Partial<Record<EventField, string>>;
 const eventFieldIds: Record<EventField, string> = {
   eventType: "event-type",
   title: "title",
+  location: "location",
+  isOnlineMeeting: "event-format",
+  meetingLink: "meeting-link",
   notificationEmail: "notification-email",
   timezone: "timezone-trigger",
   dates: "date-range-trigger",
@@ -190,6 +199,9 @@ export function CreateEventForm({
   const [initialDateRange] = useState(() => getDefaultDateRange("time_grid", startOfToday()));
   const [eventType, setEventType] = useState<EventType>("time_grid");
   const [title, setTitle] = useState("");
+  const [location, setLocation] = useState("");
+  const [isOnlineMeeting, setIsOnlineMeeting] = useState(false);
+  const [meetingLink, setMeetingLink] = useState("");
   const [notificationEmail, setNotificationEmail] = useState("");
   const [dateRange, setDateRange] = useState<DateRange | undefined>(initialDateRange);
   const [draftDateRange, setDraftDateRange] = useState<DateRange | undefined>(initialDateRange);
@@ -367,6 +379,9 @@ export function CreateEventForm({
     const parsed = createEventCreateSchema(messages).safeParse({
       eventType,
       title,
+      location: isOnlineMeeting ? undefined : location,
+      isOnlineMeeting,
+      meetingLink: isOnlineMeeting ? meetingLink : undefined,
       notificationEmail: notificationsConfigured ? notificationEmail : undefined,
       timezone,
       dates: selectedDates,
@@ -446,6 +461,120 @@ export function CreateEventForm({
                   {fieldErrors.title}
                 </p>
               ) : null}
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label id={eventFieldIds.isOnlineMeeting}>
+                  {messages.createEvent.eventFormatLabel}
+                </Label>
+                <div
+                  role="radiogroup"
+                  aria-labelledby={eventFieldIds.isOnlineMeeting}
+                  className="grid grid-cols-1 gap-2 sm:grid-cols-2"
+                >
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={!isOnlineMeeting}
+                    className={cn(
+                      "flex h-10 items-center justify-center gap-2 rounded-md border px-3 text-sm font-medium transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                      !isOnlineMeeting
+                        ? "border-primary bg-primary/10 text-foreground"
+                        : "border-input bg-background text-muted-foreground",
+                    )}
+                    onClick={() => {
+                      setIsOnlineMeeting(false);
+                      setMeetingLink("");
+                      clearErrors("isOnlineMeeting", "meetingLink");
+                    }}
+                  >
+                    <MapPinIcon className="size-4" aria-hidden="true" />
+                    {messages.createEvent.inPersonLabel}
+                  </button>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={isOnlineMeeting}
+                    className={cn(
+                      "flex h-10 items-center justify-center gap-2 rounded-md border px-3 text-sm font-medium transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                      isOnlineMeeting
+                        ? "border-primary bg-primary/10 text-foreground"
+                        : "border-input bg-background text-muted-foreground",
+                    )}
+                    onClick={() => {
+                      setIsOnlineMeeting(true);
+                      setLocation("");
+                      clearErrors("isOnlineMeeting", "location");
+                    }}
+                  >
+                    <VideoIcon className="size-4" aria-hidden="true" />
+                    {messages.createEvent.onlineMeetingLabel}
+                  </button>
+                </div>
+              </div>
+
+              {isOnlineMeeting ? (
+                <div className="space-y-2">
+                  <Label htmlFor={eventFieldIds.meetingLink}>
+                    {messages.createEvent.meetingLinkLabel}
+                  </Label>
+                  <div className="relative">
+                    <LinkIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id={eventFieldIds.meetingLink}
+                      type="url"
+                      inputMode="url"
+                      value={meetingLink}
+                      placeholder={messages.createEvent.meetingLinkPlaceholder}
+                      aria-invalid={fieldErrors.meetingLink ? true : undefined}
+                      aria-describedby={fieldErrors.meetingLink ? "meeting-link-error" : undefined}
+                      className={cn(
+                        "pl-9",
+                        fieldErrors.meetingLink &&
+                          "border-destructive focus-visible:ring-destructive/20",
+                      )}
+                      onChange={(event) => {
+                        setMeetingLink(event.target.value);
+                        clearErrors("meetingLink");
+                      }}
+                    />
+                  </div>
+                  {fieldErrors.meetingLink ? (
+                    <p id="meeting-link-error" className="text-sm text-destructive">
+                      {fieldErrors.meetingLink}
+                    </p>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor={eventFieldIds.location}>{messages.createEvent.locationLabel}</Label>
+                  <div className="relative">
+                    <MapPinIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id={eventFieldIds.location}
+                      value={location}
+                      placeholder={messages.createEvent.locationPlaceholder}
+                      aria-invalid={fieldErrors.location ? true : undefined}
+                      aria-describedby={fieldErrors.location ? "location-error" : undefined}
+                      className={cn(
+                        "pl-9",
+                        fieldErrors.location &&
+                          "border-destructive focus-visible:ring-destructive/20",
+                      )}
+                      onChange={(event) => {
+                        setLocation(event.target.value);
+                        clearErrors("location");
+                      }}
+                    />
+                  </div>
+                  {fieldErrors.location ? (
+                    <p id="location-error" className="text-sm text-destructive">
+                      {fieldErrors.location}
+                    </p>
+                  ) : null}
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">

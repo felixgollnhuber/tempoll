@@ -21,6 +21,7 @@ import {
   useState,
 } from "react";
 
+import { EventMetaDetails } from "@/components/event-meta-details";
 import {
   buildFinalizedSlot,
   buildProjectedBoard,
@@ -912,6 +913,7 @@ export function EventHeatmap({
                         timezone: viewerTimezoneOption?.label ?? viewerTimezone,
                       })}
                     </CardDescription>
+                    <EventMetaDetails snapshot={snapshot} className="mt-2" />
                   </div>
                 ) : null}
               </div>

@@ -17,6 +17,9 @@ type BuildSnapshotInput = {
   id: string;
   slug: string;
   title: string;
+  location?: string | null;
+  isOnlineMeeting?: boolean;
+  meetingLink?: string | null;
   eventType?: EventType;
   timezone: string;
   status: "OPEN" | "CLOSED";
@@ -594,6 +597,9 @@ export function buildSnapshot({
   id,
   slug,
   title,
+  location,
+  isOnlineMeeting = false,
+  meetingLink,
   eventType = "time_grid",
   locale,
   timezone,
@@ -710,6 +716,9 @@ export function buildSnapshot({
     id,
     slug,
     title,
+    location: isOnlineMeeting ? null : location ?? null,
+    isOnlineMeeting,
+    meetingLink: isOnlineMeeting ? meetingLink ?? null : null,
     eventType,
     timezone,
     status,

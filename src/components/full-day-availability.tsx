@@ -20,6 +20,7 @@ import {
   useState,
 } from "react";
 
+import { EventMetaDetails } from "@/components/event-meta-details";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -739,6 +740,7 @@ export function FullDayAvailability({
                     <CardDescription className="mt-1 text-xs">
                       {snapshot.timezone}
                     </CardDescription>
+                    <EventMetaDetails snapshot={snapshot} className="mt-2" />
                   </div>
                 ) : null}
               </div>
