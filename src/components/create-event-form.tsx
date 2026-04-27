@@ -1,6 +1,6 @@
 "use client";
 
-import { addDays, eachDayOfInterval, format, isAfter, startOfToday } from "date-fns";
+import { addDays, addMonths, eachDayOfInterval, format, isAfter, startOfToday } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import {
   CalendarDaysIcon,
@@ -36,6 +36,7 @@ import {
 import { meetingDurationOptions, slotMinuteOptions } from "@/lib/constants";
 import { useI18n } from "@/lib/i18n/context";
 import { buildTimezoneOptions } from "@/lib/timezone-options";
+import type { EventType } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { createEventCreateSchema } from "@/lib/validators";
 
@@ -92,6 +93,21 @@ const weekdayOptions = [
 const defaultSelectedWeekdays = weekdayOptions
   .filter((weekday) => weekday.defaultSelected)
   .map((weekday) => weekday.value);
+
+function getDefaultDateRange(eventType: EventType, today: Date): DateRange {
+  if (eventType === "full_day") {
+    return {
+      from: today,
+      to: addMonths(today, 1),
+    };
+  }
+
+  const tomorrow = addDays(today, 1);
+  return {
+    from: tomorrow,
+    to: addDays(tomorrow, 2),
+  };
+}
 
 function sortWeekdays(values: number[]) {
   return [...values].sort(
@@ -171,23 +187,13 @@ export function CreateEventForm({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<EventFormErrors>({});
   const [isRangePickerOpen, setIsRangePickerOpen] = useState(false);
-  const [eventType, setEventType] = useState<"time_grid" | "full_day">("time_grid");
+  const [initialDateRange] = useState(() => getDefaultDateRange("time_grid", startOfToday()));
+  const [eventType, setEventType] = useState<EventType>("time_grid");
   const [title, setTitle] = useState("");
   const [notificationEmail, setNotificationEmail] = useState("");
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
-    const tomorrow = addDays(new Date(), 1);
-    return {
-      from: tomorrow,
-      to: addDays(tomorrow, 2),
-    };
-  });
-  const [draftDateRange, setDraftDateRange] = useState<DateRange | undefined>(() => {
-    const tomorrow = addDays(new Date(), 1);
-    return {
-      from: tomorrow,
-      to: addDays(tomorrow, 2),
-    };
-  });
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(initialDateRange);
+  const [draftDateRange, setDraftDateRange] = useState<DateRange | undefined>(initialDateRange);
+  const [usesDefaultDateRange, setUsesDefaultDateRange] = useState(true);
   const [timezone, setTimezone] = useState(() => {
     const browserTimezone =
       typeof window !== "undefined"
@@ -309,6 +315,7 @@ export function CreateEventForm({
     }
 
     setDateRange(draftDateRange);
+    setUsesDefaultDateRange(false);
     clearErrors("dates");
     setIsRangePickerOpen(false);
   }
@@ -322,6 +329,17 @@ export function CreateEventForm({
       return sortWeekdays([...current, value]);
     });
     clearErrors("weekdays", "dates");
+  }
+
+  function selectEventType(nextEventType: EventType) {
+    if (usesDefaultDateRange) {
+      const nextDefaultRange = getDefaultDateRange(nextEventType, startOfToday());
+      setDateRange(nextDefaultRange);
+      setDraftDateRange(nextDefaultRange);
+      clearErrors("dates", "weekdays");
+    }
+
+    setEventType(nextEventType);
   }
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -446,7 +464,7 @@ export function CreateEventForm({
                     eventType === "time_grid" && "border-primary bg-primary/8",
                   )}
                   onClick={() => {
-                    setEventType("time_grid");
+                    selectEventType("time_grid");
                     clearErrors("eventType");
                   }}
                 >
@@ -469,7 +487,7 @@ export function CreateEventForm({
                     eventType === "full_day" && "border-primary bg-primary/8",
                   )}
                   onClick={() => {
-                    setEventType("full_day");
+                    selectEventType("full_day");
                     clearErrors(
                       "eventType",
                       "dayStartMinutes",

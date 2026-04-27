@@ -285,16 +285,18 @@ describe("CreateEventForm", () => {
     global.fetch = fetchMock as typeof fetch;
 
     renderCreateEventForm();
-    vi.useRealTimers();
-    const user = userEvent.setup();
 
-    await user.type(screen.getByLabelText("Event title"), "Offsite days");
-    await user.click(screen.getByRole("radio", { name: /Full days/i }));
+    fireEvent.change(screen.getByLabelText("Event title"), {
+      target: { value: "Offsite days" },
+    });
+    fireEvent.click(screen.getByRole("radio", { name: /Full days/i }));
 
     expect(screen.queryByRole("combobox", { name: "Daily start" })).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "Slot size" })).not.toBeInTheDocument();
+    expect(screen.getAllByText("Apr 2, 2026 - May 2, 2026").length).toBeGreaterThan(0);
 
-    await user.click(screen.getByRole("button", { name: "Create event" }));
+    vi.useRealTimers();
+    fireEvent.click(screen.getByRole("button", { name: "Create event" }));
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -307,7 +309,21 @@ describe("CreateEventForm", () => {
     };
 
     expect(payload.eventType).toBe("full_day");
-    expect(payload.dates).toEqual(["2026-04-03"]);
+    expect(payload.dates[0]).toBe("2026-04-02");
+    expect(payload.dates[payload.dates.length - 1]).toBe("2026-05-01");
+  });
+
+  it("uses the current day when switching a still-default range to full-day after midnight", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-02T10:00:00.000Z"));
+
+    renderCreateEventForm();
+
+    vi.setSystemTime(new Date("2026-04-03T00:30:00.000Z"));
+
+    fireEvent.click(screen.getByRole("radio", { name: /Full days/i }));
+
+    expect(screen.getAllByText("Apr 3, 2026 - May 3, 2026").length).toBeGreaterThan(0);
   });
 
   it("submits the optional notification email when alerts are available", async () => {
