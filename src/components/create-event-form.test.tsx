@@ -58,6 +58,10 @@ describe("CreateEventForm", () => {
     renderCreateEventForm("de");
 
     expect(screen.getByLabelText("Event-Titel")).toBeInTheDocument();
+    expect(screen.getByLabelText("Organizer-E-Mail-Benachrichtigungen")).toHaveAttribute(
+      "placeholder",
+      "name@beispiel.de",
+    );
     expect(screen.getByRole("group", { name: "Verfügbare Wochentage" })).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "Montag" })).toBeChecked();
     expect(screen.getByRole("checkbox", { name: "Samstag" })).not.toBeChecked();

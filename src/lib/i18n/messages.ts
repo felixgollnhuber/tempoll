@@ -877,7 +877,7 @@ export const de: Messages = {
     meetingDurationLabel: "Meeting-Dauer",
     meetingDurationPlaceholder: "Dauer wählen",
     notificationEmailLabel: "Organizer-E-Mail-Benachrichtigungen",
-    notificationEmailPlaceholder: "[PRIVATE_EMAIL]",
+    notificationEmailPlaceholder: "name@beispiel.de",
     notificationEmailDescription:
       "Optional. Erhalte eine E-Mail, nachdem Teilnehmende ihre Verfügbarkeit 5 ruhige Minuten lang nicht mehr geändert haben.",
     notificationEmailUnavailable:
