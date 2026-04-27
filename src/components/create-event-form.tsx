@@ -36,6 +36,7 @@ import {
 import { meetingDurationOptions, slotMinuteOptions } from "@/lib/constants";
 import { useI18n } from "@/lib/i18n/context";
 import { buildTimezoneOptions } from "@/lib/timezone-options";
+import type { EventType } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { createEventCreateSchema } from "@/lib/validators";
 
@@ -63,7 +64,6 @@ const eventFieldOrder = [
 
 type EventField = (typeof eventFieldOrder)[number];
 type EventFormErrors = Partial<Record<EventField, string>>;
-type EventType = "time_grid" | "full_day";
 
 const eventFieldIds: Record<EventField, string> = {
   eventType: "event-type",
@@ -107,17 +107,6 @@ function getDefaultDateRange(eventType: EventType, today: Date): DateRange {
     from: tomorrow,
     to: addDays(tomorrow, 2),
   };
-}
-
-function dateRangeMatchesByDay(left: DateRange | undefined, right: DateRange) {
-  if (!left?.from || !left?.to || !right.from || !right.to) {
-    return false;
-  }
-
-  return (
-    format(left.from, "yyyy-MM-dd") === format(right.from, "yyyy-MM-dd") &&
-    format(left.to, "yyyy-MM-dd") === format(right.to, "yyyy-MM-dd")
-  );
 }
 
 function sortWeekdays(values: number[]) {
@@ -198,16 +187,13 @@ export function CreateEventForm({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<EventFormErrors>({});
   const [isRangePickerOpen, setIsRangePickerOpen] = useState(false);
-  const [defaultDateRangeStart] = useState(() => startOfToday());
+  const [initialDateRange] = useState(() => getDefaultDateRange("time_grid", startOfToday()));
   const [eventType, setEventType] = useState<EventType>("time_grid");
   const [title, setTitle] = useState("");
   const [notificationEmail, setNotificationEmail] = useState("");
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(() =>
-    getDefaultDateRange("time_grid", defaultDateRangeStart),
-  );
-  const [draftDateRange, setDraftDateRange] = useState<DateRange | undefined>(() =>
-    getDefaultDateRange("time_grid", defaultDateRangeStart),
-  );
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(initialDateRange);
+  const [draftDateRange, setDraftDateRange] = useState<DateRange | undefined>(initialDateRange);
+  const [usesDefaultDateRange, setUsesDefaultDateRange] = useState(true);
   const [timezone, setTimezone] = useState(() => {
     const browserTimezone =
       typeof window !== "undefined"
@@ -329,6 +315,7 @@ export function CreateEventForm({
     }
 
     setDateRange(draftDateRange);
+    setUsesDefaultDateRange(false);
     clearErrors("dates");
     setIsRangePickerOpen(false);
   }
@@ -345,9 +332,8 @@ export function CreateEventForm({
   }
 
   function selectEventType(nextEventType: EventType) {
-    const currentDefaultRange = getDefaultDateRange(eventType, defaultDateRangeStart);
-    if (dateRangeMatchesByDay(dateRange, currentDefaultRange)) {
-      const nextDefaultRange = getDefaultDateRange(nextEventType, defaultDateRangeStart);
+    if (usesDefaultDateRange) {
+      const nextDefaultRange = getDefaultDateRange(nextEventType, startOfToday());
       setDateRange(nextDefaultRange);
       setDraftDateRange(nextDefaultRange);
       clearErrors("dates", "weekdays");
