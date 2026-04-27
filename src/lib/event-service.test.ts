@@ -188,6 +188,7 @@ describe("updateManagedEvent", () => {
     await createEvent({
       eventType: "full_day",
       title: "Offsite Days",
+      isOnlineMeeting: false,
       timezone: "Europe/Vienna",
       dates: ["2026-04-02", "2026-04-03"],
       dayStartMinutes: 9 * 60,

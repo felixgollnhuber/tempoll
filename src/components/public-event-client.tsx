@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { CopyButton } from "@/components/copy-button";
+import { EventMetaDetails } from "@/components/event-meta-details";
 import { EventHeatmap, type BoardMode, type DraftSelection } from "@/components/event-heatmap";
 import { FullDayAvailability } from "@/components/full-day-availability";
 import { Button } from "@/components/ui/button";
@@ -445,6 +446,7 @@ export function PublicEventClient({
                 ? messages.publicEvent.joinDescriptionFullDay
                 : messages.publicEvent.joinDescription}
             </CardDescription>
+            <EventMetaDetails snapshot={snapshot} />
           </CardHeader>
           <CardContent className="space-y-5 p-5">
             <div className="grid gap-3 sm:grid-cols-2">

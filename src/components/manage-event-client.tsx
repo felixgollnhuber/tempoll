@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { EventHeatmap } from "@/components/event-heatmap";
 import { FullDayAvailability } from "@/components/full-day-availability";
 import { CopyButton } from "@/components/copy-button";
+import { EventMetaDetails } from "@/components/event-meta-details";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -655,6 +656,7 @@ export function ManageEventClient({
                 </Button>
               ) : null}
             </div>
+            <EventMetaDetails snapshot={snapshot} className="pt-1" />
           </div>
         </CardContent>
       </Card>

@@ -32,6 +32,9 @@ export async function GET(request: Request, { params }: Context) {
   const body = buildEventCalendarFile({
     slug: event.snapshot.slug,
     title: event.snapshot.title,
+    location: event.snapshot.location,
+    isOnlineMeeting: event.snapshot.isOnlineMeeting,
+    meetingLink: event.snapshot.meetingLink,
     timezone: event.snapshot.timezone,
     slotStart: event.snapshot.finalizedSlot.slotStart,
     slotEnd: event.snapshot.finalizedSlot.slotEnd,

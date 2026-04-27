@@ -61,6 +61,49 @@ describe("validators", () => {
     });
   });
 
+  it("accepts optional location for in-person events", () => {
+    const result = createEventCreateSchema(messages).safeParse({
+      ...createEventInput("time_grid", buildDateRange(1)),
+      location: "Office 3.2",
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.data).toMatchObject({
+      location: "Office 3.2",
+      isOnlineMeeting: false,
+    });
+  });
+
+  it("accepts online meeting details without keeping a location", () => {
+    const result = createEventCreateSchema(messages).safeParse({
+      ...createEventInput("time_grid", buildDateRange(1)),
+      location: "Office 3.2",
+      isOnlineMeeting: true,
+      meetingLink: "https://meet.example.com/planning",
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.data).not.toHaveProperty("location");
+    expect(result.data).toMatchObject({
+      isOnlineMeeting: true,
+      meetingLink: "https://meet.example.com/planning",
+    });
+  });
+
+  it("requires meeting links to be full http or https URLs", () => {
+    const result = createEventCreateSchema(messages).safeParse({
+      ...createEventInput("time_grid", buildDateRange(1)),
+      isOnlineMeeting: true,
+      meetingLink: "meet.example.com/planning",
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]).toMatchObject({
+      path: ["meetingLink"],
+      message: "Use a full meeting link including http:// or https://.",
+    });
+  });
+
   it("allows long full-day availability payloads beyond the old 1000-slot cap", () => {
     const selectedSlotStarts = Array.from({ length: 1001 }, (_, index) =>
       new Date(Date.UTC(2026, 0, 1 + index)).toISOString(),

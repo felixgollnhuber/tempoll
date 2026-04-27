@@ -58,6 +58,12 @@ describe("CreateEventForm", () => {
     renderCreateEventForm("de");
 
     expect(screen.getByLabelText("Event-Titel")).toBeInTheDocument();
+    expect(screen.getByLabelText("Ort")).toHaveAttribute(
+      "placeholder",
+      "Büro, Café, Raumname...",
+    );
+    expect(screen.getByRole("radiogroup", { name: "Event-Format" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Online-Meeting" })).toBeInTheDocument();
     expect(screen.getByLabelText("Organizer-E-Mail-Benachrichtigungen")).toHaveAttribute(
       "placeholder",
       "name@beispiel.de",
@@ -352,6 +358,78 @@ describe("CreateEventForm", () => {
     };
 
     expect(payload.notificationEmail).toBe("owner@example.com");
+  });
+
+  it("submits optional location for in-person events", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        manageKey: "manage-key-123",
+      }),
+    });
+    global.fetch = fetchMock as typeof fetch;
+
+    renderCreateEventForm();
+
+    await user.type(screen.getByLabelText("Event title"), "Planning");
+    await user.type(screen.getByLabelText("Location"), "Office 3.2");
+    await user.click(screen.getByRole("button", { name: "Create event" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const payload = JSON.parse(String(requestInit.body)) as {
+      location?: string;
+      isOnlineMeeting?: boolean;
+    };
+
+    expect(payload).toMatchObject({
+      location: "Office 3.2",
+      isOnlineMeeting: false,
+    });
+  });
+
+  it("submits online meeting details without a location", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        manageKey: "manage-key-123",
+      }),
+    });
+    global.fetch = fetchMock as typeof fetch;
+
+    renderCreateEventForm();
+
+    await user.type(screen.getByLabelText("Event title"), "Hybrid planning");
+    await user.type(screen.getByLabelText("Location"), "Office 3.2");
+    await user.click(screen.getByRole("radio", { name: "Online meeting" }));
+    expect(screen.queryByLabelText("Location")).not.toBeInTheDocument();
+    await user.type(
+      screen.getByLabelText("Meeting link"),
+      "https://meet.example.com/hybrid-planning",
+    );
+    await user.click(screen.getByRole("button", { name: "Create event" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const payload = JSON.parse(String(requestInit.body)) as {
+      location?: string;
+      isOnlineMeeting?: boolean;
+      meetingLink?: string;
+    };
+
+    expect(payload).not.toHaveProperty("location");
+    expect(payload).toMatchObject({
+      isOnlineMeeting: true,
+      meetingLink: "https://meet.example.com/hybrid-planning",
+    });
   });
 
   it("shows an unavailable note instead of the email field when alerts are disabled", () => {

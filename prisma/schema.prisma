@@ -21,6 +21,9 @@ model Event {
   slug                   String             @unique
   title                  String
   type                   EventType          @default(TIME_GRID)
+  location               String?
+  isOnlineMeeting        Boolean            @default(false)
+  meetingLink            String?
   timezone               String
   slotMinutes            Int                @default(30)
   meetingDurationMinutes Int                @default(60)

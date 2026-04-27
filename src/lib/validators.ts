@@ -20,6 +20,23 @@ function createOptionalEmailSchema(messages: Messages) {
     .transform((value) => value || undefined);
 }
 
+function createOptionalTextSchema(maxLength: number, message: string) {
+  return z
+    .string()
+    .trim()
+    .max(maxLength, message)
+    .transform((value) => value || undefined);
+}
+
+function isHttpUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 export function createEventCreateSchema(messages: Messages) {
   return z
     .object({
@@ -29,6 +46,19 @@ export function createEventCreateSchema(messages: Messages) {
         .trim()
         .min(3, messages.validation.eventCreate.titleMin)
         .max(80, messages.validation.eventCreate.titleMax),
+      location: createOptionalTextSchema(
+        160,
+        messages.validation.eventCreate.locationMax,
+      ).optional(),
+      isOnlineMeeting: z.boolean().default(false),
+      meetingLink: createOptionalTextSchema(
+        2048,
+        messages.validation.eventCreate.meetingLinkMax,
+      )
+        .refine((value) => value === undefined || isHttpUrl(value), {
+          message: messages.validation.eventCreate.meetingLinkUrl,
+        })
+        .optional(),
       timezone: z.string().trim().min(1, messages.validation.eventCreate.timezoneRequired),
       dates: z
         .array(z.string().regex(dateKeyRegex, messages.validation.eventCreate.validCalendarDates))
@@ -85,6 +115,15 @@ export function createEventCreateSchema(messages: Messages) {
           message: messages.validation.eventCreate.durationMatchesSlot,
         });
       }
+    })
+    .transform((data) => {
+      const { location, meetingLink, ...baseData } = data;
+
+      return {
+        ...baseData,
+        ...(!data.isOnlineMeeting && location ? { location } : {}),
+        ...(data.isOnlineMeeting && meetingLink ? { meetingLink } : {}),
+      };
     });
 }
 

@@ -3,6 +3,9 @@ export type EventType = "time_grid" | "full_day";
 export type EventCreateInput = {
   eventType: EventType;
   title: string;
+  location?: string;
+  isOnlineMeeting: boolean;
+  meetingLink?: string;
   timezone: string;
   dates: string[];
   dayStartMinutes: number;
@@ -80,6 +83,9 @@ export type PublicEventSnapshot = {
   slug: string;
   title: string;
   eventType: EventType;
+  location: string | null;
+  isOnlineMeeting: boolean;
+  meetingLink: string | null;
   timezone: string;
   status: "OPEN" | "CLOSED";
   slotMinutes: number;

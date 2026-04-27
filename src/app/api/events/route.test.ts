@@ -22,6 +22,7 @@ describe("POST /api/events", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getClientIp.mockReturnValue("127.0.0.1");
+    enforceRateLimit.mockImplementation(() => undefined);
     createEvent.mockResolvedValue({
       slug: "sprint-planning",
       manageKey: "manage-key-123",
@@ -53,6 +54,7 @@ describe("POST /api/events", () => {
     expect(createEvent).toHaveBeenCalledWith({
       eventType: "time_grid",
       title: "Sprint Planning",
+      isOnlineMeeting: false,
       timezone: "Europe/Vienna",
       dates: ["2026-03-30"],
       dayStartMinutes: 540,
@@ -89,6 +91,7 @@ describe("POST /api/events", () => {
     expect(createEvent).toHaveBeenCalledWith({
       eventType: "full_day",
       title: "Offsite Days",
+      isOnlineMeeting: false,
       timezone: "Europe/Vienna",
       dates: ["2026-03-30", "2026-03-31"],
       dayStartMinutes: 540,
@@ -129,5 +132,44 @@ describe("POST /api/events", () => {
     await expect(response.json()).resolves.toEqual({
       error: "Too many event creation attempts. Please wait a few minutes and try again.",
     });
+  });
+
+  it("passes online meeting details through without a location", async () => {
+    const { POST } = await import("./route");
+    const response = await POST(
+      new Request("https://tempoll.example.com/api/events", {
+        method: "POST",
+        body: JSON.stringify({
+          title: "Hybrid Planning",
+          location: "Office 3.2",
+          isOnlineMeeting: true,
+          meetingLink: "https://meet.example.com/hybrid-planning",
+          timezone: "Europe/Vienna",
+          dates: ["2026-03-30"],
+          dayStartMinutes: 540,
+          dayEndMinutes: 600,
+          slotMinutes: 30,
+          meetingDurationMinutes: 60,
+        }),
+        headers: {
+          "Accept-Language": "en-US",
+          "Content-Type": "application/json",
+        },
+      }),
+    );
+
+    expect(createEvent).toHaveBeenCalledWith({
+      eventType: "time_grid",
+      title: "Hybrid Planning",
+      isOnlineMeeting: true,
+      meetingLink: "https://meet.example.com/hybrid-planning",
+      timezone: "Europe/Vienna",
+      dates: ["2026-03-30"],
+      dayStartMinutes: 540,
+      dayEndMinutes: 600,
+      slotMinutes: 30,
+      meetingDurationMinutes: 60,
+    });
+    expect(response.status).toBe(201);
   });
 });

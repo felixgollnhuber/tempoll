@@ -16,6 +16,9 @@ describe("GET /api/events/[slug]/ics", () => {
       snapshot: {
         slug: "team-sync",
         title: "Team Sync",
+        location: "Office 3.2",
+        isOnlineMeeting: true,
+        meetingLink: "https://meet.example.com/team-sync",
         eventType: "time_grid",
         timezone: "Europe/Vienna",
         status: "CLOSED",
@@ -52,6 +55,9 @@ describe("GET /api/events/[slug]/ics", () => {
     const body = await response.text();
     expect(body).toContain("BEGIN:VCALENDAR");
     expect(body).toContain("SUMMARY:Team Sync");
+    expect(body).toContain("LOCATION:Online meeting");
+    expect(body).not.toContain("Office 3.2");
+    expect(body).toContain("Meeting link: https://meet.example.com/team-sync");
     expect(body).toContain("DTSTART;TZID=Europe/Vienna:20260402T090000");
     expect(body).toContain("URL:http://localhost:3000/e/team-sync");
   });
