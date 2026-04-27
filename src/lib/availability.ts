@@ -344,7 +344,7 @@ export function formatMeetingWindowLabels({
   return {
     label: `${formatInTimeZone(start, timezone, locale === "de" ? "EEE, d. MMM · HH:mm" : "EEE, MMM d · HH:mm", {
       locale: getDateFnsLocale(locale),
-    })}–${formatInTimeZone(end, timezone, "HH:mm", {
+    })}-${formatInTimeZone(end, timezone, "HH:mm", {
       locale: getDateFnsLocale(locale),
     })}`,
     localLabel:
@@ -356,7 +356,7 @@ export function formatMeetingWindowLabels({
             {
               locale: getDateFnsLocale(locale),
             },
-          )}–${formatInTimeZone(end, viewerTimezone, "HH:mm", {
+          )}-${formatInTimeZone(end, viewerTimezone, "HH:mm", {
             locale: getDateFnsLocale(locale),
           })}`
         : null,

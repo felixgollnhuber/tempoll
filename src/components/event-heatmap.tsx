@@ -244,7 +244,7 @@ function getVisibleRangeLabel(dates: PublicEventSnapshot["dates"]) {
     return dates[0].label;
   }
 
-  return `${dates[0].label} – ${dates[dates.length - 1].label}`;
+  return `${dates[0].label} - ${dates[dates.length - 1].label}`;
 }
 
 function getSlotElementFromPoint(clientX: number, clientY: number) {
@@ -510,6 +510,14 @@ export function EventHeatmap({
   const canShowNextDates =
     usesDateWindowing &&
     clampedVisibleDateStartIndex + visibleDates.length < projectedBoard.dates.length;
+  const dayWindowPrompt =
+    canShowPreviousDates && canShowNextDates
+      ? messages.publicEvent.moreDaysAvailable
+      : canShowNextDates
+        ? messages.publicEvent.moreDaysAhead
+        : canShowPreviousDates
+          ? messages.publicEvent.earlierDaysAvailable
+          : messages.publicEvent.moreDaysAvailable;
   const visibleRangeLabel = useMemo(() => getVisibleRangeLabel(visibleDates), [visibleDates]);
   const viewerTimezoneOption = useMemo(
     () => findTimezoneOption(timezoneOptions, viewerTimezone),
@@ -1045,22 +1053,26 @@ export function EventHeatmap({
               </div>
 
               {usesDateWindowing ? (
-                <div className="flex items-center justify-between gap-3 rounded-md border bg-muted/20 p-2">
+                <div className="flex items-stretch gap-2 rounded-md border border-primary/30 bg-primary/10 p-2 shadow-sm">
                   <Button
                     type="button"
-                    variant="outline"
-                    size="icon-xs"
+                    variant={canShowPreviousDates ? "secondary" : "outline"}
+                    size="sm"
                     aria-label={messages.publicEvent.showPreviousDays}
                     disabled={!canShowPreviousDates}
+                    className="h-auto self-stretch px-3"
                     onClick={() => moveVisibleDateWindow(-1)}
                   >
                     <ChevronLeftIcon className="size-4" />
                   </Button>
                   <div className="min-w-0 flex-1 text-center">
-                    <p aria-live="polite" className="truncate text-xs font-medium text-foreground">
+                    <p className="text-[11px] font-semibold uppercase text-primary">
+                      {dayWindowPrompt}
+                    </p>
+                    <p aria-live="polite" className="mt-1 truncate text-sm font-semibold text-foreground">
                       {visibleRangeLabel}
                     </p>
-                    <p className="text-[11px] text-muted-foreground">
+                    <p className="text-xs text-muted-foreground">
                       {format(messages.publicEvent.dayWindowSummary, {
                         start: clampedVisibleDateStartIndex + 1,
                         end: clampedVisibleDateStartIndex + visibleDates.length,
@@ -1070,10 +1082,11 @@ export function EventHeatmap({
                   </div>
                   <Button
                     type="button"
-                    variant="outline"
-                    size="icon-xs"
+                    variant={canShowNextDates ? "default" : "outline"}
+                    size="sm"
                     aria-label={messages.publicEvent.showNextDays}
                     disabled={!canShowNextDates}
+                    className="h-auto self-stretch px-3"
                     onClick={() => moveVisibleDateWindow(1)}
                   >
                     <ChevronRightIcon className="size-4" />

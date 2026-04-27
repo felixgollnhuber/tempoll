@@ -95,6 +95,10 @@ export function PublicEventClient({
     lastSavedSignatureRef.current = getSelectedSlotStarts(nextSnapshot).join("|");
   }, []);
   const canEdit = Boolean(session && snapshot.status === "OPEN");
+  const shouldShowPreJoin = !session && snapshot.status === "OPEN";
+  const trimmedName = name.trim();
+  const canJoin =
+    snapshot.status === "OPEN" && trimmedName.length >= 2 && trimmedName.length <= 32;
   const hasAnyAvailability = snapshot.participants.some(
     (participant) => participant.selectedSlotCount > 0,
   );
@@ -257,6 +261,10 @@ export function PublicEventClient({
   }, [canEdit]);
 
   async function handleJoin() {
+    if (!canJoin) {
+      return;
+    }
+
     setJoining(true);
     setJoinError(null);
 
@@ -266,7 +274,7 @@ export function PublicEventClient({
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        displayName: name,
+        displayName: trimmedName,
       }),
     });
 
@@ -397,26 +405,54 @@ export function PublicEventClient({
 
   return (
     <div className="space-y-4">
-      {!session ? (
-        <Card>
-          <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-base">{messages.publicEvent.joinTitle}</CardTitle>
-            <CardDescription className="text-xs">
+      {shouldShowPreJoin ? (
+        <Card className="overflow-hidden">
+          <CardHeader className="border-b bg-muted/20 p-5">
+            <CardTitle role="heading" aria-level={1} className="text-2xl">
+              {snapshot.title}
+            </CardTitle>
+            <CardDescription className="text-sm">
               {messages.publicEvent.joinDescription}
             </CardDescription>
           </CardHeader>
-          <CardContent className="p-4 pt-0">
-            <div className="flex flex-col gap-3 md:flex-row md:items-end">
-              <div className="flex-1 space-y-2">
-                <Label htmlFor="displayName">{messages.publicEvent.yourNameLabel}</Label>
-                <Input
-                  id="displayName"
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder={messages.publicEvent.yourNamePlaceholder}
-                />
+          <CardContent className="space-y-5 p-5">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-md border bg-background p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <span className="flex size-7 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+                    1
+                  </span>
+                  <h2 className="text-sm font-semibold text-foreground">
+                    {messages.publicEvent.joinStepNameTitle}
+                  </h2>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="displayName">{messages.publicEvent.yourNameLabel}</Label>
+                  <Input
+                    id="displayName"
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    placeholder={messages.publicEvent.yourNamePlaceholder}
+                  />
+                </div>
               </div>
-              <Button onClick={handleJoin} disabled={joining || snapshot.status === "CLOSED"}>
+              <div className="rounded-md border border-dashed bg-muted/20 p-4 text-muted-foreground">
+                <div className="mb-3 flex items-center gap-2">
+                  <span className="flex size-7 items-center justify-center rounded-full border bg-background text-xs font-semibold">
+                    2
+                  </span>
+                  <h2 className="text-sm font-semibold text-foreground">
+                    {messages.publicEvent.joinStepAvailabilityTitle}
+                  </h2>
+                </div>
+                <p className="text-sm">{messages.publicEvent.joinStepAvailabilityDescription}</p>
+              </div>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-muted-foreground">
+                {messages.publicEvent.joinGateDescription}
+              </p>
+              <Button onClick={handleJoin} disabled={joining || !canJoin} className="sm:min-w-36">
                 {joining ? <Loader2Icon className="size-4 animate-spin" /> : null}
                 {messages.publicEvent.joinButton}
               </Button>
@@ -426,21 +462,23 @@ export function PublicEventClient({
         </Card>
       ) : null}
 
-      <EventHeatmap
-        snapshot={snapshot}
-        mode={mode}
-        onModeChange={setMode}
-        canEdit={canEdit}
-        selectedMap={selectedMap}
-        onUpdateCell={updateCell}
-        finalSlotStart={snapshot.finalizedSlot?.slotStart ?? null}
-        sessionBadgeLabel={session?.displayName ?? null}
-        sidebarTopContent={sidebarTopContent}
-        timezoneOptions={timezoneOptions}
-        viewerTimezone={viewerTimezone}
-        viewerTimezoneSelectValue={viewerTimezoneSelectValue}
-        onViewerTimezoneChange={setViewerTimezonePreference}
-      />
+      {shouldShowPreJoin ? null : (
+        <EventHeatmap
+          snapshot={snapshot}
+          mode={mode}
+          onModeChange={setMode}
+          canEdit={canEdit}
+          selectedMap={selectedMap}
+          onUpdateCell={updateCell}
+          finalSlotStart={snapshot.finalizedSlot?.slotStart ?? null}
+          sessionBadgeLabel={session?.displayName ?? null}
+          sidebarTopContent={sidebarTopContent}
+          timezoneOptions={timezoneOptions}
+          viewerTimezone={viewerTimezone}
+          viewerTimezoneSelectValue={viewerTimezoneSelectValue}
+          onViewerTimezoneChange={setViewerTimezonePreference}
+        />
+      )}
     </div>
   );
 }
