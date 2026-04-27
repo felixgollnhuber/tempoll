@@ -45,6 +45,7 @@ export const en = {
     setFixedDate: "Set fixed date",
     clearFixedDate: "Clear fixed date",
     fixedDateSelected: "Fixed date selected",
+    fixedDaySelected: "Fixed day selected",
     option: "Option {count}",
     and: "and",
     yes: "Yes",
@@ -373,6 +374,12 @@ export const en = {
       "This will publish this slot as the new fixed date immediately.",
     fixedDateActionSelectedDescription:
       "This slot is already published as the fixed date.",
+    fixedDayActionCloseDescription:
+      "This will publish the fixed day immediately and stop further edits.",
+    fixedDayActionUpdateDescription:
+      "This will publish this day as the new fixed day immediately.",
+    fixedDayActionSelectedDescription:
+      "This day is already published as the fixed day.",
     reopenEvent: "Reopen event",
     reopenEventConfirmTitle: "Reopen this event?",
     reopenEventConfirmDescription:
@@ -681,6 +688,7 @@ export const en = {
       validCalendarDates: "Choose valid calendar dates.",
       chooseStartAndEndDate: "Choose a start and end date.",
       dateRangeMax: "Time-slot events can include up to 31 days.",
+      fullDayDateRangeMax: "Full-day events can include up to 366 days.",
       validDailyStart: "Choose a valid daily start time.",
       validDailyEnd: "Choose a valid daily end time.",
       supportedSlotSize: "Select a supported slot size.",
@@ -760,6 +768,7 @@ export const de: Messages = {
     setFixedDate: "Fixen Termin setzen",
     clearFixedDate: "Fixen Termin entfernen",
     fixedDateSelected: "Fixer Termin ausgewählt",
+    fixedDaySelected: "Fixer Tag ausgewählt",
     option: "Option {count}",
     and: "und",
     yes: "Ja",
@@ -1100,6 +1109,12 @@ export const de: Messages = {
       "Dadurch wird dieser Slot sofort als neuer fixer Termin veröffentlicht.",
     fixedDateActionSelectedDescription:
       "Dieser Slot ist bereits als fixer Termin veröffentlicht.",
+    fixedDayActionCloseDescription:
+      "Dadurch wird der fixe Tag sofort veröffentlicht und weitere Änderungen werden gestoppt.",
+    fixedDayActionUpdateDescription:
+      "Dadurch wird dieser Tag sofort als neuer fixer Tag veröffentlicht.",
+    fixedDayActionSelectedDescription:
+      "Dieser Tag ist bereits als fixer Tag veröffentlicht.",
     reopenEvent: "Event wieder öffnen",
     reopenEventConfirmTitle: "Dieses Event wieder öffnen?",
     reopenEventConfirmDescription:
@@ -1428,6 +1443,7 @@ export const de: Messages = {
       validCalendarDates: "Bitte wähle gültige Kalenderdaten.",
       chooseStartAndEndDate: "Bitte wähle ein Start- und Enddatum.",
       dateRangeMax: "Events mit Zeit-Slots können höchstens 31 Tage enthalten.",
+      fullDayDateRangeMax: "Ganztägige Events können höchstens 366 Tage enthalten.",
       validDailyStart: "Bitte wähle eine gültige Startzeit.",
       validDailyEnd: "Bitte wähle eine gültige Endzeit.",
       supportedSlotSize: "Bitte wähle eine unterstützte Slot-Größe.",

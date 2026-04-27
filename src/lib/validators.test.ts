@@ -49,6 +49,18 @@ describe("validators", () => {
     expect(result.success).toBe(true);
   });
 
+  it("rejects full-day events with extremely long date ranges", () => {
+    const result = createEventCreateSchema(messages).safeParse(
+      createEventInput("full_day", buildDateRange(367)),
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]).toMatchObject({
+      path: ["dates"],
+      message: "Full-day events can include up to 366 days.",
+    });
+  });
+
   it("allows long full-day availability payloads beyond the old 1000-slot cap", () => {
     const selectedSlotStarts = Array.from({ length: 1001 }, (_, index) =>
       new Date(Date.UTC(2026, 0, 1 + index)).toISOString(),

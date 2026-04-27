@@ -484,7 +484,7 @@ export function ManageEventClient({
         {savedFinalSlot ? (
           <div className="rounded-md border bg-muted/20 px-3 py-2">
             <p className="text-[11px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
-              {messages.common.fixedDate}
+              {isFullDayEvent ? messages.common.fixedDay : messages.common.fixedDate}
             </p>
             <p className="mt-1 text-sm font-semibold text-foreground">{savedFinalSlotDisplayLabel}</p>
             <p className="mt-1 text-[11px] text-muted-foreground">

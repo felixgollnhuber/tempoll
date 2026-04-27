@@ -947,10 +947,10 @@ export function FullDayAvailability({
                             </p>
                             <p className="text-xs text-muted-foreground">
                               {displayStatus === "OPEN"
-                                ? messages.manageEvent.fixedDateActionCloseDescription
+                                ? messages.manageEvent.fixedDayActionCloseDescription
                                 : activeSlotDetails.isFinalSlotStart
-                                  ? messages.manageEvent.fixedDateActionSelectedDescription
-                                  : messages.manageEvent.fixedDateActionUpdateDescription}
+                                  ? messages.manageEvent.fixedDayActionSelectedDescription
+                                  : messages.manageEvent.fixedDayActionUpdateDescription}
                             </p>
                           </div>
                           <Button
@@ -966,7 +966,7 @@ export function FullDayAvailability({
                             {displayStatus === "OPEN"
                               ? messages.manageEvent.setFixedDayAndCloseEvent
                               : activeSlotDetails.isFinalSlotStart
-                                ? messages.common.fixedDateSelected
+                                ? messages.common.fixedDaySelected
                                 : messages.manageEvent.updateFixedDay}
                           </Button>
                         </div>

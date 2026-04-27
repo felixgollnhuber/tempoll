@@ -6,6 +6,8 @@ import type { Messages } from "@/lib/i18n/messages";
 const dateKeyRegex = /^\d{4}-\d{2}-\d{2}$/;
 const slotMinuteSet = new Set<number>(slotMinuteOptions);
 const meetingDurationSet = new Set<number>(meetingDurationOptions);
+const fullDayDateLimit = 366;
+const availabilitySelectionLimit = 3000;
 
 function createOptionalEmailSchema(messages: Messages) {
   return z
@@ -60,6 +62,14 @@ export function createEventCreateSchema(messages: Messages) {
         });
       }
 
+      if (data.eventType === "full_day" && data.dates.length > fullDayDateLimit) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["dates"],
+          message: messages.validation.eventCreate.fullDayDateRangeMax,
+        });
+      }
+
       if (data.dayEndMinutes <= data.dayStartMinutes) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -90,7 +100,7 @@ export function createParticipantCreateSchema(messages: Messages) {
 
 export function createAvailabilityMutationSchema() {
   return z.object({
-    selectedSlotStarts: z.array(z.string().datetime()).max(10_000),
+    selectedSlotStarts: z.array(z.string().datetime()).max(availabilitySelectionLimit),
   });
 }
 

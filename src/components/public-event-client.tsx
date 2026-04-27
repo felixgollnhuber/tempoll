@@ -360,7 +360,9 @@ export function PublicEventClient({
     snapshot.status === "CLOSED" && snapshot.finalizedSlot ? (
       <Card>
         <CardHeader className="p-4 pb-2">
-          <CardTitle className="text-sm">{messages.common.fixedDate}</CardTitle>
+          <CardTitle className="text-sm">
+            {isFullDayEvent ? messages.common.fixedDay : messages.common.fixedDate}
+          </CardTitle>
           <CardDescription className="text-xs">
             {isFullDayEvent
               ? messages.publicEvent.fixedDayDescription
