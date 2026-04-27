@@ -58,7 +58,7 @@ describe("CreateEventForm", () => {
     renderCreateEventForm("de");
 
     expect(screen.getByLabelText("Event-Titel")).toBeInTheDocument();
-    expect(screen.getByText("Verfügbare Wochentage")).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Verfügbare Wochentage" })).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "Montag" })).toBeChecked();
     expect(screen.getByRole("checkbox", { name: "Samstag" })).not.toBeChecked();
     expect(screen.getByRole("button", { name: "Event erstellen" })).toBeInTheDocument();
@@ -210,7 +210,6 @@ describe("CreateEventForm", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-04-02T10:00:00.000Z"));
 
-    const user = userEvent.setup();
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -221,6 +220,7 @@ describe("CreateEventForm", () => {
 
     renderCreateEventForm();
     vi.useRealTimers();
+    const user = userEvent.setup();
 
     await user.type(screen.getByLabelText("Event title"), "Sprint planning");
     await user.click(screen.getByRole("checkbox", { name: "Friday" }));
@@ -243,12 +243,12 @@ describe("CreateEventForm", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-04-02T10:00:00.000Z"));
 
-    const user = userEvent.setup();
     const fetchMock = vi.fn();
     global.fetch = fetchMock as typeof fetch;
 
     renderCreateEventForm();
     vi.useRealTimers();
+    const user = userEvent.setup();
 
     await user.type(screen.getByLabelText("Event title"), "Sprint planning");
     await user.click(screen.getByRole("checkbox", { name: "Friday" }));
@@ -257,6 +257,14 @@ describe("CreateEventForm", () => {
     expect(
       screen.getByText("Select at least one available weekday inside the date range."),
     ).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Available weekdays" })).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+    expect(screen.getByRole("group", { name: "Available weekdays" })).toHaveAttribute(
+      "aria-describedby",
+      "weekday-filter-description weekday-filter-error",
+    );
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

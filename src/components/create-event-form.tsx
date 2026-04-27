@@ -593,18 +593,25 @@ export function CreateEventForm({
                 ) : null}
               </div>
 
-              <div
+              <fieldset
                 id={eventFieldIds.weekdays}
                 tabIndex={-1}
+                aria-describedby={
+                  fieldErrors.weekdays
+                    ? "weekday-filter-description weekday-filter-error"
+                    : "weekday-filter-description"
+                }
+                aria-invalid={fieldErrors.weekdays ? true : undefined}
                 className="space-y-2 rounded-md focus:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 md:col-span-2"
               >
+                <legend className="sr-only">{messages.createEvent.weekdays.label}</legend>
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <Label>{messages.createEvent.weekdays.label}</Label>
+                  <span className="text-sm font-medium">{messages.createEvent.weekdays.label}</span>
                   <Badge variant="secondary" className="rounded-full px-2.5">
                     {plural(messages.createEvent.range.days, selectedFilteredRangeDays)}
                   </Badge>
                 </div>
-                <p className="text-sm text-muted-foreground">
+                <p id="weekday-filter-description" className="text-sm text-muted-foreground">
                   {messages.createEvent.weekdays.description}
                 </p>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
@@ -640,11 +647,11 @@ export function CreateEventForm({
                   })}
                 </div>
                 {fieldErrors.weekdays ? (
-                  <p className="text-sm text-destructive">
+                  <p id="weekday-filter-error" className="text-sm text-destructive">
                     {fieldErrors.weekdays}
                   </p>
                 ) : null}
-              </div>
+              </fieldset>
             </div>
 
             <Separator />
