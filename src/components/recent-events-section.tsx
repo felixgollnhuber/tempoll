@@ -14,6 +14,7 @@ import {
   readRecentEvents,
   removeRecentEvent,
   subscribeRecentEvents,
+  type RecentEventEntry,
 } from "@/lib/recent-events";
 import { useI18n } from "@/lib/i18n/context";
 
@@ -29,10 +30,10 @@ function formatTimestamp(value: string, locale: string) {
 }
 
 type RecentEventsSectionProps = {
-  devModeEnabled?: boolean;
+  devSeedEntries?: RecentEventEntry[];
 };
 
-export function RecentEventsSection({ devModeEnabled = false }: RecentEventsSectionProps) {
+export function RecentEventsSection({ devSeedEntries = [] }: RecentEventsSectionProps) {
   const { messages, intlLocale, format } = useI18n();
   const storedEntries = useSyncExternalStore(
     subscribeRecentEvents,
@@ -40,8 +41,8 @@ export function RecentEventsSection({ devModeEnabled = false }: RecentEventsSect
     getRecentEventsServerSnapshot,
   );
   const entries = useMemo(
-    () => mergeDevSeedRecentEvents(storedEntries, devModeEnabled),
-    [devModeEnabled, storedEntries],
+    () => mergeDevSeedRecentEvents(storedEntries, devSeedEntries),
+    [devSeedEntries, storedEntries],
   );
 
   return (

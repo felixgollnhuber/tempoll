@@ -2,7 +2,38 @@ import { screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { RecentEventsSection } from "./recent-events-section";
+import type { RecentEventEntry } from "@/lib/recent-events";
 import { renderWithI18n } from "@/test/render-with-i18n";
+
+const devSeedEntries: RecentEventEntry[] = [
+  {
+    slug: "dev-team-sync",
+    title: "Dev Team Sync",
+    lastViewedAt: "2026-04-27T12:00:00.000Z",
+    publicUrl: "/e/dev-team-sync",
+    manageUrl: "/manage/dev_team_sync.manage-dev-team-sync",
+    lastViewedPublicAt: "2026-04-27T12:00:00.000Z",
+    lastViewedManageAt: "2026-04-27T12:00:00.000Z",
+  },
+  {
+    slug: "dev-product-planning",
+    title: "Product Planning",
+    lastViewedAt: "2026-04-27T11:59:00.000Z",
+    publicUrl: "/e/dev-product-planning",
+    manageUrl: "/manage/dev_product_planning.manage-dev-product-planning",
+    lastViewedPublicAt: "2026-04-27T11:59:00.000Z",
+    lastViewedManageAt: "2026-04-27T11:59:00.000Z",
+  },
+  {
+    slug: "dev-closed-review",
+    title: "Closed Design Review",
+    lastViewedAt: "2026-04-27T11:58:00.000Z",
+    publicUrl: "/e/dev-closed-review",
+    manageUrl: "/manage/dev_closed_review.manage-dev-closed-review",
+    lastViewedPublicAt: "2026-04-27T11:58:00.000Z",
+    lastViewedManageAt: "2026-04-27T11:58:00.000Z",
+  },
+];
 
 describe("RecentEventsSection", () => {
   beforeEach(() => {
@@ -36,7 +67,7 @@ describe("RecentEventsSection", () => {
   });
 
   it("shows seeded dev events when dev mode is enabled", () => {
-    renderWithI18n(<RecentEventsSection devModeEnabled />);
+    renderWithI18n(<RecentEventsSection devSeedEntries={devSeedEntries} />);
 
     expect(screen.getByText("Dev Team Sync")).toBeInTheDocument();
     expect(screen.getByText("Product Planning")).toBeInTheDocument();
@@ -63,7 +94,7 @@ describe("RecentEventsSection", () => {
       ]),
     );
 
-    renderWithI18n(<RecentEventsSection devModeEnabled />);
+    renderWithI18n(<RecentEventsSection devSeedEntries={devSeedEntries} />);
 
     expect(screen.getByText("Real event")).toBeInTheDocument();
     expect(screen.getAllByText("Dev seed")).toHaveLength(3);

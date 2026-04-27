@@ -25,35 +25,6 @@ const STORAGE_KEY = "tempoll_recent_events";
 const MAX_RECENT_EVENTS = 20;
 const RECENT_EVENTS_UPDATED_EVENT = "tempoll:recent-events-updated";
 const EMPTY_RECENT_EVENTS: RecentEventEntry[] = [];
-const DEV_SEED_RECENT_EVENTS: RecentEventEntry[] = [
-  {
-    slug: "dev-team-sync",
-    title: "Dev Team Sync",
-    lastViewedAt: "2026-04-27T12:00:00.000Z",
-    publicUrl: "/e/dev-team-sync",
-    manageUrl: "/manage/dev_team_sync.manage-dev-team-sync",
-    lastViewedPublicAt: "2026-04-27T12:00:00.000Z",
-    lastViewedManageAt: "2026-04-27T12:00:00.000Z",
-  },
-  {
-    slug: "dev-product-planning",
-    title: "Product Planning",
-    lastViewedAt: "2026-04-27T11:59:00.000Z",
-    publicUrl: "/e/dev-product-planning",
-    manageUrl: "/manage/dev_product_planning.manage-dev-product-planning",
-    lastViewedPublicAt: "2026-04-27T11:59:00.000Z",
-    lastViewedManageAt: "2026-04-27T11:59:00.000Z",
-  },
-  {
-    slug: "dev-closed-review",
-    title: "Closed Design Review",
-    lastViewedAt: "2026-04-27T11:58:00.000Z",
-    publicUrl: "/e/dev-closed-review",
-    manageUrl: "/manage/dev_closed_review.manage-dev-closed-review",
-    lastViewedPublicAt: "2026-04-27T11:58:00.000Z",
-    lastViewedManageAt: "2026-04-27T11:58:00.000Z",
-  },
-];
 
 let cachedRawRecentEvents: string | null | undefined;
 let cachedRecentEvents: RecentEventEntry[] = EMPTY_RECENT_EVENTS;
@@ -96,21 +67,29 @@ export function mergeRecentEvents(
 
 export function mergeDevSeedRecentEvents(
   userEntries: RecentEventEntry[],
-  devModeEnabled: boolean,
+  devSeedEntries: RecentEventEntry[],
 ): DisplayRecentEventEntry[] {
-  const devSeedSlugs = new Set(DEV_SEED_RECENT_EVENTS.map((entry) => entry.slug));
-  const userDisplayEntries = userEntries.map((entry) => ({
-    ...entry,
-    devSeed: devModeEnabled && devSeedSlugs.has(entry.slug),
-    devOnly: false,
-  }));
+  const devSeedBySlug = new Map(devSeedEntries.map((entry) => [entry.slug, entry]));
+  const userDisplayEntries = sortRecentEvents(userEntries).map((entry) => {
+    const seedEntry = devSeedBySlug.get(entry.slug);
 
-  if (!devModeEnabled) {
+    return {
+      ...entry,
+      publicUrl: entry.publicUrl ?? seedEntry?.publicUrl,
+      manageUrl: entry.manageUrl ?? seedEntry?.manageUrl,
+      lastViewedPublicAt: entry.lastViewedPublicAt ?? seedEntry?.lastViewedPublicAt,
+      lastViewedManageAt: entry.lastViewedManageAt ?? seedEntry?.lastViewedManageAt,
+      devSeed: Boolean(seedEntry),
+      devOnly: false,
+    };
+  });
+
+  if (devSeedEntries.length === 0) {
     return userDisplayEntries;
   }
 
   const userSlugs = new Set(userEntries.map((entry) => entry.slug));
-  const devOnlyEntries = DEV_SEED_RECENT_EVENTS.filter((entry) => !userSlugs.has(entry.slug)).map(
+  const devOnlyEntries = sortRecentEvents(devSeedEntries.filter((entry) => !userSlugs.has(entry.slug))).map(
     (entry) => ({
       ...entry,
       devSeed: true,
@@ -118,11 +97,7 @@ export function mergeDevSeedRecentEvents(
     }),
   );
 
-  return sortRecentEvents([...userDisplayEntries, ...devOnlyEntries]).map((entry) => ({
-    ...entry,
-    devSeed: devSeedSlugs.has(entry.slug),
-    devOnly: devOnlyEntries.some((devEntry) => devEntry.slug === entry.slug),
-  }));
+  return [...userDisplayEntries, ...devOnlyEntries];
 }
 
 export function readRecentEvents() {
