@@ -5,6 +5,7 @@ import type { DateRange } from "react-day-picker";
 import {
   CalendarRangeIcon,
   ChevronDownIcon,
+  CheckIcon,
   Loader2Icon,
   SparklesIcon,
 } from "lucide-react";
@@ -50,6 +51,7 @@ const eventFieldOrder = [
   "notificationEmail",
   "timezone",
   "dates",
+  "weekdays",
   "dayStartMinutes",
   "dayEndMinutes",
   "slotMinutes",
@@ -64,6 +66,7 @@ const eventFieldIds: Record<EventField, string> = {
   notificationEmail: "notification-email",
   timezone: "timezone-trigger",
   dates: "date-range-trigger",
+  weekdays: "weekday-filter",
   dayStartMinutes: "day-start-trigger",
   dayEndMinutes: "day-end-trigger",
   slotMinutes: "slot-size-trigger",
@@ -71,6 +74,28 @@ const eventFieldIds: Record<EventField, string> = {
 };
 
 const eventFieldSet = new Set<EventField>(eventFieldOrder);
+
+const weekdayOptions = [
+  { value: 1, messageKey: "monday", defaultSelected: true },
+  { value: 2, messageKey: "tuesday", defaultSelected: true },
+  { value: 3, messageKey: "wednesday", defaultSelected: true },
+  { value: 4, messageKey: "thursday", defaultSelected: true },
+  { value: 5, messageKey: "friday", defaultSelected: true },
+  { value: 6, messageKey: "saturday", defaultSelected: false },
+  { value: 0, messageKey: "sunday", defaultSelected: false },
+] as const;
+
+const defaultSelectedWeekdays = weekdayOptions
+  .filter((weekday) => weekday.defaultSelected)
+  .map((weekday) => weekday.value);
+
+function sortWeekdays(values: number[]) {
+  return [...values].sort(
+    (left, right) =>
+      weekdayOptions.findIndex((weekday) => weekday.value === left) -
+      weekdayOptions.findIndex((weekday) => weekday.value === right),
+  );
+}
 
 function getRangeLabel(
   range: DateRange | undefined,
@@ -101,6 +126,34 @@ function getRangeDays(range: DateRange | undefined) {
     start: range.from,
     end: range.to,
   }).length;
+}
+
+function getFilteredRangeDays(range: DateRange | undefined, selectedWeekdays: number[]) {
+  if (!range?.from || !range?.to) {
+    return 0;
+  }
+
+  const selectedWeekdaySet = new Set(selectedWeekdays);
+
+  return eachDayOfInterval({
+    start: range.from,
+    end: range.to,
+  }).filter((date) => selectedWeekdaySet.has(date.getDay())).length;
+}
+
+function expandRangeToDateKeys(range: DateRange, selectedWeekdays: number[]) {
+  if (!range.from || !range.to) {
+    return [];
+  }
+
+  const selectedWeekdaySet = new Set(selectedWeekdays);
+
+  return eachDayOfInterval({
+    start: range.from,
+    end: range.to,
+  })
+    .filter((date) => selectedWeekdaySet.has(date.getDay()))
+    .map((date) => format(date, "yyyy-MM-dd"));
 }
 
 export function CreateEventForm({
@@ -148,14 +201,9 @@ export function CreateEventForm({
   const [dayEndMinutes, setDayEndMinutes] = useState(
     defaultCreateEventDefaults.dayEndMinutes,
   );
-
-  const selectedDates =
-    dateRange?.from && dateRange?.to
-      ? eachDayOfInterval({
-          start: dateRange.from,
-          end: dateRange.to,
-        }).map((date) => format(date, "yyyy-MM-dd"))
-      : [];
+  const [selectedWeekdays, setSelectedWeekdays] = useState<number[]>(
+    defaultSelectedWeekdays,
+  );
 
   const compactDateLabel = locale === "de" ? "d. MMM yyyy" : "MMM d, yyyy";
   const selectedRangeLabel = getRangeLabel(dateRange, compactDateLabel, messages, dateFnsLocale);
@@ -167,6 +215,7 @@ export function CreateEventForm({
   );
   const selectedRangeDays = getRangeDays(dateRange);
   const draftRangeDays = getRangeDays(draftDateRange);
+  const selectedFilteredRangeDays = getFilteredRangeDays(dateRange, selectedWeekdays);
   const timezoneOptions = useMemo(
     () =>
       buildTimezoneOptions(
@@ -255,6 +304,17 @@ export function CreateEventForm({
     setIsRangePickerOpen(false);
   }
 
+  function toggleWeekday(value: number) {
+    setSelectedWeekdays((current) => {
+      if (current.includes(value)) {
+        return current.filter((weekday) => weekday !== value);
+      }
+
+      return sortWeekdays([...current, value]);
+    });
+    clearErrors("weekdays", "dates");
+  }
+
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setErrorMessage(null);
@@ -264,6 +324,16 @@ export function CreateEventForm({
         dates: messages.validation.eventCreate.dateRangeRequired,
       });
       focusField("dates");
+      return;
+    }
+
+    const selectedDates = expandRangeToDateKeys(dateRange, selectedWeekdays);
+
+    if (selectedDates.length === 0) {
+      setFieldErrors({
+        weekdays: messages.validation.eventCreate.weekdayRequired,
+      });
+      focusField("weekdays");
       return;
     }
 
@@ -522,6 +592,66 @@ export function CreateEventForm({
                   </p>
                 ) : null}
               </div>
+
+              <fieldset
+                id={eventFieldIds.weekdays}
+                tabIndex={-1}
+                aria-describedby={
+                  fieldErrors.weekdays
+                    ? "weekday-filter-description weekday-filter-error"
+                    : "weekday-filter-description"
+                }
+                aria-invalid={fieldErrors.weekdays ? true : undefined}
+                className="space-y-2 rounded-md focus:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 md:col-span-2"
+              >
+                <legend className="sr-only">{messages.createEvent.weekdays.label}</legend>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-sm font-medium">{messages.createEvent.weekdays.label}</span>
+                  <Badge variant="secondary" className="rounded-full px-2.5">
+                    {plural(messages.createEvent.range.days, selectedFilteredRangeDays)}
+                  </Badge>
+                </div>
+                <p id="weekday-filter-description" className="text-sm text-muted-foreground">
+                  {messages.createEvent.weekdays.description}
+                </p>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+                  {weekdayOptions.map((weekday) => {
+                    const isSelected = selectedWeekdays.includes(weekday.value);
+                    const weekdayMessage =
+                      messages.createEvent.weekdays.options[weekday.messageKey];
+
+                    return (
+                      <label
+                        key={weekday.value}
+                        className={cn(
+                          "flex min-h-12 cursor-pointer items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm transition-colors",
+                          isSelected
+                            ? "border-primary bg-primary/10 text-foreground"
+                            : "border-border bg-background text-muted-foreground hover:bg-muted/50",
+                        )}
+                      >
+                        <input
+                          type="checkbox"
+                          className="sr-only"
+                          aria-label={weekdayMessage.label}
+                          checked={isSelected}
+                          onChange={() => toggleWeekday(weekday.value)}
+                        />
+                        <span className="min-w-0" aria-hidden="true">
+                          <span className="block font-medium">{weekdayMessage.shortLabel}</span>
+                          <span className="block truncate text-xs">{weekdayMessage.label}</span>
+                        </span>
+                        {isSelected ? <CheckIcon className="size-4 shrink-0" aria-hidden="true" /> : null}
+                      </label>
+                    );
+                  })}
+                </div>
+                {fieldErrors.weekdays ? (
+                  <p id="weekday-filter-error" className="text-sm text-destructive">
+                    {fieldErrors.weekdays}
+                  </p>
+                ) : null}
+              </fieldset>
             </div>
 
             <Separator />
@@ -709,7 +839,7 @@ export function CreateEventForm({
               </div>
               <div className="flex items-center justify-between gap-4">
                 <dt className="text-muted-foreground">{messages.createEvent.previewFields.daysShown}</dt>
-                <dd className="font-medium">{selectedRangeDays}</dd>
+                <dd className="font-medium">{selectedFilteredRangeDays}</dd>
               </div>
               <div className="flex items-center justify-between gap-4">
                 <dt className="text-muted-foreground">{messages.createEvent.previewFields.dailyWindow}</dt>
