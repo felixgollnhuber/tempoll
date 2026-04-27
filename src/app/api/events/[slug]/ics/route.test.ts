@@ -16,6 +16,7 @@ describe("GET /api/events/[slug]/ics", () => {
       snapshot: {
         slug: "team-sync",
         title: "Team Sync",
+        eventType: "time_grid",
         timezone: "Europe/Vienna",
         status: "CLOSED",
         finalizedSlot: {
@@ -55,11 +56,52 @@ describe("GET /api/events/[slug]/ics", () => {
     expect(body).toContain("URL:http://localhost:3000/e/team-sync");
   });
 
+  it("returns an all-day calendar file for closed full-day events", async () => {
+    getPublicEventSnapshot.mockResolvedValue({
+      snapshot: {
+        slug: "offsite-days",
+        title: "Offsite Days",
+        eventType: "full_day",
+        timezone: "Europe/Vienna",
+        status: "CLOSED",
+        finalizedSlot: {
+          slotStart: "2026-04-01T22:00:00.000Z",
+          slotEnd: "2026-04-02T22:00:00.000Z",
+          dateKey: "2026-04-02",
+          label: "Thu, Apr 2",
+          localLabel: null,
+          availableCount: 2,
+          participantIds: ["p1", "p2"],
+        },
+      },
+    });
+
+    const { GET } = await import("./route");
+    const response = await GET(
+      new Request("https://tempoll.example.com/api/events/offsite-days/ics", {
+        headers: {
+          "Accept-Language": "en-US",
+        },
+      }),
+      {
+        params: Promise.resolve({
+          slug: "offsite-days",
+        }),
+      },
+    );
+
+    const body = await response.text();
+    expect(body).toContain("DTSTART;VALUE=DATE:20260402");
+    expect(body).toContain("DTEND;VALUE=DATE:20260403");
+    expect(body).not.toContain("DTSTART;TZID=");
+  });
+
   it("returns 404 when no fixed date exists", async () => {
     getPublicEventSnapshot.mockResolvedValue({
       snapshot: {
         slug: "team-sync",
         title: "Team Sync",
+        eventType: "time_grid",
         timezone: "Europe/Vienna",
         status: "OPEN",
         finalizedSlot: null,

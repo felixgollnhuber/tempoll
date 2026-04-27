@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
 import { toast } from "sonner";
 
 import { EventHeatmap } from "@/components/event-heatmap";
+import { FullDayAvailability } from "@/components/full-day-availability";
 import { CopyButton } from "@/components/copy-button";
 import {
   AlertDialog,
@@ -74,6 +75,7 @@ export function ManageEventClient({
   const hasAnyAvailability = snapshot.participants.some(
     (participant) => participant.selectedSlotCount > 0,
   );
+  const isFullDayEvent = snapshot.eventType === "full_day";
   const activeParticipantId = useMemo(
     () =>
       snapshot.participants.some((participant) => participant.id === requestedActiveParticipantId)
@@ -104,25 +106,32 @@ export function ManageEventClient({
       return null;
     }
 
+    if (snapshot.eventType === "full_day") {
+      return savedFinalSlot.label;
+    }
+
     return formatMeetingWindowLabels({
       slotStart: savedFinalSlot.slotStart,
       slotEnd: savedFinalSlot.slotEnd,
       locale,
       timezone: viewerTimezone,
     }).label;
-  }, [locale, savedFinalSlot, viewerTimezone]);
+  }, [locale, savedFinalSlot, snapshot.eventType, viewerTimezone]);
   const visibleSuggestionsWithDisplayLabels = useMemo(
     () =>
       visibleSuggestions.map((suggestion) => ({
         ...suggestion,
-        displayLabel: formatMeetingWindowLabels({
-          slotStart: suggestion.slotStart,
-          slotEnd: suggestion.slotEnd,
-          locale,
-          timezone: viewerTimezone,
-        }).label,
+        displayLabel:
+          snapshot.eventType === "full_day"
+            ? suggestion.label
+            : formatMeetingWindowLabels({
+                slotStart: suggestion.slotStart,
+                slotEnd: suggestion.slotEnd,
+                locale,
+                timezone: viewerTimezone,
+              }).label,
       })),
-    [locale, viewerTimezone, visibleSuggestions],
+    [locale, snapshot.eventType, viewerTimezone, visibleSuggestions],
   );
   const notificationTimestampFormatter = useMemo(
     () =>
@@ -409,11 +418,17 @@ export function ManageEventClient({
   const bestWindowsCard = hasAnyAvailability && visibleSuggestionsWithDisplayLabels.length > 0 ? (
     <Card>
       <CardHeader className="p-4 pb-2">
-        <CardTitle className="text-sm">{messages.manageEvent.bestWindowsTitle}</CardTitle>
+        <CardTitle className="text-sm">
+          {isFullDayEvent
+            ? messages.manageEvent.bestDaysTitle
+            : messages.manageEvent.bestWindowsTitle}
+        </CardTitle>
         <CardDescription className="text-xs">
-          {format(messages.publicEvent.bestWindowsDescription, {
-            duration: snapshot.meetingDurationMinutes,
-          })}
+          {isFullDayEvent
+            ? messages.publicEvent.bestDaysDescription
+            : format(messages.publicEvent.bestWindowsDescription, {
+                duration: snapshot.meetingDurationMinutes,
+              })}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-2 p-4 pt-0">
@@ -424,7 +439,12 @@ export function ManageEventClient({
             </p>
             <p className="mt-1 text-sm font-semibold text-foreground">{suggestion.displayLabel}</p>
             <p className="mt-1 text-[11px] text-muted-foreground">
-              {plural(messages.manageEvent.peopleAvailable, suggestion.availableCount)}
+              {plural(
+                isFullDayEvent
+                  ? messages.publicEvent.fullDayFree
+                  : messages.manageEvent.peopleAvailable,
+                suggestion.availableCount,
+              )}
             </p>
           </div>
         ))}
@@ -455,7 +475,9 @@ export function ManageEventClient({
           <p className="text-sm text-muted-foreground">
             {snapshot.status === "CLOSED"
               ? messages.manageEvent.statusClosedDescription
-              : messages.manageEvent.statusOpenDescription}
+              : isFullDayEvent
+                ? messages.manageEvent.statusOpenFullDayDescription
+                : messages.manageEvent.statusOpenDescription}
           </p>
         </div>
 
@@ -466,7 +488,12 @@ export function ManageEventClient({
             </p>
             <p className="mt-1 text-sm font-semibold text-foreground">{savedFinalSlotDisplayLabel}</p>
             <p className="mt-1 text-[11px] text-muted-foreground">
-              {plural(messages.publicEvent.fullWindowFree, savedFinalSlot.availableCount)}
+              {plural(
+                isFullDayEvent
+                  ? messages.publicEvent.fullDayFree
+                  : messages.publicEvent.fullWindowFree,
+                savedFinalSlot.availableCount,
+              )}
             </p>
           </div>
         ) : null}
@@ -555,7 +582,9 @@ export function ManageEventClient({
                       <p className="text-sm font-medium text-foreground">{participant.displayName}</p>
                       <p className="text-[11px] text-muted-foreground">
                         {plural(
-                          messages.publicEvent.participantSelectedSlots,
+                          isFullDayEvent
+                            ? messages.publicEvent.participantSelectedDays
+                            : messages.publicEvent.participantSelectedSlots,
                           participant.selectedSlotCount,
                         )}
                       </p>
@@ -725,37 +754,61 @@ export function ManageEventClient({
         </aside>
 
         <div className="order-2 min-w-0 xl:order-1">
-          <EventHeatmap
-            snapshot={snapshot}
-            mode="view"
-            canEdit={false}
-            showModeToggle={false}
-            showSidebar={false}
-            displayStatus={snapshot.status}
-            finalSlotStart={savedFinalSlot?.slotStart ?? null}
-            showStatusBadge={false}
-            showTitleBlock={false}
-            showFixedDateAction
-            timezoneOptions={timezoneOptions}
-            viewerTimezone={viewerTimezone}
-            viewerTimezoneSelectValue={viewerTimezoneSelectValue}
-            onViewerTimezoneChange={setViewerTimezonePreference}
-            isFixedDateActionPending={
-              pendingAction === "closeEvent" || pendingAction === "updateFixedDate"
-            }
-            onFixedDateAction={handleFixedDateAction}
-            activeParticipantId={activeParticipantId}
-            onActiveParticipantChange={setRequestedActiveParticipantId}
-            getDescription={({ usesDateWindowing }) =>
-              snapshot.status === "CLOSED"
-                ? usesDateWindowing
-                  ? messages.manageEvent.closedHeatmapDescriptionWindowed
-                  : messages.manageEvent.closedHeatmapDescription
-                : usesDateWindowing
-                  ? messages.manageEvent.openHeatmapDescriptionWindowed
-                  : messages.manageEvent.openHeatmapDescription
-            }
-          />
+          {isFullDayEvent ? (
+            <FullDayAvailability
+              snapshot={snapshot}
+              canEdit={false}
+              showSidebar={false}
+              displayStatus={snapshot.status}
+              finalSlotStart={savedFinalSlot?.slotStart ?? null}
+              showStatusBadge={false}
+              showTitleBlock={false}
+              showFixedDateAction
+              isFixedDateActionPending={
+                pendingAction === "closeEvent" || pendingAction === "updateFixedDate"
+              }
+              onFixedDateAction={handleFixedDateAction}
+              activeParticipantId={activeParticipantId}
+              onActiveParticipantChange={setRequestedActiveParticipantId}
+              description={
+                snapshot.status === "CLOSED"
+                  ? messages.manageEvent.closedFullDayDescription
+                  : messages.manageEvent.openFullDayDescription
+              }
+            />
+          ) : (
+            <EventHeatmap
+              snapshot={snapshot}
+              mode="view"
+              canEdit={false}
+              showModeToggle={false}
+              showSidebar={false}
+              displayStatus={snapshot.status}
+              finalSlotStart={savedFinalSlot?.slotStart ?? null}
+              showStatusBadge={false}
+              showTitleBlock={false}
+              showFixedDateAction
+              timezoneOptions={timezoneOptions}
+              viewerTimezone={viewerTimezone}
+              viewerTimezoneSelectValue={viewerTimezoneSelectValue}
+              onViewerTimezoneChange={setViewerTimezonePreference}
+              isFixedDateActionPending={
+                pendingAction === "closeEvent" || pendingAction === "updateFixedDate"
+              }
+              onFixedDateAction={handleFixedDateAction}
+              activeParticipantId={activeParticipantId}
+              onActiveParticipantChange={setRequestedActiveParticipantId}
+              getDescription={({ usesDateWindowing }) =>
+                snapshot.status === "CLOSED"
+                  ? usesDateWindowing
+                    ? messages.manageEvent.closedHeatmapDescriptionWindowed
+                    : messages.manageEvent.closedHeatmapDescription
+                  : usesDateWindowing
+                    ? messages.manageEvent.openHeatmapDescriptionWindowed
+                    : messages.manageEvent.openHeatmapDescription
+              }
+            />
+          )}
         </div>
       </div>
     </div>

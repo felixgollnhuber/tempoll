@@ -6,6 +6,7 @@ import { hashSecret } from "@/lib/tokens";
 const prisma = {
   event: {
     findUnique: vi.fn(),
+    create: vi.fn(),
     update: vi.fn(),
   },
   participant: {
@@ -44,6 +45,7 @@ function createManagedEvent() {
     id: "event_1",
     slug: "team-sync",
     title: "Team Sync",
+    type: "TIME_GRID" as const,
     timezone: "Europe/Vienna",
     slotMinutes: 30,
     meetingDurationMinutes: 60,
@@ -72,6 +74,10 @@ describe("updateManagedEvent", () => {
     vi.clearAllMocks();
     vi.resetModules();
     prisma.event.findUnique.mockResolvedValue(createManagedEvent());
+    prisma.event.create.mockResolvedValue({
+      id: "event_1",
+      slug: "team-sync",
+    });
     prisma.event.update.mockResolvedValue(undefined);
     publishEventUpdate.mockResolvedValue(undefined);
     updateNotificationRecipient.mockResolvedValue({
@@ -173,6 +179,36 @@ describe("updateManagedEvent", () => {
         pendingDigest: null,
       },
     });
+  });
+
+  it("creates a full-day event with the Prisma event type", async () => {
+    const { createEvent } = await import("./event-service");
+    prisma.event.findUnique.mockResolvedValueOnce(null);
+
+    await createEvent({
+      eventType: "full_day",
+      title: "Offsite Days",
+      timezone: "Europe/Vienna",
+      dates: ["2026-04-02", "2026-04-03"],
+      dayStartMinutes: 9 * 60,
+      dayEndMinutes: 11 * 60,
+      slotMinutes: 30,
+      meetingDurationMinutes: 60,
+    });
+
+    expect(prisma.event.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          type: "FULL_DAY",
+          title: "Offsite Days",
+          dates: {
+            createMany: {
+              data: [{ dateKey: "2026-04-02" }, { dateKey: "2026-04-03" }],
+            },
+          },
+        }),
+      }),
+    );
   });
 
   it("clears organizer notification email settings", async () => {

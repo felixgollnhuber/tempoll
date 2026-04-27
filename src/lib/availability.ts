@@ -4,6 +4,7 @@ import { getDateFnsLocale, getIntlLocale } from "@/lib/i18n/format";
 import type { AppLocale } from "@/lib/i18n/locale";
 import type {
   BestTimeSuggestion,
+  EventType,
   FinalizedEventSlot,
   PublicEventSnapshot,
   SnapshotDate,
@@ -16,6 +17,7 @@ type BuildSnapshotInput = {
   id: string;
   slug: string;
   title: string;
+  eventType?: EventType;
   timezone: string;
   status: "OPEN" | "CLOSED";
   slotMinutes: number;
@@ -105,6 +107,14 @@ function addDaysToDateKey(dateKey: string, days: number) {
   const date = parseDateKey(dateKey);
   date.setUTCDate(date.getUTCDate() + days);
   return formatDateKey(date);
+}
+
+export function buildFullDaySlotStart(dateKey: string, timezone: string) {
+  return buildSlotStart(dateKey, 0, timezone);
+}
+
+function buildFullDaySlotEnd(dateKey: string, timezone: string) {
+  return buildFullDaySlotStart(addDaysToDateKey(dateKey, 1), timezone);
 }
 
 function getDateKeyInTimezone(date: Date, timezone: string) {
@@ -260,6 +270,21 @@ export function enumerateEventSlots({
   }
 
   return eventSlots;
+}
+
+export function enumerateFullDayEventSlots({
+  dates,
+  timezone,
+}: {
+  dates: string[];
+  timezone: string;
+}) {
+  return sortDateKeys(dates).map((dateKey) => ({
+    slotStart: buildFullDaySlotStart(dateKey, timezone),
+    dateKey,
+    minutes: 0,
+    label: "All day",
+  }));
 }
 
 function getMeetingWindowSize(slotMinutes: number, meetingDurationMinutes: number) {
@@ -485,6 +510,7 @@ function summarizeMeetingWindow({
 }
 
 export function buildFinalizedSlot({
+  eventType = "time_grid",
   dates,
   locale,
   timezone,
@@ -496,6 +522,7 @@ export function buildFinalizedSlot({
   finalSlotStart,
   viewerTimezone,
 }: {
+  eventType?: EventType;
   dates: string[];
   locale: AppLocale;
   timezone: string;
@@ -507,6 +534,30 @@ export function buildFinalizedSlot({
   finalSlotStart: string;
   viewerTimezone?: string | null;
 }): FinalizedEventSlot | null {
+  if (eventType === "full_day") {
+    const slot = enumerateFullDayEventSlots({
+      dates,
+      timezone,
+    }).find((candidate) => candidate.slotStart === finalSlotStart);
+
+    if (!slot) {
+      return null;
+    }
+
+    const participantIds =
+      slots.find((candidate) => candidate.slotStart === finalSlotStart)?.participantIds ?? [];
+
+    return {
+      slotStart: slot.slotStart,
+      slotEnd: buildFullDaySlotEnd(slot.dateKey, timezone),
+      dateKey: slot.dateKey,
+      label: formatDateKeyLabel(slot.dateKey, timezone, locale),
+      localLabel: null,
+      availableCount: participantIds.length,
+      participantIds,
+    };
+  }
+
   const meetingWindow = buildMeetingWindows({
     dates,
     timezone,
@@ -543,6 +594,7 @@ export function buildSnapshot({
   id,
   slug,
   title,
+  eventType = "time_grid",
   locale,
   timezone,
   status,
@@ -557,18 +609,24 @@ export function buildSnapshot({
   viewerTimezone,
 }: BuildSnapshotInput): PublicEventSnapshot {
   const sortedDates = sortDateKeys(dates);
-  const enumeratedSlots = enumerateEventSlots({
-    dates: sortedDates,
-    timezone,
-    dayStartMinutes,
-    dayEndMinutes,
-    slotMinutes,
-  });
+  const enumeratedSlots =
+    eventType === "full_day"
+      ? enumerateFullDayEventSlots({
+          dates: sortedDates,
+          timezone,
+        })
+      : enumerateEventSlots({
+          dates: sortedDates,
+          timezone,
+          dayStartMinutes,
+          dayEndMinutes,
+          slotMinutes,
+        });
   const dateEntries: SnapshotDate[] = sortedDates.map((dateKey) => ({
     dateKey,
     label: formatDateKeyLabel(dateKey, timezone, locale),
   }));
-  const timeRows = buildSnapshotTimeRows(enumeratedSlots);
+  const timeRows = eventType === "full_day" ? [] : buildSnapshotTimeRows(enumeratedSlots);
 
   const participantSelections = new Map<string, Set<string>>();
   const slotParticipants = new Map<string, Set<string>>();
@@ -608,21 +666,30 @@ export function buildSnapshot({
     isCurrentUser: participant.id === currentParticipantId,
   }));
 
-  const suggestions = rankBestSuggestions({
-    dates: sortedDates,
-    locale,
-    timezone,
-    dayStartMinutes,
-    dayEndMinutes,
-    slotMinutes,
-    meetingDurationMinutes,
-    slots,
-    viewerTimezone,
-  });
+  const suggestions =
+    eventType === "full_day"
+      ? rankBestFullDaySuggestions({
+          dates: sortedDates,
+          locale,
+          timezone,
+          slots,
+        })
+      : rankBestSuggestions({
+          dates: sortedDates,
+          locale,
+          timezone,
+          dayStartMinutes,
+          dayEndMinutes,
+          slotMinutes,
+          meetingDurationMinutes,
+          slots,
+          viewerTimezone,
+        });
 
   const finalizedSlot =
     finalSlotStart && status === "CLOSED"
       ? buildFinalizedSlot({
+          eventType,
           dates: sortedDates,
           locale,
           timezone,
@@ -643,6 +710,7 @@ export function buildSnapshot({
     id,
     slug,
     title,
+    eventType,
     timezone,
     status,
     slotMinutes,
@@ -657,6 +725,47 @@ export function buildSnapshot({
     finalizedSlot,
     currentParticipant,
   };
+}
+
+function rankBestFullDaySuggestions({
+  dates,
+  locale,
+  timezone,
+  slots,
+}: {
+  dates: string[];
+  locale: AppLocale;
+  timezone: string;
+  slots: SnapshotSlot[];
+}): BestTimeSuggestion[] {
+  const slotMap = new Map(slots.map((slot) => [slot.slotStart, slot]));
+
+  return enumerateFullDayEventSlots({
+    dates,
+    timezone,
+  })
+    .map((slot) => {
+      const snapshotSlot = slotMap.get(slot.slotStart);
+      const participantIds = snapshotSlot?.participantIds ?? [];
+
+      return {
+        slotStart: slot.slotStart,
+        slotEnd: buildFullDaySlotEnd(slot.dateKey, timezone),
+        dateKey: slot.dateKey,
+        label: formatDateKeyLabel(slot.dateKey, timezone, locale),
+        localLabel: null,
+        availableCount: participantIds.length,
+        participantIds,
+      };
+    })
+    .sort((left, right) => {
+      if (right.availableCount !== left.availableCount) {
+        return right.availableCount - left.availableCount;
+      }
+
+      return left.slotStart.localeCompare(right.slotStart);
+    })
+    .slice(0, 3);
 }
 
 function rankBestSuggestions({
@@ -740,6 +849,21 @@ export function getAllowedSlotStarts({
       dayStartMinutes,
       dayEndMinutes,
       slotMinutes,
+    }).map((slot) => slot.slotStart),
+  );
+}
+
+export function getAllowedFullDaySlotStarts({
+  dates,
+  timezone,
+}: {
+  dates: string[];
+  timezone: string;
+}) {
+  return new Set(
+    enumerateFullDayEventSlots({
+      dates,
+      timezone,
     }).map((slot) => slot.slotStart),
   );
 }

@@ -11,6 +11,7 @@ import type { AppLocale } from "@/lib/i18n/locale";
 import { prisma } from "@/lib/prisma";
 import {
   buildSnapshot,
+  getAllowedFullDaySlotStarts,
   getAllowedFinalSlotStarts,
   getAllowedSlotStarts,
 } from "@/lib/availability";
@@ -120,10 +121,13 @@ function toSnapshot(
   locale: AppLocale,
   currentParticipantId?: string | null,
 ): PublicEventSnapshot {
+  const eventType = event.type === "FULL_DAY" ? "full_day" : "time_grid";
+
   return buildSnapshot({
     id: event.id,
     slug: event.slug,
     title: event.title,
+    eventType,
     locale,
     timezone: event.timezone,
     status: event.status,
@@ -207,6 +211,7 @@ export async function createEvent(input: EventCreateInput): Promise<CreateEventR
     data: {
       slug,
       title: input.title,
+      type: input.eventType === "full_day" ? "FULL_DAY" : "TIME_GRID",
       timezone: input.timezone,
       slotMinutes: input.slotMinutes,
       meetingDurationMinutes: input.meetingDurationMinutes,
@@ -390,13 +395,21 @@ export async function saveAvailability(
   await ensureAvailabilityDigestSchedulerStarted();
 
   const participant = await verifyParticipantMutation(slug, cookieValue);
-  const allowedSlots = getAllowedSlotStarts({
-    dates: participant.event.dates.map((date) => date.dateKey),
-    timezone: participant.event.timezone,
-    dayStartMinutes: participant.event.dayStartMinutes,
-    dayEndMinutes: participant.event.dayEndMinutes,
-    slotMinutes: participant.event.slotMinutes,
-  });
+  const eventType = participant.event.type === "FULL_DAY" ? "full_day" : "time_grid";
+  const eventDateKeys = participant.event.dates.map((date) => date.dateKey);
+  const allowedSlots =
+    eventType === "full_day"
+      ? getAllowedFullDaySlotStarts({
+          dates: eventDateKeys,
+          timezone: participant.event.timezone,
+        })
+      : getAllowedSlotStarts({
+          dates: eventDateKeys,
+          timezone: participant.event.timezone,
+          dayStartMinutes: participant.event.dayStartMinutes,
+          dayEndMinutes: participant.event.dayEndMinutes,
+          slotMinutes: participant.event.slotMinutes,
+        });
 
   const uniqueSlotStarts = Array.from(new Set(mutation.selectedSlotStarts));
   const invalidSlot = uniqueSlotStarts.find((slotStart) => !allowedSlots.has(slotStart));
@@ -555,14 +568,22 @@ export async function updateManagedEvent(
   const event = await verifyManageKey(manageKey);
 
   function parseFinalSlotStart(finalSlotStart: string) {
-    const allowedFinalSlotStarts = getAllowedFinalSlotStarts({
-      dates: event.dates.map((date) => date.dateKey),
-      timezone: event.timezone,
-      dayStartMinutes: event.dayStartMinutes,
-      dayEndMinutes: event.dayEndMinutes,
-      slotMinutes: event.slotMinutes,
-      meetingDurationMinutes: event.meetingDurationMinutes,
-    });
+    const eventType = event.type === "FULL_DAY" ? "full_day" : "time_grid";
+    const eventDateKeys = event.dates.map((date) => date.dateKey);
+    const allowedFinalSlotStarts =
+      eventType === "full_day"
+        ? getAllowedFullDaySlotStarts({
+            dates: eventDateKeys,
+            timezone: event.timezone,
+          })
+        : getAllowedFinalSlotStarts({
+            dates: eventDateKeys,
+            timezone: event.timezone,
+            dayStartMinutes: event.dayStartMinutes,
+            dayEndMinutes: event.dayEndMinutes,
+            slotMinutes: event.slotMinutes,
+            meetingDurationMinutes: event.meetingDurationMinutes,
+          });
 
     if (!allowedFinalSlotStarts.has(finalSlotStart)) {
       throw conflict("final_slot_invalid");

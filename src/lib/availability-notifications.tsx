@@ -142,11 +142,13 @@ async function getEventForDigest(eventId: string) {
 
 function buildNotificationSnapshot(event: NotificationEvent) {
   const locale = getNotificationLocale();
+  const eventType = event.type === "FULL_DAY" ? "full_day" : "time_grid";
 
   return buildSnapshot({
     id: event.id,
     slug: event.slug,
     title: event.title,
+    eventType,
     locale,
     timezone: event.timezone,
     status: event.status,

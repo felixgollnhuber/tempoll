@@ -35,6 +35,8 @@ export async function GET(request: Request, { params }: Context) {
     timezone: event.snapshot.timezone,
     slotStart: event.snapshot.finalizedSlot.slotStart,
     slotEnd: event.snapshot.finalizedSlot.slotEnd,
+    allDayDateKey:
+      event.snapshot.eventType === "full_day" ? event.snapshot.finalizedSlot.dateKey : null,
     url: buildPublicEventUrl(event.snapshot.slug),
   });
 

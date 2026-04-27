@@ -3,9 +3,11 @@
 import { addDays, eachDayOfInterval, format, isAfter, startOfToday } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import {
+  CalendarDaysIcon,
   CalendarRangeIcon,
   ChevronDownIcon,
   CheckIcon,
+  Clock3Icon,
   Loader2Icon,
   SparklesIcon,
 } from "lucide-react";
@@ -47,6 +49,7 @@ type CreateEventFormProps = {
 };
 
 const eventFieldOrder = [
+  "eventType",
   "title",
   "notificationEmail",
   "timezone",
@@ -62,6 +65,7 @@ type EventField = (typeof eventFieldOrder)[number];
 type EventFormErrors = Partial<Record<EventField, string>>;
 
 const eventFieldIds: Record<EventField, string> = {
+  eventType: "event-type",
   title: "title",
   notificationEmail: "notification-email",
   timezone: "timezone-trigger",
@@ -167,6 +171,7 @@ export function CreateEventForm({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<EventFormErrors>({});
   const [isRangePickerOpen, setIsRangePickerOpen] = useState(false);
+  const [eventType, setEventType] = useState<"time_grid" | "full_day">("time_grid");
   const [title, setTitle] = useState("");
   const [notificationEmail, setNotificationEmail] = useState("");
   const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
@@ -235,6 +240,10 @@ export function CreateEventForm({
 
   const startTimeOptions = timeOptions.filter((option) => option.value < dayEndMinutes);
   const endTimeOptions = timeOptions.filter((option) => option.value > dayStartMinutes);
+  const selectedEventTypeLabel =
+    eventType === "full_day"
+      ? messages.createEvent.eventTypeFullDay
+      : messages.createEvent.eventTypeTimeGrid;
 
   function clearErrors(...fields: EventField[]) {
     setErrorMessage(null);
@@ -338,6 +347,7 @@ export function CreateEventForm({
     }
 
     const parsed = createEventCreateSchema(messages).safeParse({
+      eventType,
       title,
       notificationEmail: notificationsConfigured ? notificationEmail : undefined,
       timezone,
@@ -418,6 +428,68 @@ export function CreateEventForm({
                   {fieldErrors.title}
                 </p>
               ) : null}
+            </div>
+
+            <div className="space-y-2">
+              <Label id={eventFieldIds.eventType}>{messages.createEvent.eventTypeLabel}</Label>
+              <div
+                role="radiogroup"
+                aria-labelledby={eventFieldIds.eventType}
+                className="grid grid-cols-1 gap-3 sm:grid-cols-2"
+              >
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={eventType === "time_grid"}
+                  className={cn(
+                    "flex items-start gap-3 rounded-md border bg-muted/20 p-3 text-left transition-colors hover:bg-muted/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                    eventType === "time_grid" && "border-primary bg-primary/8",
+                  )}
+                  onClick={() => {
+                    setEventType("time_grid");
+                    clearErrors("eventType");
+                  }}
+                >
+                  <Clock3Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium">
+                      {messages.createEvent.eventTypeTimeGrid}
+                    </span>
+                    <span className="mt-1 block text-xs text-muted-foreground">
+                      {messages.createEvent.eventTypeTimeGridDescription}
+                    </span>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={eventType === "full_day"}
+                  className={cn(
+                    "flex items-start gap-3 rounded-md border bg-muted/20 p-3 text-left transition-colors hover:bg-muted/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                    eventType === "full_day" && "border-primary bg-primary/8",
+                  )}
+                  onClick={() => {
+                    setEventType("full_day");
+                    clearErrors(
+                      "eventType",
+                      "dayStartMinutes",
+                      "dayEndMinutes",
+                      "slotMinutes",
+                      "meetingDurationMinutes",
+                    );
+                  }}
+                >
+                  <CalendarDaysIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium">
+                      {messages.createEvent.eventTypeFullDay}
+                    </span>
+                    <span className="mt-1 block text-xs text-muted-foreground">
+                      {messages.createEvent.eventTypeFullDayDescription}
+                    </span>
+                  </span>
+                </button>
+              </div>
             </div>
 
             {notificationsConfigured ? (
@@ -654,9 +726,11 @@ export function CreateEventForm({
               </fieldset>
             </div>
 
-            <Separator />
+            {eventType === "time_grid" ? (
+              <>
+                <Separator />
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor={eventFieldIds.dayStartMinutes}>{messages.createEvent.dailyStartLabel}</Label>
                 <Select
@@ -804,7 +878,9 @@ export function CreateEventForm({
                   </p>
                 ) : null}
               </div>
-            </div>
+                </div>
+              </>
+            ) : null}
 
             {errorMessage ? <p className="text-sm text-destructive">{errorMessage}</p> : null}
 
@@ -838,29 +914,37 @@ export function CreateEventForm({
                 <dd className="text-right font-medium">{selectedRangeLabel}</dd>
               </div>
               <div className="flex items-center justify-between gap-4">
+                <dt className="text-muted-foreground">{messages.createEvent.previewFields.eventType}</dt>
+                <dd className="text-right font-medium">{selectedEventTypeLabel}</dd>
+              </div>
+              <div className="flex items-center justify-between gap-4">
                 <dt className="text-muted-foreground">{messages.createEvent.previewFields.daysShown}</dt>
                 <dd className="font-medium">{selectedFilteredRangeDays}</dd>
               </div>
-              <div className="flex items-center justify-between gap-4">
-                <dt className="text-muted-foreground">{messages.createEvent.previewFields.dailyWindow}</dt>
-                <dd className="font-medium">
-                  {getTimeLabel(dayStartMinutes)} - {getTimeLabel(dayEndMinutes)}
-                </dd>
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <dt className="text-muted-foreground">{messages.createEvent.previewFields.granularity}</dt>
-                <dd className="font-medium">
-                  {formatMessage(messages.createEvent.minutesShort, { count: slotMinutes })}
-                </dd>
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <dt className="text-muted-foreground">{messages.createEvent.previewFields.rankedWindow}</dt>
-                <dd className="font-medium">
-                  {formatMessage(messages.createEvent.minutesShort, {
-                    count: meetingDurationMinutes,
-                  })}
-                </dd>
-              </div>
+              {eventType === "time_grid" ? (
+                <>
+                  <div className="flex items-center justify-between gap-4">
+                    <dt className="text-muted-foreground">{messages.createEvent.previewFields.dailyWindow}</dt>
+                    <dd className="font-medium">
+                      {getTimeLabel(dayStartMinutes)} - {getTimeLabel(dayEndMinutes)}
+                    </dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <dt className="text-muted-foreground">{messages.createEvent.previewFields.granularity}</dt>
+                    <dd className="font-medium">
+                      {formatMessage(messages.createEvent.minutesShort, { count: slotMinutes })}
+                    </dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <dt className="text-muted-foreground">{messages.createEvent.previewFields.rankedWindow}</dt>
+                    <dd className="font-medium">
+                      {formatMessage(messages.createEvent.minutesShort, {
+                        count: meetingDurationMinutes,
+                      })}
+                    </dd>
+                  </div>
+                </>
+              ) : null}
             </dl>
           </CardContent>
         </Card>

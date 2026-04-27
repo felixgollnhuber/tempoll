@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { CopyButton } from "@/components/copy-button";
 import { EventHeatmap, type BoardMode, type DraftSelection } from "@/components/event-heatmap";
+import { FullDayAvailability } from "@/components/full-day-availability";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -99,6 +100,7 @@ export function PublicEventClient({
   const trimmedName = name.trim();
   const canJoin =
     snapshot.status === "OPEN" && trimmedName.length >= 2 && trimmedName.length <= 32;
+  const isFullDayEvent = snapshot.eventType === "full_day";
   const hasAnyAvailability = snapshot.participants.some(
     (participant) => participant.selectedSlotCount > 0,
   );
@@ -107,25 +109,32 @@ export function PublicEventClient({
       return null;
     }
 
+    if (snapshot.eventType === "full_day") {
+      return snapshot.finalizedSlot.label;
+    }
+
     return formatMeetingWindowLabels({
       slotStart: snapshot.finalizedSlot.slotStart,
       slotEnd: snapshot.finalizedSlot.slotEnd,
       locale,
       timezone: viewerTimezone,
     }).label;
-  }, [locale, snapshot.finalizedSlot, viewerTimezone]);
+  }, [locale, snapshot.eventType, snapshot.finalizedSlot, viewerTimezone]);
   const suggestionsWithDisplayLabels = useMemo(
     () =>
       snapshot.suggestions.map((suggestion) => ({
         ...suggestion,
-        displayLabel: formatMeetingWindowLabels({
-          slotStart: suggestion.slotStart,
-          slotEnd: suggestion.slotEnd,
-          locale,
-          timezone: viewerTimezone,
-        }).label,
+        displayLabel:
+          snapshot.eventType === "full_day"
+            ? suggestion.label
+            : formatMeetingWindowLabels({
+                slotStart: suggestion.slotStart,
+                slotEnd: suggestion.slotEnd,
+                locale,
+                timezone: viewerTimezone,
+              }).label,
       })),
-    [locale, snapshot.suggestions, viewerTimezone],
+    [locale, snapshot.eventType, snapshot.suggestions, viewerTimezone],
   );
 
   const fetchSnapshot = useCallback(async () => {
@@ -353,14 +362,21 @@ export function PublicEventClient({
         <CardHeader className="p-4 pb-2">
           <CardTitle className="text-sm">{messages.common.fixedDate}</CardTitle>
           <CardDescription className="text-xs">
-            {messages.publicEvent.fixedDateDescription}
+            {isFullDayEvent
+              ? messages.publicEvent.fixedDayDescription
+              : messages.publicEvent.fixedDateDescription}
           </CardDescription>
         </CardHeader>
           <CardContent className="space-y-2 p-4 pt-0">
           <div className="rounded-md border bg-muted/20 px-3 py-2">
             <p className="text-sm font-semibold text-foreground">{finalizedSlotDisplayLabel}</p>
             <p className="mt-1 text-[11px] text-muted-foreground">
-              {plural(messages.publicEvent.fullWindowFree, snapshot.finalizedSlot.availableCount)}
+              {plural(
+                isFullDayEvent
+                  ? messages.publicEvent.fullDayFree
+                  : messages.publicEvent.fullWindowFree,
+                snapshot.finalizedSlot.availableCount,
+              )}
             </p>
           </div>
           <Button asChild size="sm" className="w-full">
@@ -373,11 +389,17 @@ export function PublicEventClient({
     ) : hasAnyAvailability ? (
       <Card>
         <CardHeader className="p-4 pb-2">
-          <CardTitle className="text-sm">{messages.publicEvent.bestWindowsTitle}</CardTitle>
+          <CardTitle className="text-sm">
+            {isFullDayEvent
+              ? messages.publicEvent.bestDaysTitle
+              : messages.publicEvent.bestWindowsTitle}
+          </CardTitle>
           <CardDescription className="text-xs">
-            {format(messages.publicEvent.bestWindowsDescription, {
-              duration: snapshot.meetingDurationMinutes,
-            })}
+            {isFullDayEvent
+              ? messages.publicEvent.bestDaysDescription
+              : format(messages.publicEvent.bestWindowsDescription, {
+                  duration: snapshot.meetingDurationMinutes,
+                })}
           </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2 p-4 pt-0">
@@ -388,7 +410,12 @@ export function PublicEventClient({
               </p>
               <p className="mt-1 text-sm font-semibold text-foreground">{suggestion.displayLabel}</p>
               <p className="mt-1 text-[11px] text-muted-foreground">
-                {plural(messages.publicEvent.fullWindowFree, suggestion.availableCount)}
+                {plural(
+                  isFullDayEvent
+                    ? messages.publicEvent.fullDayFree
+                    : messages.publicEvent.fullWindowFree,
+                  suggestion.availableCount,
+                )}
               </p>
             </div>
           ))}
@@ -412,7 +439,9 @@ export function PublicEventClient({
               {snapshot.title}
             </CardTitle>
             <CardDescription className="text-sm">
-              {messages.publicEvent.joinDescription}
+              {isFullDayEvent
+                ? messages.publicEvent.joinDescriptionFullDay
+                : messages.publicEvent.joinDescription}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5 p-5">
@@ -445,12 +474,18 @@ export function PublicEventClient({
                     {messages.publicEvent.joinStepAvailabilityTitle}
                   </h2>
                 </div>
-                <p className="text-sm">{messages.publicEvent.joinStepAvailabilityDescription}</p>
+                <p className="text-sm">
+                  {isFullDayEvent
+                    ? messages.publicEvent.joinStepAvailabilityDescriptionFullDay
+                    : messages.publicEvent.joinStepAvailabilityDescription}
+                </p>
               </div>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-muted-foreground">
-                {messages.publicEvent.joinGateDescription}
+                {isFullDayEvent
+                  ? messages.publicEvent.joinGateDescriptionFullDay
+                  : messages.publicEvent.joinGateDescription}
               </p>
               <Button onClick={handleJoin} disabled={joining || !canJoin} className="sm:min-w-36">
                 {joining ? <Loader2Icon className="size-4 animate-spin" /> : null}
@@ -462,7 +497,19 @@ export function PublicEventClient({
         </Card>
       ) : null}
 
-      {shouldShowPreJoin ? null : (
+      {shouldShowPreJoin ? null : isFullDayEvent ? (
+        <FullDayAvailability
+          snapshot={snapshot}
+          mode={mode}
+          onModeChange={setMode}
+          canEdit={canEdit}
+          selectedMap={selectedMap}
+          onUpdateDay={updateCell}
+          finalSlotStart={snapshot.finalizedSlot?.slotStart ?? null}
+          sessionBadgeLabel={session?.displayName ?? null}
+          sidebarTopContent={sidebarTopContent}
+        />
+      ) : (
         <EventHeatmap
           snapshot={snapshot}
           mode={mode}

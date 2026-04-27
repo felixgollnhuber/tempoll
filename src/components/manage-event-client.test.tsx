@@ -56,6 +56,7 @@ function createManageView(options?: {
       id: "event_1",
       slug: "test-event-xeqlxw",
       title: "Team sync",
+      eventType: "time_grid",
       timezone: "Europe/Vienna",
       status,
       slotMinutes: 30,
@@ -132,6 +133,7 @@ function buildPublishedFinalizedSlot(
   finalSlotStart: string,
 ): NonNullable<PublicEventSnapshot["finalizedSlot"]> {
   const finalizedSlot = buildFinalizedSlot({
+    eventType: snapshot.eventType,
     dates: snapshot.dates.map((date) => date.dateKey),
     locale: "en",
     timezone: snapshot.timezone,
@@ -148,6 +150,73 @@ function buildPublishedFinalizedSlot(
   }
 
   return finalizedSlot;
+}
+
+function createFullDayManageView(): ManageEventView {
+  const view = createManageView();
+
+  return {
+    ...view,
+    snapshot: {
+      ...view.snapshot,
+      id: "event_full_day",
+      slug: "full-day-event",
+      title: "Offsite days",
+      eventType: "full_day",
+      dates: [
+        { dateKey: "2026-04-02", label: "Thu, Apr 2" },
+        { dateKey: "2026-04-03", label: "Fri, Apr 3" },
+      ],
+      timeRows: [],
+      slots: [
+        {
+          slotStart: "2026-04-01T22:00:00.000Z",
+          dateKey: "2026-04-02",
+          minutes: 0,
+          availabilityCount: 2,
+          participantIds: ["participant_1", "participant_2"],
+          selectedByCurrentUser: false,
+        },
+        {
+          slotStart: "2026-04-02T22:00:00.000Z",
+          dateKey: "2026-04-03",
+          minutes: 0,
+          availabilityCount: 1,
+          participantIds: ["participant_1"],
+          selectedByCurrentUser: false,
+        },
+      ],
+      participants: [
+        {
+          id: "participant_1",
+          displayName: "Felix",
+          color: "#ef7f3b",
+          selectedSlotCount: 2,
+          isCurrentUser: false,
+        },
+        {
+          id: "participant_2",
+          displayName: "Nora",
+          color: "#6b8afd",
+          selectedSlotCount: 1,
+          isCurrentUser: false,
+        },
+      ],
+      suggestions: [
+        {
+          slotStart: "2026-04-01T22:00:00.000Z",
+          slotEnd: "2026-04-02T22:00:00.000Z",
+          dateKey: "2026-04-02",
+          label: "Thu, Apr 2",
+          localLabel: null,
+          availableCount: 2,
+          participantIds: ["participant_1", "participant_2"],
+        },
+      ],
+      finalizedSlot: null,
+      currentParticipant: null,
+    },
+  };
 }
 
 function installManageFetchMock(view: ManageEventView) {
@@ -352,6 +421,37 @@ describe("ManageEventClient", () => {
     expect(JSON.parse(String(requestInit.body))).toMatchObject({
       action: "closeEvent",
       finalSlotStart: "2026-04-02T07:00:00.000Z",
+    });
+  });
+
+  it("closes a full-day event from the selected day", async () => {
+    const user = userEvent.setup();
+    const view = createFullDayManageView();
+    const fetchMock = installManageFetchMock(view);
+    renderWithI18n(<ManageEventClient initialView={view} />);
+
+    expect(screen.getByText("Best days right now")).toBeInTheDocument();
+    expect(screen.getByText("Full-day poll")).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", {
+        name: /Thu, Apr 2 · 2\/2 available/i,
+      }),
+    );
+
+    expect(screen.getByText("This day can be published as the fixed day.")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Set fixed day and close event" }));
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Closed").length).toBeGreaterThan(0);
+      expect(screen.getByRole("link", { name: "Add to calendar (.ics)" })).toBeInTheDocument();
+    });
+
+    const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(requestInit.body))).toMatchObject({
+      action: "closeEvent",
+      finalSlotStart: "2026-04-01T22:00:00.000Z",
     });
   });
 
