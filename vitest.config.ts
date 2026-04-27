@@ -12,7 +12,7 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
-    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+    include: ["*.test.ts", "src/**/*.test.ts", "src/**/*.test.tsx", "scripts/**/*.test.mjs"],
     setupFiles: ["./src/test/setup.ts"],
   },
 });

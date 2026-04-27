@@ -15,6 +15,7 @@ type AppChromeProps = {
   logoSrc?: string;
   setupComplete: boolean;
   legalPagesEnabled: boolean;
+  devModeEnabled?: boolean;
   children: React.ReactNode;
 };
 
@@ -40,6 +41,7 @@ export function AppChrome({
   logoSrc,
   setupComplete,
   legalPagesEnabled,
+  devModeEnabled = false,
   children,
 }: AppChromeProps) {
   const { messages } = useI18n();
@@ -142,6 +144,11 @@ export function AppChrome({
             {legalPagesEnabled ? (
               <Link href="/privacy" className="hover:text-foreground">
                 {messages.appChrome.privacy}
+              </Link>
+            ) : null}
+            {devModeEnabled ? (
+              <Link href="/dev/database" className="hover:text-foreground">
+                {messages.appChrome.databaseStatus}
               </Link>
             ) : null}
           </div>

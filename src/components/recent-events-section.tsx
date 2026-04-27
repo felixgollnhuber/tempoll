@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Clock3Icon, LockIcon, Trash2Icon } from "lucide-react";
-import { useSyncExternalStore } from "react";
+import { Clock3Icon, FlaskConicalIcon, LockIcon, Trash2Icon } from "lucide-react";
+import { useMemo, useSyncExternalStore } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import {
   clearRecentEvents,
   getRecentEventsServerSnapshot,
+  mergeDevSeedRecentEvents,
   readRecentEvents,
   removeRecentEvent,
   subscribeRecentEvents,
@@ -27,12 +28,20 @@ function formatTimestamp(value: string, locale: string) {
   }
 }
 
-export function RecentEventsSection() {
+type RecentEventsSectionProps = {
+  devModeEnabled?: boolean;
+};
+
+export function RecentEventsSection({ devModeEnabled = false }: RecentEventsSectionProps) {
   const { messages, intlLocale, format } = useI18n();
-  const entries = useSyncExternalStore(
+  const storedEntries = useSyncExternalStore(
     subscribeRecentEvents,
     readRecentEvents,
     getRecentEventsServerSnapshot,
+  );
+  const entries = useMemo(
+    () => mergeDevSeedRecentEvents(storedEntries, devModeEnabled),
+    [devModeEnabled, storedEntries],
   );
 
   return (
@@ -45,7 +54,7 @@ export function RecentEventsSection() {
             {messages.recentEvents.description}
           </p>
         </div>
-        {entries.length > 0 ? (
+        {storedEntries.length > 0 ? (
           <Button variant="outline" size="sm" onClick={() => clearRecentEvents()}>
             {messages.recentEvents.clearAll}
           </Button>
@@ -78,12 +87,20 @@ export function RecentEventsSection() {
                       </span>
                     </CardDescription>
                   </div>
-                  {entry.manageUrl ? (
-                    <Badge variant="outline" className="gap-1">
-                      <LockIcon className="size-3" />
-                      {messages.recentEvents.privateLinkSaved}
-                    </Badge>
-                  ) : null}
+                  <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                    {entry.devSeed ? (
+                      <Badge variant="secondary" className="gap-1">
+                        <FlaskConicalIcon className="size-3" />
+                        {messages.recentEvents.devSeed}
+                      </Badge>
+                    ) : null}
+                    {entry.manageUrl ? (
+                      <Badge variant="outline" className="gap-1">
+                        <LockIcon className="size-3" />
+                        {messages.recentEvents.privateLinkSaved}
+                      </Badge>
+                    ) : null}
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -99,15 +116,21 @@ export function RecentEventsSection() {
                     </Button>
                   ) : null}
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-muted-foreground"
-                  onClick={() => removeRecentEvent(entry.slug)}
-                >
-                  <Trash2Icon className="size-4" />
-                  {messages.recentEvents.remove}
-                </Button>
+                {entry.devOnly ? (
+                  <p className="text-xs text-muted-foreground">
+                    {messages.recentEvents.devSeedDescription}
+                  </p>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground"
+                    onClick={() => removeRecentEvent(entry.slug)}
+                  >
+                    <Trash2Icon className="size-4" />
+                    {messages.recentEvents.remove}
+                  </Button>
+                )}
               </CardContent>
             </Card>
           ))}

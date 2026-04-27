@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { RecentEventsSection } from "@/components/recent-events-section";
+import { isDevModeEnabled } from "@/lib/dev-mode";
 import { getServerI18n } from "@/lib/i18n/server";
 import { cn } from "@/lib/utils";
 
@@ -42,6 +43,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function Home() {
   const { messages, format } = await getServerI18n();
+  const devModeEnabled = isDevModeEnabled();
 
   return (
     <main className="flex-1 pb-24">
@@ -178,7 +180,7 @@ export default async function Home() {
       </section>
 
       <section className="app-shell mt-20">
-        <RecentEventsSection />
+        <RecentEventsSection devModeEnabled={devModeEnabled} />
       </section>
     </main>
   );

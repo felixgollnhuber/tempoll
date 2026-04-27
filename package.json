@@ -5,6 +5,7 @@
   "license": "AGPL-3.0-only",
   "scripts": {
     "dev": "next dev",
+    "dev:worktree": "node scripts/dev-worktree.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",

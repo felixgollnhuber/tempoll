@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { mergeRecentEvents, type RecentEventEntry } from "./recent-events";
+import {
+  mergeDevSeedRecentEvents,
+  mergeRecentEvents,
+  type RecentEventEntry,
+} from "./recent-events";
 
 describe("recent event helpers", () => {
   it("merges public and organizer visits into a single slug entry", () => {
@@ -50,5 +54,40 @@ describe("recent event helpers", () => {
     );
 
     expect(merged.map((entry) => entry.slug)).toEqual(["beta", "alpha"]);
+  });
+
+  it("adds dev seed events only when dev mode is enabled", () => {
+    expect(mergeDevSeedRecentEvents([], false)).toEqual([]);
+
+    const merged = mergeDevSeedRecentEvents([], true);
+
+    expect(merged.map((entry) => entry.slug)).toEqual([
+      "dev-team-sync",
+      "dev-product-planning",
+      "dev-closed-review",
+    ]);
+    expect(merged.every((entry) => entry.devSeed)).toBe(true);
+    expect(merged.every((entry) => entry.devOnly)).toBe(true);
+  });
+
+  it("keeps a locally saved dev seed entry marked as a dev seed", () => {
+    const merged = mergeDevSeedRecentEvents(
+      [
+        {
+          slug: "dev-team-sync",
+          title: "Dev Team Sync",
+          lastViewedAt: "2026-04-27T20:00:00.000Z",
+          publicUrl: "/e/dev-team-sync",
+        },
+      ],
+      true,
+    );
+
+    const savedSeed = merged.find((entry) => entry.slug === "dev-team-sync");
+
+    expect(savedSeed).toMatchObject({
+      devSeed: true,
+      devOnly: false,
+    });
   });
 });
