@@ -87,6 +87,7 @@ function createSnapshot(options?: {
     id: "event_1",
     slug: "test-event",
     title: "Test Event",
+    eventType: "time_grid",
     timezone: "Europe/Vienna",
     status,
     slotMinutes: 30,
@@ -112,6 +113,88 @@ function createSnapshot(options?: {
           isCurrentUser: true,
         }
       : null,
+  };
+}
+
+function createFullDaySnapshot(): PublicEventSnapshot {
+  return {
+    id: "event_full_day",
+    slug: "full-day-event",
+    title: "Full Day Event",
+    eventType: "full_day",
+    timezone: "Europe/Vienna",
+    status: "OPEN",
+    slotMinutes: 30,
+    meetingDurationMinutes: 60,
+    dayStartMinutes: 9 * 60,
+    dayEndMinutes: 10 * 60,
+    dates: [
+      { dateKey: "2026-03-30", label: "Mon, Mar 30" },
+      { dateKey: "2026-03-31", label: "Tue, Mar 31" },
+      { dateKey: "2026-04-01", label: "Wed, Apr 1" },
+    ],
+    timeRows: [],
+    slots: [
+      {
+        slotStart: "2026-03-29T22:00:00.000Z",
+        dateKey: "2026-03-30",
+        minutes: 0,
+        availabilityCount: 0,
+        participantIds: [],
+        selectedByCurrentUser: false,
+      },
+      {
+        slotStart: "2026-03-31T22:00:00.000Z",
+        dateKey: "2026-04-01",
+        minutes: 0,
+        availabilityCount: 0,
+        participantIds: [],
+        selectedByCurrentUser: false,
+      },
+      {
+        slotStart: "2026-03-30T22:00:00.000Z",
+        dateKey: "2026-03-31",
+        minutes: 0,
+        availabilityCount: 1,
+        participantIds: ["p2"],
+        selectedByCurrentUser: false,
+      },
+    ],
+    participants: [
+      {
+        id: "p1",
+        displayName: "Felix",
+        color: "#ef7f3b",
+        selectedSlotCount: 0,
+        isCurrentUser: true,
+      },
+      {
+        id: "p2",
+        displayName: "Nora",
+        color: "#6b8afd",
+        selectedSlotCount: 1,
+        isCurrentUser: false,
+      },
+    ],
+    suggestions: [
+      {
+        slotStart: "2026-03-30T22:00:00.000Z",
+        slotEnd: "2026-03-31T22:00:00.000Z",
+        dateKey: "2026-03-31",
+        label: "Tue, Mar 31",
+        localLabel: null,
+        availableCount: 1,
+        participantIds: ["p2"],
+      },
+    ],
+    finalizedSlot: null,
+    currentParticipant: {
+      id: "p1",
+      displayName: "Felix",
+      color: "#ef7f3b",
+      selectedSlotCount: 0,
+      isCurrentUser: true,
+    },
   };
 }
 
@@ -361,6 +444,7 @@ describe("PublicEventClient", () => {
       id: "event_dst",
       slug: "test-event",
       title: "DST Event",
+      eventType: "time_grid",
       timezone: "Europe/Vienna",
       status: "OPEN",
       slotMinutes: 60,
@@ -483,6 +567,191 @@ describe("PublicEventClient", () => {
     const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
     expect(JSON.parse(String(requestInit?.body))).toMatchObject({
       selectedSlotStarts: ["2026-10-25T00:00:00.000Z", "2026-10-25T01:00:00.000Z"],
+    });
+
+    vi.useRealTimers();
+  });
+
+  it("renders a full-day picker and saves selected days", async () => {
+    vi.useFakeTimers();
+    const initialSnapshot = createFullDaySnapshot();
+    const savedSnapshot: PublicEventSnapshot = {
+      ...initialSnapshot,
+      slots: initialSnapshot.slots.map((slot) =>
+        slot.slotStart === "2026-03-29T22:00:00.000Z"
+          ? {
+              ...slot,
+              availabilityCount: 1,
+              participantIds: ["p1"],
+              selectedByCurrentUser: true,
+            }
+          : slot,
+      ),
+      participants: initialSnapshot.participants.map((participant) =>
+        participant.id === "p1"
+          ? {
+              ...participant,
+              selectedSlotCount: 1,
+            }
+          : participant,
+      ),
+      currentParticipant: initialSnapshot.currentParticipant
+        ? {
+            ...initialSnapshot.currentParticipant,
+            selectedSlotCount: 1,
+          }
+        : null,
+    };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === "/api/events/full-day-event/availability") {
+        expect(init?.method).toBe("PUT");
+        return {
+          ok: true,
+          json: async () => ({ snapshot: savedSnapshot }),
+        };
+      }
+
+      throw new Error(`Unhandled fetch call: ${String(input)}`);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    renderWithI18n(
+      <PublicEventClient
+        slug="full-day-event"
+        initialSnapshot={initialSnapshot}
+        initialSession={{
+          participantId: "p1",
+          displayName: "Felix",
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Full-day poll")).toBeInTheDocument();
+    expect(screen.getAllByText("March 2026").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("April 2026").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("MO").length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "2026-03-01" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Edit" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "View" })).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.click(screen.getByRole("button", { name: /Mon, Mar 30 · nobody available/i }));
+    await vi.advanceTimersByTimeAsync(600);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
+    expect(JSON.parse(String(requestInit?.body))).toMatchObject({
+      selectedSlotStarts: ["2026-03-29T22:00:00.000Z"],
+    });
+
+    vi.useRealTimers();
+  });
+
+  it("lets full-day participants switch to view mode without saving", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    renderWithI18n(
+      <PublicEventClient
+        slug="full-day-event"
+        initialSnapshot={createFullDaySnapshot()}
+        initialSession={{
+          participantId: "p1",
+          displayName: "Felix",
+        }}
+      />,
+    );
+
+    expect(screen.queryByText("Day details")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "View" }));
+
+    expect(screen.getByRole("button", { name: "Edit" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "View" })).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(screen.getByRole("button", { name: /Mon, Mar 30 · nobody available/i }));
+
+    expect(screen.getByText("Day details")).toBeInTheDocument();
+    expect(screen.getByText("Mon, Mar 30 · 0/2 available")).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("paints full-day availability while dragging across days", async () => {
+    vi.useFakeTimers();
+    const initialSnapshot = createFullDaySnapshot();
+    const savedSnapshot: PublicEventSnapshot = {
+      ...initialSnapshot,
+      slots: initialSnapshot.slots.map((slot) =>
+        slot.slotStart === "2026-03-29T22:00:00.000Z" ||
+        slot.slotStart === "2026-03-31T22:00:00.000Z"
+          ? {
+              ...slot,
+              availabilityCount: 1,
+              participantIds: ["p1"],
+              selectedByCurrentUser: true,
+            }
+          : slot,
+      ),
+      participants: initialSnapshot.participants.map((participant) =>
+        participant.id === "p1"
+          ? {
+              ...participant,
+              selectedSlotCount: 2,
+            }
+          : participant,
+      ),
+      currentParticipant: initialSnapshot.currentParticipant
+        ? {
+            ...initialSnapshot.currentParticipant,
+            selectedSlotCount: 2,
+          }
+        : null,
+    };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === "/api/events/full-day-event/availability") {
+        expect(init?.method).toBe("PUT");
+        return {
+          ok: true,
+          json: async () => ({ snapshot: savedSnapshot }),
+        };
+      }
+
+      throw new Error(`Unhandled fetch call: ${String(input)}`);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    renderWithI18n(
+      <PublicEventClient
+        slug="full-day-event"
+        initialSnapshot={initialSnapshot}
+        initialSession={{
+          participantId: "p1",
+          displayName: "Felix",
+        }}
+      />,
+    );
+
+    const firstDay = screen.getByRole("button", {
+      name: /Mon, Mar 30 · nobody available/i,
+    });
+    const secondDay = screen.getByRole("button", {
+      name: /Wed, Apr 1 · nobody available/i,
+    });
+
+    Object.defineProperty(document, "elementsFromPoint", {
+      configurable: true,
+      value: vi.fn(() => [secondDay]),
+    });
+
+    fireEvent.pointerDown(firstDay, { isPrimary: true, pointerId: 1, clientX: 8, clientY: 8 });
+    fireEvent.pointerMove(firstDay, { isPrimary: true, pointerId: 1, clientX: 16, clientY: 16 });
+    fireEvent.pointerUp(firstDay, { isPrimary: true, pointerId: 1, clientX: 16, clientY: 16 });
+    await vi.advanceTimersByTimeAsync(600);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
+    expect(JSON.parse(String(requestInit?.body))).toMatchObject({
+      selectedSlotStarts: ["2026-03-29T22:00:00.000Z", "2026-03-31T22:00:00.000Z"],
     });
 
     vi.useRealTimers();

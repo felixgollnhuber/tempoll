@@ -6,6 +6,8 @@ import type { Messages } from "@/lib/i18n/messages";
 const dateKeyRegex = /^\d{4}-\d{2}-\d{2}$/;
 const slotMinuteSet = new Set<number>(slotMinuteOptions);
 const meetingDurationSet = new Set<number>(meetingDurationOptions);
+const fullDayDateLimit = 366;
+const availabilitySelectionLimit = 3000;
 
 function createOptionalEmailSchema(messages: Messages) {
   return z
@@ -21,6 +23,7 @@ function createOptionalEmailSchema(messages: Messages) {
 export function createEventCreateSchema(messages: Messages) {
   return z
     .object({
+      eventType: z.enum(["time_grid", "full_day"]).default("time_grid"),
       title: z
         .string()
         .trim()
@@ -29,8 +32,7 @@ export function createEventCreateSchema(messages: Messages) {
       timezone: z.string().trim().min(1, messages.validation.eventCreate.timezoneRequired),
       dates: z
         .array(z.string().regex(dateKeyRegex, messages.validation.eventCreate.validCalendarDates))
-        .min(1, messages.validation.eventCreate.chooseStartAndEndDate)
-        .max(31, messages.validation.eventCreate.dateRangeMax),
+        .min(1, messages.validation.eventCreate.chooseStartAndEndDate),
       dayStartMinutes: z
         .number()
         .int()
@@ -52,6 +54,22 @@ export function createEventCreateSchema(messages: Messages) {
       notificationEmail: createOptionalEmailSchema(messages).optional(),
     })
     .superRefine((data, ctx) => {
+      if (data.eventType === "time_grid" && data.dates.length > 31) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["dates"],
+          message: messages.validation.eventCreate.dateRangeMax,
+        });
+      }
+
+      if (data.eventType === "full_day" && data.dates.length > fullDayDateLimit) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["dates"],
+          message: messages.validation.eventCreate.fullDayDateRangeMax,
+        });
+      }
+
       if (data.dayEndMinutes <= data.dayStartMinutes) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -82,7 +100,7 @@ export function createParticipantCreateSchema(messages: Messages) {
 
 export function createAvailabilityMutationSchema() {
   return z.object({
-    selectedSlotStarts: z.array(z.string().datetime()).max(1000),
+    selectedSlotStarts: z.array(z.string().datetime()).max(availabilitySelectionLimit),
   });
 }
 

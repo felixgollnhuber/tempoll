@@ -72,6 +72,46 @@ describe("PUT /api/events/[slug]/availability", () => {
     expect(response.headers.get("cache-control")).toContain("private, no-store");
   });
 
+  it("accepts long full-day availability selections beyond 31 days", async () => {
+    saveAvailability.mockResolvedValue({
+      snapshot: {
+        id: "event_1",
+      },
+    });
+    const selectedSlotStarts = Array.from({ length: 1001 }, (_, index) =>
+      new Date(Date.UTC(2026, 0, 1 + index)).toISOString(),
+    );
+
+    const { PUT } = await import("./route");
+    const response = await PUT(
+      new Request("https://tempoll.example.com/api/events/full-day-event/availability", {
+        method: "PUT",
+        body: JSON.stringify({
+          selectedSlotStarts,
+        }),
+        headers: {
+          "Accept-Language": "en-US",
+          "Content-Type": "application/json",
+        },
+      }),
+      {
+        params: Promise.resolve({
+          slug: "full-day-event",
+        }),
+      },
+    );
+
+    expect(saveAvailability).toHaveBeenCalledWith(
+      "full-day-event",
+      "en",
+      {
+        selectedSlotStarts,
+      },
+      "participant_1.secret-token",
+    );
+    expect(response.status).toBe(200);
+  });
+
   it("returns the domain-auth error for missing or expired participant sessions", async () => {
     saveAvailability.mockRejectedValue(unauthorized("participant_session_missing"));
 

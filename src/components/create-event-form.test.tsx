@@ -268,6 +268,44 @@ describe("CreateEventForm", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("creates a full-day event without showing time-slot controls", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-02T10:00:00.000Z"));
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        manageKey: "manage-key-123",
+      }),
+    });
+    global.fetch = fetchMock as typeof fetch;
+
+    renderCreateEventForm();
+    vi.useRealTimers();
+    const user = userEvent.setup();
+
+    await user.type(screen.getByLabelText("Event title"), "Offsite days");
+    await user.click(screen.getByRole("radio", { name: /Full days/i }));
+
+    expect(screen.queryByRole("combobox", { name: "Daily start" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Slot size" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Create event" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const payload = JSON.parse(String(requestInit.body)) as {
+      dates: string[];
+      eventType: string;
+    };
+
+    expect(payload.eventType).toBe("full_day");
+    expect(payload.dates).toEqual(["2026-04-03"]);
+  });
+
   it("submits the optional notification email when alerts are available", async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn().mockResolvedValue({

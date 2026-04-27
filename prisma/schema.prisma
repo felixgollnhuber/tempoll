@@ -11,10 +11,16 @@ enum EventStatus {
   CLOSED
 }
 
+enum EventType {
+  TIME_GRID
+  FULL_DAY
+}
+
 model Event {
   id                     String             @id @default(cuid())
   slug                   String             @unique
   title                  String
+  type                   EventType          @default(TIME_GRID)
   timezone               String
   slotMinutes            Int                @default(30)
   meetingDurationMinutes Int                @default(60)

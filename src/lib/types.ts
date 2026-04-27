@@ -1,4 +1,7 @@
+export type EventType = "time_grid" | "full_day";
+
 export type EventCreateInput = {
+  eventType: EventType;
   title: string;
   timezone: string;
   dates: string[];
@@ -76,6 +79,7 @@ export type PublicEventSnapshot = {
   id: string;
   slug: string;
   title: string;
+  eventType: EventType;
   timezone: string;
   status: "OPEN" | "CLOSED";
   slotMinutes: number;

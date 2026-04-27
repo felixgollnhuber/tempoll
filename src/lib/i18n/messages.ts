@@ -40,10 +40,12 @@ export const en = {
     open: "Open",
     closed: "Closed",
     fixedDate: "Fixed date",
+    fixedDay: "Fixed day",
     addToCalendar: "Add to calendar (.ics)",
     setFixedDate: "Set fixed date",
     clearFixedDate: "Clear fixed date",
     fixedDateSelected: "Fixed date selected",
+    fixedDaySelected: "Fixed day selected",
     option: "Option {count}",
     and: "and",
     yes: "Yes",
@@ -117,6 +119,11 @@ export const en = {
       "Set one date range, choose available weekdays and the daily window, then share a single link.",
     titleLabel: "Event title",
     titlePlaceholder: "Design review, sprint planning, dinner with friends...",
+    eventTypeLabel: "Event type",
+    eventTypeTimeGrid: "Time slots",
+    eventTypeTimeGridDescription: "Participants pick times inside each day.",
+    eventTypeFullDay: "Full days",
+    eventTypeFullDayDescription: "Participants pick whole days only.",
     timezoneLabel: "Timezone",
     timezonePlaceholder: "Pick a timezone",
     dateRangeLabel: "Date range",
@@ -160,6 +167,7 @@ export const en = {
     untitledEvent: "Untitled event",
     previewFields: {
       dateRange: "Date range",
+      eventType: "Event type",
       daysShown: "Days shown",
       dailyWindow: "Daily window",
       granularity: "Granularity",
@@ -190,6 +198,7 @@ export const en = {
       other: "{count} days",
     },
     gridSummary: "{count}-minute grid",
+    fullDaySummary: "Full-day poll",
     participantsSummary: {
       one: "{count} participant",
       other: "{count} participants",
@@ -211,15 +220,24 @@ export const en = {
       one: "{count} selected slot",
       other: "{count} selected slots",
     },
+    participantSelectedDays: {
+      one: "{count} selected day",
+      other: "{count} selected days",
+    },
     participantHighlighting: "Highlighting",
     joinTitle: "Join this board",
     joinDescription: "Enter your name to start selecting the times that work for you.",
+    joinDescriptionFullDay: "Enter your name to start selecting the days that work for you.",
     joinStepNameTitle: "Enter your name",
     joinStepAvailabilityTitle: "Select availability",
     joinStepAvailabilityDescription:
       "The availability grid appears after you join, so your choices are saved to your name.",
+    joinStepAvailabilityDescriptionFullDay:
+      "The calendar appears after you join, so your choices are saved to your name.",
     joinGateDescription:
       "First enter your name. Then you can mark the times that work for you.",
+    joinGateDescriptionFullDay:
+      "First enter your name. Then you can mark the days that work for you.",
     yourNameLabel: "Your name",
     yourNamePlaceholder: "Alex, Nora, Product team...",
     joinButton: "Join event",
@@ -237,6 +255,10 @@ export const en = {
       "Select a slot to inspect availability. Use the arrows to move through the date range.",
     availabilityDescriptionView:
       "Click any slot to see who is available and who is not.",
+    fullDayAvailabilityDescriptionEdit:
+      "Tap days to mark your availability while keeping the group overview in view.",
+    fullDayAvailabilityDescriptionView:
+      "Select a day to see who is available and who is not.",
     editMode: "Edit",
     viewMode: "View",
     showPreviousDays: "Show previous days",
@@ -248,28 +270,44 @@ export const en = {
     availableCountTitle:
       "{date} {time} · {available}/{total} available · {names}",
     nobodyAvailableTitle: "{date} {time} · nobody available",
+    availableOnDayTitle: "{date} · {available}/{total} available · {names}",
+    nobodyAvailableOnDayTitle: "{date} · nobody available",
     slotDetailsTitle: "Slot details",
     slotDetailsSummary: "{date} · {time} · {available}/{total} available",
     slotDetailsPrompt: "Select a slot in the heatmap to inspect availability for that time.",
+    dayDetailsTitle: "Day details",
+    dayDetailsSummary: "{date} · {available}/{total} available",
+    dayDetailsPrompt: "Select a day to inspect availability.",
     available: "Available",
     unavailable: "Not available",
     nobodyAvailableInSlot: "Nobody is available in this slot.",
+    nobodyAvailableOnDay: "Nobody is available on this day.",
     everyoneAvailableHere: "Everyone with at least one selection is available here.",
+    everyoneAvailableOnDay: "Everyone with at least one selected day is available here.",
     bestWindowsTitle: "Best matching windows",
     bestWindowsDescription:
       "Ranked by overlap across the full {duration}-minute meeting.",
+    bestDaysTitle: "Best matching days",
+    bestDaysDescription: "Ranked by the number of available participants.",
     yourTimezone: "Your timezone: {label}",
     fixedDateDescription:
       "This event is closed and the organizer picked the final meeting slot.",
+    fixedDayDescription:
+      "This event is closed and the organizer picked the final day.",
     participantsSidebarDescription:
       "Click a participant to highlight their availability on the grid.",
     finalSlotFits: "This slot fits the full {duration}-minute meeting.",
+    finalDayFits: "This day can be published as the fixed day.",
     finalSlotFitsDescription: "Pick it as the fixed date for the closed event.",
     finalSlotOutOfRange:
       "This start time does not fit the full {duration}-minute meeting inside the selected day window.",
     fullWindowFree: {
       one: "{count} participant free for the full window",
       other: "{count} participants free for the full window",
+    },
+    fullDayFree: {
+      one: "{count} participant available on this day",
+      other: "{count} participants available on this day",
     },
   },
   manageEvent: {
@@ -292,6 +330,8 @@ export const en = {
     statusOpen: "Open for edits",
     statusClosed: "Closed",
     statusOpenDescription: "Pick a slot in the heatmap to publish the fixed date and close the event.",
+    statusOpenFullDayDescription:
+      "Pick a day to publish the fixed day and close the event.",
     statusClosedDescription:
       "This event is closed. Reopen it if participants should be able to edit availability again.",
     participantsTitle: "Participants",
@@ -319,18 +359,27 @@ export const en = {
     emailAlertsPrivateLinkNote:
       "Each email includes a fresh private organizer link. Treat it as sensitive.",
     bestWindowsTitle: "Best windows right now",
+    bestDaysTitle: "Best days right now",
     fixedDatePublishedDescription:
       "This is the published fixed date for the closed event.",
     fixedDateDraftDescription:
       "This fixed date is selected locally and will be published after saving.",
     setFixedDateAndCloseEvent: "Set fixed date and close event",
+    setFixedDayAndCloseEvent: "Set fixed day and close event",
     updateFixedDate: "Update fixed date",
+    updateFixedDay: "Update fixed day",
     fixedDateActionCloseDescription:
       "This will publish the fixed date immediately and stop further edits.",
     fixedDateActionUpdateDescription:
       "This will publish this slot as the new fixed date immediately.",
     fixedDateActionSelectedDescription:
       "This slot is already published as the fixed date.",
+    fixedDayActionCloseDescription:
+      "This will publish the fixed day immediately and stop further edits.",
+    fixedDayActionUpdateDescription:
+      "This will publish this day as the new fixed day immediately.",
+    fixedDayActionSelectedDescription:
+      "This day is already published as the fixed day.",
     reopenEvent: "Reopen event",
     reopenEventConfirmTitle: "Reopen this event?",
     reopenEventConfirmDescription:
@@ -341,10 +390,14 @@ export const en = {
       "Pick a fixed date in the heatmap before closing this event.",
     closedHeatmapDescription:
       "Click a slot to inspect availability and update the published fixed date.",
+    closedFullDayDescription:
+      "Select a day to inspect availability and update the published fixed day.",
     closedHeatmapDescriptionWindowed:
       "Select a slot to inspect overlap and update the fixed date below. Use the arrows to move through the date range.",
     openHeatmapDescription:
       "Click a slot to inspect availability and close the event from the slot action.",
+    openFullDayDescription:
+      "Select a day to inspect availability and close the event from the day action.",
     openHeatmapDescriptionWindowed:
       "Select a slot to inspect availability and close the event from the slot action. Use the arrows to move through the date range.",
     peopleAvailable: {
@@ -634,7 +687,8 @@ export const en = {
       timezoneRequired: "Choose a timezone.",
       validCalendarDates: "Choose valid calendar dates.",
       chooseStartAndEndDate: "Choose a start and end date.",
-      dateRangeMax: "Choose a date range of up to 31 days.",
+      dateRangeMax: "Time-slot events can include up to 31 days.",
+      fullDayDateRangeMax: "Full-day events can include up to 366 days.",
       validDailyStart: "Choose a valid daily start time.",
       validDailyEnd: "Choose a valid daily end time.",
       supportedSlotSize: "Select a supported slot size.",
@@ -709,10 +763,12 @@ export const de: Messages = {
     open: "Offen",
     closed: "Geschlossen",
     fixedDate: "Fixer Termin",
+    fixedDay: "Fixer Tag",
     addToCalendar: "Zum Kalender hinzufügen (.ics)",
     setFixedDate: "Fixen Termin setzen",
     clearFixedDate: "Fixen Termin entfernen",
     fixedDateSelected: "Fixer Termin ausgewählt",
+    fixedDaySelected: "Fixer Tag ausgewählt",
     option: "Option {count}",
     and: "und",
     yes: "Ja",
@@ -786,6 +842,11 @@ export const de: Messages = {
       "Lege einen Datumsbereich fest, wähle verfügbare Wochentage und das tägliche Zeitfenster und teile anschließend einen einzigen Link.",
     titleLabel: "Event-Titel",
     titlePlaceholder: "Design-Review, Sprint-Planung, Abendessen mit Freund:innen...",
+    eventTypeLabel: "Event-Art",
+    eventTypeTimeGrid: "Zeit-Slots",
+    eventTypeTimeGridDescription: "Teilnehmende wählen Zeiten innerhalb jedes Tages.",
+    eventTypeFullDay: "Ganze Tage",
+    eventTypeFullDayDescription: "Teilnehmende wählen nur ganze Tage.",
     timezoneLabel: "Zeitzone",
     timezonePlaceholder: "Zeitzone wählen",
     dateRangeLabel: "Datumsbereich",
@@ -831,6 +892,7 @@ export const de: Messages = {
     untitledEvent: "Unbenanntes Event",
     previewFields: {
       dateRange: "Datumsbereich",
+      eventType: "Event-Art",
       daysShown: "Angezeigte Tage",
       dailyWindow: "Tägliches Zeitfenster",
       granularity: "Granularität",
@@ -863,6 +925,7 @@ export const de: Messages = {
       other: "{count} Tage",
     },
     gridSummary: "{count}-Minuten-Raster",
+    fullDaySummary: "Ganztägige Umfrage",
     participantsSummary: {
       one: "{count} teilnehmende Person",
       other: "{count} Teilnehmende",
@@ -884,16 +947,26 @@ export const de: Messages = {
       one: "{count} ausgewählter Slot",
       other: "{count} ausgewählte Slots",
     },
+    participantSelectedDays: {
+      one: "{count} ausgewählter Tag",
+      other: "{count} ausgewählte Tage",
+    },
     participantHighlighting: "Hervorgehoben",
     joinTitle: "Diesem Board beitreten",
     joinDescription:
       "Gib deinen Namen ein, um die Zeiten zu markieren, die für dich passen.",
+    joinDescriptionFullDay:
+      "Gib deinen Namen ein, um die Tage zu markieren, die für dich passen.",
     joinStepNameTitle: "Namen eingeben",
     joinStepAvailabilityTitle: "Verfügbarkeit auswählen",
     joinStepAvailabilityDescription:
       "Das Verfügbarkeitsraster erscheint nach dem Beitritt, damit deine Auswahl mit deinem Namen gespeichert wird.",
+    joinStepAvailabilityDescriptionFullDay:
+      "Der Kalender erscheint nach dem Beitritt, damit deine Auswahl mit deinem Namen gespeichert wird.",
     joinGateDescription:
       "Gib zuerst deinen Namen ein. Danach kannst du die passenden Zeiten markieren.",
+    joinGateDescriptionFullDay:
+      "Gib zuerst deinen Namen ein. Danach kannst du die passenden Tage markieren.",
     yourNameLabel: "Dein Name",
     yourNamePlaceholder: "Alex, Nora, Produktteam...",
     joinButton: "Event beitreten",
@@ -912,6 +985,10 @@ export const de: Messages = {
       "Wähle einen Slot aus, um die Verfügbarkeit zu prüfen. Mit den Pfeilen bewegst du dich durch den Datumsbereich.",
     availabilityDescriptionView:
       "Klicke auf einen beliebigen Slot, um zu sehen, wer verfügbar ist und wer nicht.",
+    fullDayAvailabilityDescriptionEdit:
+      "Tippe auf Tage, um deine Verfügbarkeit zu markieren und die Gruppenübersicht im Blick zu behalten.",
+    fullDayAvailabilityDescriptionView:
+      "Wähle einen Tag aus, um zu sehen, wer verfügbar ist und wer nicht.",
     editMode: "Bearbeiten",
     viewMode: "Ansehen",
     showPreviousDays: "Vorherige Tage anzeigen",
@@ -923,24 +1000,37 @@ export const de: Messages = {
     availableCountTitle:
       "{date} {time} · {available}/{total} verfügbar · {names}",
     nobodyAvailableTitle: "{date} {time} · niemand verfügbar",
+    availableOnDayTitle: "{date} · {available}/{total} verfügbar · {names}",
+    nobodyAvailableOnDayTitle: "{date} · niemand verfügbar",
     slotDetailsTitle: "Slot-Details",
     slotDetailsSummary: "{date} · {time} · {available}/{total} verfügbar",
     slotDetailsPrompt:
       "Wähle einen Slot in der Heatmap aus, um die Verfügbarkeit für diese Zeit zu prüfen.",
+    dayDetailsTitle: "Tagesdetails",
+    dayDetailsSummary: "{date} · {available}/{total} verfügbar",
+    dayDetailsPrompt: "Wähle einen Tag aus, um die Verfügbarkeit zu prüfen.",
     available: "Verfügbar",
     unavailable: "Nicht verfügbar",
     nobodyAvailableInSlot: "In diesem Slot ist niemand verfügbar.",
+    nobodyAvailableOnDay: "An diesem Tag ist niemand verfügbar.",
     everyoneAvailableHere:
       "Hier sind alle verfügbar, die mindestens eine Auswahl getroffen haben.",
+    everyoneAvailableOnDay:
+      "Hier sind alle verfügbar, die mindestens einen Tag ausgewählt haben.",
     bestWindowsTitle: "Beste passende Zeitfenster",
     bestWindowsDescription:
       "Gerankt nach Überschneidung über das gesamte {duration}-minütige Meeting.",
+    bestDaysTitle: "Beste passende Tage",
+    bestDaysDescription: "Gerankt nach der Anzahl verfügbarer Teilnehmender.",
     yourTimezone: "Deine Zeitzone: {label}",
     fixedDateDescription:
       "Dieses Event ist geschlossen und die organisierende Person hat den finalen Meeting-Slot gewählt.",
+    fixedDayDescription:
+      "Dieses Event ist geschlossen und die organisierende Person hat den finalen Tag gewählt.",
     participantsSidebarDescription:
       "Klicke auf eine teilnehmende Person, um ihre Verfügbarkeit im Raster hervorzuheben.",
     finalSlotFits: "Dieser Slot passt zum gesamten {duration}-minütigen Meeting.",
+    finalDayFits: "Dieser Tag kann als fixer Tag veröffentlicht werden.",
     finalSlotFitsDescription:
       "Wähle ihn als fixes Datum für das geschlossene Event.",
     finalSlotOutOfRange:
@@ -948,6 +1038,10 @@ export const de: Messages = {
     fullWindowFree: {
       one: "{count} Person ist im gesamten Zeitfenster frei",
       other: "{count} Personen sind im gesamten Zeitfenster frei",
+    },
+    fullDayFree: {
+      one: "{count} Person ist an diesem Tag verfügbar",
+      other: "{count} Personen sind an diesem Tag verfügbar",
     },
   },
   manageEvent: {
@@ -971,6 +1065,8 @@ export const de: Messages = {
     statusClosed: "Geschlossen",
     statusOpenDescription:
       "Wähle in der Heatmap einen Slot aus, um den fixen Termin zu veröffentlichen und das Event zu schließen.",
+    statusOpenFullDayDescription:
+      "Wähle einen Tag aus, um den fixen Tag zu veröffentlichen und das Event zu schließen.",
     statusClosedDescription:
       "Dieses Event ist geschlossen. Öffne es wieder, wenn Teilnehmende ihre Verfügbarkeit erneut bearbeiten dürfen.",
     participantsTitle: "Teilnehmende",
@@ -998,18 +1094,27 @@ export const de: Messages = {
     emailAlertsPrivateLinkNote:
       "Jede E-Mail enthält einen frischen privaten Organizer-Link. Behandle ihn als sensibel.",
     bestWindowsTitle: "Beste Zeitfenster im Moment",
+    bestDaysTitle: "Beste Tage im Moment",
     fixedDatePublishedDescription:
       "Das ist der veröffentlichte feste Termin für das geschlossene Event.",
     fixedDateDraftDescription:
       "Dieser feste Termin ist lokal ausgewählt und wird nach dem Speichern veröffentlicht.",
     setFixedDateAndCloseEvent: "Fixen Termin setzen und Event schließen",
+    setFixedDayAndCloseEvent: "Fixen Tag setzen und Event schließen",
     updateFixedDate: "Fixen Termin aktualisieren",
+    updateFixedDay: "Fixen Tag aktualisieren",
     fixedDateActionCloseDescription:
       "Dadurch wird der feste Termin sofort veröffentlicht und weitere Änderungen werden gestoppt.",
     fixedDateActionUpdateDescription:
       "Dadurch wird dieser Slot sofort als neuer fixer Termin veröffentlicht.",
     fixedDateActionSelectedDescription:
       "Dieser Slot ist bereits als fixer Termin veröffentlicht.",
+    fixedDayActionCloseDescription:
+      "Dadurch wird der fixe Tag sofort veröffentlicht und weitere Änderungen werden gestoppt.",
+    fixedDayActionUpdateDescription:
+      "Dadurch wird dieser Tag sofort als neuer fixer Tag veröffentlicht.",
+    fixedDayActionSelectedDescription:
+      "Dieser Tag ist bereits als fixer Tag veröffentlicht.",
     reopenEvent: "Event wieder öffnen",
     reopenEventConfirmTitle: "Dieses Event wieder öffnen?",
     reopenEventConfirmDescription:
@@ -1021,10 +1126,14 @@ export const de: Messages = {
       "Wähle in der Heatmap ein fixes Datum aus, bevor du dieses Event schließt.",
     closedHeatmapDescription:
       "Klicke auf einen Slot, um die Verfügbarkeit zu prüfen und den veröffentlichten fixen Termin zu aktualisieren.",
+    closedFullDayDescription:
+      "Wähle einen Tag aus, um die Verfügbarkeit zu prüfen und den veröffentlichten fixen Tag zu aktualisieren.",
     closedHeatmapDescriptionWindowed:
       "Wähle einen Slot aus, um die Überschneidung zu prüfen, und aktualisiere den fixen Termin darunter. Mit den Pfeilen bewegst du dich durch den Datumsbereich.",
     openHeatmapDescription:
       "Klicke auf einen Slot, um die Verfügbarkeit zu prüfen und das Event über die Slot-Aktion zu schließen.",
+    openFullDayDescription:
+      "Wähle einen Tag aus, um die Verfügbarkeit zu prüfen und das Event über die Tagesaktion zu schließen.",
     openHeatmapDescriptionWindowed:
       "Wähle einen Slot aus, um die Verfügbarkeit zu prüfen und das Event über die Slot-Aktion zu schließen. Mit den Pfeilen bewegst du dich durch den Datumsbereich.",
     peopleAvailable: {
@@ -1333,7 +1442,8 @@ export const de: Messages = {
       timezoneRequired: "Bitte wähle eine Zeitzone.",
       validCalendarDates: "Bitte wähle gültige Kalenderdaten.",
       chooseStartAndEndDate: "Bitte wähle ein Start- und Enddatum.",
-      dateRangeMax: "Bitte wähle einen Datumsbereich mit höchstens 31 Tagen.",
+      dateRangeMax: "Events mit Zeit-Slots können höchstens 31 Tage enthalten.",
+      fullDayDateRangeMax: "Ganztägige Events können höchstens 366 Tage enthalten.",
       validDailyStart: "Bitte wähle eine gültige Startzeit.",
       validDailyEnd: "Bitte wähle eine gültige Endzeit.",
       supportedSlotSize: "Bitte wähle eine unterstützte Slot-Größe.",

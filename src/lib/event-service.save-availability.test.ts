@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { buildSlotStart } from "@/lib/availability";
+import { buildFullDaySlotStart, buildSlotStart } from "@/lib/availability";
 import { hashSecret } from "@/lib/tokens";
 
 const prisma = {
@@ -50,6 +50,7 @@ function createParticipantForMutation(selectedSlotStarts: string[], recipientEma
       id: "event_1",
       slug: "team-sync",
       title: "Team Sync",
+      type: "TIME_GRID" as const,
       timezone: "Europe/Vienna",
       slotMinutes: 30,
       meetingDurationMinutes: 60,
@@ -83,6 +84,7 @@ function createEventSnapshotSource(selectedSlotStarts: string[]) {
     id: "event_1",
     slug: "team-sync",
     title: "Team Sync",
+    type: "TIME_GRID" as const,
     timezone: "Europe/Vienna",
     slotMinutes: 30,
     meetingDurationMinutes: 60,
@@ -183,6 +185,41 @@ describe("saveAvailability", () => {
       eventId: "event_1",
       participantId: "participant_1",
       recipientEmail: "owner@example.com",
+    });
+  });
+
+  it("accepts canonical full-day slots for full-day events", async () => {
+    const fullDaySlotStart = buildFullDaySlotStart("2026-04-02", "Europe/Vienna");
+    const participant = createParticipantForMutation([]);
+    (participant.event as unknown as { type: "FULL_DAY" }).type = "FULL_DAY";
+    participant.event.dayStartMinutes = 0;
+    participant.event.dayEndMinutes = 24 * 60;
+    const eventSource = createEventSnapshotSource([fullDaySlotStart]);
+    (eventSource as unknown as { type: "FULL_DAY" }).type = "FULL_DAY";
+    eventSource.dayStartMinutes = 0;
+    eventSource.dayEndMinutes = 24 * 60;
+    prisma.participant.findUnique.mockResolvedValue(participant);
+    prisma.event.findUnique.mockResolvedValue(eventSource);
+
+    const { saveAvailability } = await import("./event-service");
+
+    await saveAvailability(
+      "team-sync",
+      "en",
+      {
+        selectedSlotStarts: [fullDaySlotStart],
+      },
+      "participant_1.secret-token",
+    );
+
+    expect(prisma.availabilitySlot.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          eventId: "event_1",
+          participantId: "participant_1",
+          slotStartAt: new Date(fullDaySlotStart),
+        },
+      ],
     });
   });
 });

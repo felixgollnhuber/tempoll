@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildFullDaySlotStart,
   buildMeetingWindows,
   buildSlotStart,
   buildSnapshot,
   buildTimeOptions,
   enumerateEventSlots,
+  enumerateFullDayEventSlots,
+  getAllowedFullDaySlotStarts,
   getAllowedFinalSlotStarts,
   getAllowedSlotStarts,
 } from "./availability";
@@ -124,6 +127,116 @@ describe("availability helpers", () => {
       buildSlotStart("2026-04-10", 9 * 60, "Europe/Vienna"),
     );
     expect(snapshot.finalizedSlot).toBeNull();
+  });
+
+  it("builds one canonical slot per date for full-day events", () => {
+    const slots = enumerateFullDayEventSlots({
+      dates: ["2026-04-11", "2026-04-10"],
+      timezone: "Europe/Vienna",
+    });
+
+    expect(slots).toEqual([
+      {
+        slotStart: buildFullDaySlotStart("2026-04-10", "Europe/Vienna"),
+        dateKey: "2026-04-10",
+        minutes: 0,
+        label: "All day",
+      },
+      {
+        slotStart: buildFullDaySlotStart("2026-04-11", "Europe/Vienna"),
+        dateKey: "2026-04-11",
+        minutes: 0,
+        label: "All day",
+      },
+    ]);
+    expect(getAllowedFullDaySlotStarts({
+      dates: ["2026-04-10"],
+      timezone: "Europe/Vienna",
+    })).toEqual(new Set([buildFullDaySlotStart("2026-04-10", "Europe/Vienna")]));
+  });
+
+  it("aggregates and ranks full-day availability by day", () => {
+    const firstDay = buildFullDaySlotStart("2026-04-10", "Europe/Vienna");
+    const secondDay = buildFullDaySlotStart("2026-04-11", "Europe/Vienna");
+
+    const snapshot = buildSnapshot({
+      id: "event_1",
+      slug: "offsite-days",
+      title: "Offsite Days",
+      eventType: "full_day",
+      locale: "en",
+      timezone: "Europe/Vienna",
+      status: "OPEN",
+      slotMinutes: 30,
+      meetingDurationMinutes: 60,
+      dayStartMinutes: 9 * 60,
+      dayEndMinutes: 11 * 60,
+      dates: ["2026-04-10", "2026-04-11"],
+      finalSlotStart: null,
+      currentParticipantId: "p1",
+      participants: [
+        {
+          id: "p1",
+          displayName: "Alice",
+          color: "red",
+          availabilitySlotStarts: [firstDay],
+        },
+        {
+          id: "p2",
+          displayName: "Bob",
+          color: "blue",
+          availabilitySlotStarts: [firstDay, secondDay],
+        },
+      ],
+    });
+
+    expect(snapshot.timeRows).toEqual([]);
+    expect(snapshot.slots).toHaveLength(2);
+    expect(snapshot.slots[0]).toMatchObject({
+      slotStart: firstDay,
+      availabilityCount: 2,
+      selectedByCurrentUser: true,
+    });
+    expect(snapshot.suggestions[0]).toMatchObject({
+      slotStart: firstDay,
+      label: "Fri, Apr 10",
+      availableCount: 2,
+    });
+  });
+
+  it("builds a finalized full-day slot from the stored day start", () => {
+    const fullDaySlot = buildFullDaySlotStart("2026-04-10", "Europe/Vienna");
+
+    const snapshot = buildSnapshot({
+      id: "event_1",
+      slug: "offsite-days",
+      title: "Offsite Days",
+      eventType: "full_day",
+      locale: "en",
+      timezone: "Europe/Vienna",
+      status: "CLOSED",
+      slotMinutes: 30,
+      meetingDurationMinutes: 60,
+      dayStartMinutes: 9 * 60,
+      dayEndMinutes: 11 * 60,
+      dates: ["2026-04-10"],
+      finalSlotStart: fullDaySlot,
+      participants: [
+        {
+          id: "p1",
+          displayName: "Alice",
+          color: "red",
+          availabilitySlotStarts: [fullDaySlot],
+        },
+      ],
+    });
+
+    expect(snapshot.finalizedSlot).toMatchObject({
+      slotStart: fullDaySlot,
+      dateKey: "2026-04-10",
+      label: "Fri, Apr 10",
+      availableCount: 1,
+    });
   });
 
   it("builds a finalized slot from the stored start and clears invalid starts", () => {

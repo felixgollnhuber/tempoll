@@ -16,12 +16,17 @@ function formatIcsZonedDateTime(date: Date, timezone: string) {
   return formatInTimeZone(date, timezone, "yyyyMMdd'T'HHmmss");
 }
 
+function formatIcsDate(dateKey: string) {
+  return dateKey.replace(/-/g, "");
+}
+
 export function buildEventCalendarFile({
   slug,
   title,
   timezone,
   slotStart,
   slotEnd,
+  allDayDateKey,
   url,
   generatedAt = new Date(),
 }: {
@@ -30,11 +35,15 @@ export function buildEventCalendarFile({
   timezone: string;
   slotStart: string;
   slotEnd: string;
+  allDayDateKey?: string | null;
   url: string;
   generatedAt?: Date;
 }) {
   const uid = `${slug}-${slotStart}@tempoll`;
   const description = `Scheduled with tempoll: ${url}`;
+  const allDayNextDateKey = allDayDateKey
+    ? formatInTimeZone(new Date(slotEnd), timezone, "yyyy-MM-dd")
+    : null;
 
   return [
     "BEGIN:VCALENDAR",
@@ -45,8 +54,12 @@ export function buildEventCalendarFile({
     "BEGIN:VEVENT",
     `UID:${escapeIcsText(uid)}`,
     `DTSTAMP:${formatIcsTimestamp(generatedAt)}`,
-    `DTSTART;TZID=${timezone}:${formatIcsZonedDateTime(new Date(slotStart), timezone)}`,
-    `DTEND;TZID=${timezone}:${formatIcsZonedDateTime(new Date(slotEnd), timezone)}`,
+    allDayDateKey
+      ? `DTSTART;VALUE=DATE:${formatIcsDate(allDayDateKey)}`
+      : `DTSTART;TZID=${timezone}:${formatIcsZonedDateTime(new Date(slotStart), timezone)}`,
+    allDayDateKey && allDayNextDateKey
+      ? `DTEND;VALUE=DATE:${formatIcsDate(allDayNextDateKey)}`
+      : `DTEND;TZID=${timezone}:${formatIcsZonedDateTime(new Date(slotEnd), timezone)}`,
     `SUMMARY:${escapeIcsText(title)}`,
     `DESCRIPTION:${escapeIcsText(description)}`,
     `URL:${escapeIcsText(url)}`,
