@@ -8,6 +8,7 @@ import { AppChrome } from "@/components/app-chrome";
 import { Toaster } from "@/components/ui/sonner";
 import { appConfig } from "@/lib/config";
 import { datafastConfig } from "@/lib/datafast";
+import { isDevModeEnabled } from "@/lib/dev-mode";
 import { I18nProvider } from "@/lib/i18n/context";
 import { getServerI18n } from "@/lib/i18n/server";
 import { buildDefaultMetadata } from "@/lib/site-metadata";
@@ -66,6 +67,7 @@ export default async function RootLayout({
             logoSrc={hasDefaultLogo ? defaultLogoSrc : undefined}
             setupComplete={isAppSetupComplete()}
             legalPagesEnabled={areLegalPagesEnabled()}
+            devModeEnabled={isDevModeEnabled()}
           >
             {children}
           </AppChrome>

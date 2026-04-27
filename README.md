@@ -118,6 +118,17 @@ cp .env.example .env
 
 ### Local Postgres example
 
+For parallel Git worktrees, use the worktree-aware dev command:
+
+```bash
+pnpm dev:worktree
+```
+
+It starts a fresh Postgres container for the current worktree, picks free local ports,
+applies migrations, seeds demo events, writes a managed block to `.env.local`, and
+starts the Next dev server. The generated local env includes `TEMPOLL_DEV_MODE=true`,
+which enables the `/dev/database` status page and footer link.
+
 2. Start a local Postgres instance however you prefer. Example with Docker:
 
 ```bash

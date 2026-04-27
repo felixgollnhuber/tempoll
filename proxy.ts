@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 
 import { getParticipantSessionCookieFromEditLink } from "@/lib/event-service";
 import { appConfig } from "@/lib/config";
+import { isDevModeEnabled } from "@/lib/dev-mode";
 import { LOCALE_COOKIE_NAME } from "@/lib/i18n/locale";
 import { createI18n, resolveLocale } from "@/lib/i18n/server";
 import { getParticipantCookieOptions } from "@/lib/tokens";
@@ -29,7 +30,11 @@ export async function proxy(request: NextRequest) {
   if (!isAppSetupComplete()) {
     const { pathname } = request.nextUrl;
 
-    if (pathname === "/setup" || pathname === "/api/health") {
+    if (
+      pathname === "/setup" ||
+      pathname === "/api/health" ||
+      (pathname === "/dev/database" && isDevModeEnabled())
+    ) {
       return NextResponse.next();
     }
 

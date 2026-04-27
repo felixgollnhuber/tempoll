@@ -8,6 +8,11 @@ export type RecentEventEntry = {
   lastViewedManageAt?: string;
 };
 
+export type DisplayRecentEventEntry = RecentEventEntry & {
+  devSeed: boolean;
+  devOnly: boolean;
+};
+
 export type RecentEventUpdate = {
   slug: string;
   title: string;
@@ -58,6 +63,41 @@ export function mergeRecentEvents(
 
   const remaining = existingEntries.filter((entry) => entry.slug !== update.slug);
   return sortRecentEvents([merged, ...remaining]);
+}
+
+export function mergeDevSeedRecentEvents(
+  userEntries: RecentEventEntry[],
+  devSeedEntries: RecentEventEntry[],
+): DisplayRecentEventEntry[] {
+  const devSeedBySlug = new Map(devSeedEntries.map((entry) => [entry.slug, entry]));
+  const userDisplayEntries = sortRecentEvents(userEntries).map((entry) => {
+    const seedEntry = devSeedBySlug.get(entry.slug);
+
+    return {
+      ...entry,
+      publicUrl: entry.publicUrl ?? seedEntry?.publicUrl,
+      manageUrl: entry.manageUrl ?? seedEntry?.manageUrl,
+      lastViewedPublicAt: entry.lastViewedPublicAt ?? seedEntry?.lastViewedPublicAt,
+      lastViewedManageAt: entry.lastViewedManageAt ?? seedEntry?.lastViewedManageAt,
+      devSeed: Boolean(seedEntry),
+      devOnly: false,
+    };
+  });
+
+  if (devSeedEntries.length === 0) {
+    return userDisplayEntries;
+  }
+
+  const userSlugs = new Set(userEntries.map((entry) => entry.slug));
+  const devOnlyEntries = sortRecentEvents(devSeedEntries.filter((entry) => !userSlugs.has(entry.slug))).map(
+    (entry) => ({
+      ...entry,
+      devSeed: true,
+      devOnly: true,
+    }),
+  );
+
+  return [...userDisplayEntries, ...devOnlyEntries];
 }
 
 export function readRecentEvents() {

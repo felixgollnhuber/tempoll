@@ -8,11 +8,12 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(rootDir, "src"),
+      "server-only": path.resolve(rootDir, "src/test/empty-module.ts"),
     },
   },
   test: {
     environment: "jsdom",
-    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+    include: ["*.test.ts", "src/**/*.test.ts", "src/**/*.test.tsx", "scripts/**/*.test.mjs"],
     setupFiles: ["./src/test/setup.ts"],
   },
 });

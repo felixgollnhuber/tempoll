@@ -122,4 +122,30 @@ describe("AppChrome", () => {
 
     expect(document.querySelector('a[href^="mailto:"]')).toBeNull();
   });
+
+  it("shows the database status link only in dev mode", () => {
+    const { rerender } = renderWithI18n(
+      <AppChrome appName="tempoll" setupComplete legalPagesEnabled={false}>
+        <div>content</div>
+      </AppChrome>,
+    );
+
+    expect(screen.queryByRole("link", { name: "Database status" })).not.toBeInTheDocument();
+
+    rerender(
+      <AppChrome
+        appName="tempoll"
+        setupComplete
+        legalPagesEnabled={false}
+        devModeEnabled
+      >
+        <div>content</div>
+      </AppChrome>,
+    );
+
+    expect(screen.getByRole("link", { name: "Database status" })).toHaveAttribute(
+      "href",
+      "/dev/database",
+    );
+  });
 });
