@@ -718,6 +718,8 @@ describe("PublicEventClient", () => {
 
     expect(await screen.findByText("Tue, Mar 31 - Wed, Apr 1")).toBeInTheDocument();
     expect(await screen.findByText("Days 2 - 3 of 5")).toBeInTheDocument();
+    expect(screen.getByText("More days available")).toBeInTheDocument();
+    expect(screen.queryByText("More days ahead")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Show previous days" })).toBeEnabled();
 
     fireEvent.click(screen.getByRole("button", { name: "Show next days" }));
@@ -779,12 +781,41 @@ describe("PublicEventClient", () => {
     expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
   });
 
+  it("keeps the join button disabled until the name matches backend length limits", async () => {
+    const user = userEvent.setup();
+
+    renderWithI18n(
+      <PublicEventClient
+        slug="test-event"
+        initialSnapshot={createSnapshot({ withCurrentUser: false })}
+        initialSession={null}
+      />,
+    );
+
+    const nameInput = screen.getByLabelText("Your name");
+    const joinButton = screen.getByRole("button", { name: "Join event" });
+
+    await user.type(nameInput, "A");
+    expect(joinButton).toBeDisabled();
+
+    await user.clear(nameInput);
+    await user.type(nameInput, "Al");
+    expect(joinButton).toBeEnabled();
+
+    await user.clear(nameInput);
+    await user.type(nameInput, "A".repeat(33));
+    expect(joinButton).toBeDisabled();
+  });
+
   it("shows the heatmap after a participant joins", async () => {
     const user = userEvent.setup();
     const joinedSnapshot = createSnapshot();
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       if (String(input) === "/api/events/test-event/participants") {
         expect(init?.method).toBe("POST");
+        expect(JSON.parse(String(init?.body))).toEqual({
+          displayName: "Felix",
+        });
         return {
           ok: true,
           json: async () => ({
@@ -815,7 +846,7 @@ describe("PublicEventClient", () => {
       />,
     );
 
-    await user.type(screen.getByLabelText("Your name"), "Felix");
+    await user.type(screen.getByLabelText("Your name"), " Felix ");
     await user.click(screen.getByRole("button", { name: "Join event" }));
 
     expect(await screen.findByRole("button", { name: "Edit" })).toHaveAttribute(

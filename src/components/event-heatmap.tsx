@@ -510,11 +510,14 @@ export function EventHeatmap({
   const canShowNextDates =
     usesDateWindowing &&
     clampedVisibleDateStartIndex + visibleDates.length < projectedBoard.dates.length;
-  const dayWindowPrompt = canShowNextDates
-    ? messages.publicEvent.moreDaysAhead
-    : canShowPreviousDates
-      ? messages.publicEvent.earlierDaysAvailable
-      : messages.publicEvent.moreDaysAvailable;
+  const dayWindowPrompt =
+    canShowPreviousDates && canShowNextDates
+      ? messages.publicEvent.moreDaysAvailable
+      : canShowNextDates
+        ? messages.publicEvent.moreDaysAhead
+        : canShowPreviousDates
+          ? messages.publicEvent.earlierDaysAvailable
+          : messages.publicEvent.moreDaysAvailable;
   const visibleRangeLabel = useMemo(() => getVisibleRangeLabel(visibleDates), [visibleDates]);
   const viewerTimezoneOption = useMemo(
     () => findTimezoneOption(timezoneOptions, viewerTimezone),

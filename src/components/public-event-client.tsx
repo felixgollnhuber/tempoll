@@ -96,7 +96,9 @@ export function PublicEventClient({
   }, []);
   const canEdit = Boolean(session && snapshot.status === "OPEN");
   const shouldShowPreJoin = !session && snapshot.status === "OPEN";
-  const canJoin = snapshot.status === "OPEN" && name.trim().length > 0;
+  const trimmedName = name.trim();
+  const canJoin =
+    snapshot.status === "OPEN" && trimmedName.length >= 2 && trimmedName.length <= 32;
   const hasAnyAvailability = snapshot.participants.some(
     (participant) => participant.selectedSlotCount > 0,
   );
@@ -272,7 +274,7 @@ export function PublicEventClient({
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        displayName: name,
+        displayName: trimmedName,
       }),
     });
 
