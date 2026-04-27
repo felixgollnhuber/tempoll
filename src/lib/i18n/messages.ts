@@ -200,6 +200,12 @@ export const en = {
     participantHighlighting: "Highlighting",
     joinTitle: "Join this board",
     joinDescription: "Enter your name to start selecting the times that work for you.",
+    joinStepNameTitle: "Enter your name",
+    joinStepAvailabilityTitle: "Select availability",
+    joinStepAvailabilityDescription:
+      "The availability grid appears after you join, so your choices are saved to your name.",
+    joinGateDescription:
+      "First enter your name. Then you can mark the times that work for you.",
     yourNameLabel: "Your name",
     yourNamePlaceholder: "Alex, Nora, Product team...",
     joinButton: "Join event",
@@ -222,6 +228,9 @@ export const en = {
     showPreviousDays: "Show previous days",
     showNextDays: "Show next days",
     dayWindowSummary: "Days {start} - {end} of {total}",
+    moreDaysAvailable: "More days available",
+    moreDaysAhead: "More days ahead",
+    earlierDaysAvailable: "Earlier days available",
     availableCountTitle:
       "{date} {time} · {available}/{total} available · {names}",
     nobodyAvailableTitle: "{date} {time} · nobody available",
@@ -849,6 +858,12 @@ export const de: Messages = {
     joinTitle: "Diesem Board beitreten",
     joinDescription:
       "Gib deinen Namen ein, um die Zeiten zu markieren, die für dich passen.",
+    joinStepNameTitle: "Namen eingeben",
+    joinStepAvailabilityTitle: "Verfügbarkeit auswählen",
+    joinStepAvailabilityDescription:
+      "Das Verfügbarkeitsraster erscheint nach dem Beitritt, damit deine Auswahl mit deinem Namen gespeichert wird.",
+    joinGateDescription:
+      "Gib zuerst deinen Namen ein. Danach kannst du die passenden Zeiten markieren.",
     yourNameLabel: "Dein Name",
     yourNamePlaceholder: "Alex, Nora, Produktteam...",
     joinButton: "Event beitreten",
@@ -872,6 +887,9 @@ export const de: Messages = {
     showPreviousDays: "Vorherige Tage anzeigen",
     showNextDays: "Nächste Tage anzeigen",
     dayWindowSummary: "Tage {start} - {end} von {total}",
+    moreDaysAvailable: "Weitere Tage verfügbar",
+    moreDaysAhead: "Weitere Tage folgen",
+    earlierDaysAvailable: "Frühere Tage verfügbar",
     availableCountTitle:
       "{date} {time} · {available}/{total} verfügbar · {names}",
     nobodyAvailableTitle: "{date} {time} · niemand verfügbar",

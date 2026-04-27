@@ -273,7 +273,7 @@ describe("PublicEventClient", () => {
         slotStart: "2026-03-30T07:00:00.000Z",
         slotEnd: "2026-03-30T08:00:00.000Z",
         dateKey: "2026-03-30",
-        label: "Mon, Mar 30 · 09:00–10:00",
+        label: "Mon, Mar 30 · 09:00-10:00",
         localLabel: null,
         availableCount: 2,
         participantIds: ["p1", "p2"],
@@ -284,7 +284,10 @@ describe("PublicEventClient", () => {
       <PublicEventClient
         slug="test-event"
         initialSnapshot={snapshot}
-        initialSession={null}
+        initialSession={{
+          participantId: "p1",
+          displayName: "Felix",
+        }}
         timezones={defaultTimezones}
       />,
     );
@@ -292,7 +295,7 @@ describe("PublicEventClient", () => {
     await user.click(screen.getByRole("combobox", { name: "Display timezone" }));
     await user.click(screen.getByRole("option", { name: /America\/New_York/ }));
 
-    expect(screen.getAllByText("Mon, Mar 30 · 03:00–04:00")).toHaveLength(2);
+    expect(screen.getAllByText("Mon, Mar 30 · 03:00-04:00")).toHaveLength(2);
   });
 
   it("renders local fixed-date labels after a manual timezone override", async () => {
@@ -303,7 +306,7 @@ describe("PublicEventClient", () => {
         slotStart: "2026-03-30T07:00:00.000Z",
         slotEnd: "2026-03-30T08:00:00.000Z",
         dateKey: "2026-03-30",
-        label: "Mon, Mar 30 · 09:00–10:00",
+        label: "Mon, Mar 30 · 09:00-10:00",
         localLabel: null,
         availableCount: 2,
         participantIds: ["p1", "p2"],
@@ -322,7 +325,7 @@ describe("PublicEventClient", () => {
     await user.click(screen.getByRole("combobox", { name: "Display timezone" }));
     await user.click(screen.getByRole("option", { name: /America\/New_York/ }));
 
-    expect(screen.getAllByText("Mon, Mar 30 · 03:00–04:00")).toHaveLength(2);
+    expect(screen.getAllByText("Mon, Mar 30 · 03:00-04:00")).toHaveLength(2);
   });
 
   it("reads a stored timezone override on remount", async () => {
@@ -546,7 +549,7 @@ describe("PublicEventClient", () => {
   });
 
   it("uses relative overlap buckets for cells and legend based on the current maximum overlap", () => {
-    const snapshot = createSnapshot({ withCurrentUser: false });
+    const snapshot = createSnapshot({ status: "CLOSED", withCurrentUser: false });
     snapshot.slots = snapshot.slots.map((slot) => {
       if (slot.slotStart === "2026-03-30T07:00:00.000Z") {
         return {
@@ -706,20 +709,23 @@ describe("PublicEventClient", () => {
       />,
     );
 
-    expect(await screen.findByText("Mon, Mar 30 – Tue, Mar 31")).toBeInTheDocument();
+    expect(await screen.findByText("More days ahead")).toBeInTheDocument();
+    expect(await screen.findByText("Mon, Mar 30 - Tue, Mar 31")).toBeInTheDocument();
     expect(await screen.findByText("Days 1 - 2 of 5")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Show previous days" })).toBeDisabled();
 
     fireEvent.click(screen.getByRole("button", { name: "Show next days" }));
 
-    expect(await screen.findByText("Tue, Mar 31 – Wed, Apr 1")).toBeInTheDocument();
+    expect(await screen.findByText("Tue, Mar 31 - Wed, Apr 1")).toBeInTheDocument();
     expect(await screen.findByText("Days 2 - 3 of 5")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Show previous days" })).toBeEnabled();
 
     fireEvent.click(screen.getByRole("button", { name: "Show next days" }));
     fireEvent.click(screen.getByRole("button", { name: "Show next days" }));
 
-    expect(await screen.findByText("Thu, Apr 2 – Fri, Apr 3")).toBeInTheDocument();
+    expect(await screen.findByText("Thu, Apr 2 - Fri, Apr 3")).toBeInTheDocument();
+    expect(screen.getByText("Earlier days available")).toBeInTheDocument();
+    expect(screen.queryByText("More days ahead")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Show next days" })).toBeDisabled();
   });
 
@@ -756,7 +762,7 @@ describe("PublicEventClient", () => {
     expect(screen.queryByText("Slot details")).not.toBeInTheDocument();
   });
 
-  it("stays in view mode when there is no editable session", () => {
+  it("shows the join flow and hides the heatmap for open events without a session", () => {
     renderWithI18n(
       <PublicEventClient
         slug="test-event"
@@ -765,9 +771,97 @@ describe("PublicEventClient", () => {
       />,
     );
 
+    expect(screen.getByRole("heading", { name: "Test Event" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Enter your name" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Select availability" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Join event" })).toBeDisabled();
+    expect(document.querySelector('[data-slot="event-heatmap-grid"]')).toBeNull();
+    expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+  });
+
+  it("shows the heatmap after a participant joins", async () => {
+    const user = userEvent.setup();
+    const joinedSnapshot = createSnapshot();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === "/api/events/test-event/participants") {
+        expect(init?.method).toBe("POST");
+        return {
+          ok: true,
+          json: async () => ({
+            session: {
+              participantId: "p1",
+              displayName: "Felix",
+            },
+          }),
+        };
+      }
+
+      if (String(input) === "/api/events/test-event") {
+        return {
+          ok: true,
+          json: async () => ({ snapshot: joinedSnapshot }),
+        };
+      }
+
+      throw new Error(`Unhandled fetch call: ${String(input)}`);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    renderWithI18n(
+      <PublicEventClient
+        slug="test-event"
+        initialSnapshot={createSnapshot({ withCurrentUser: false })}
+        initialSession={null}
+      />,
+    );
+
+    await user.type(screen.getByLabelText("Your name"), "Felix");
+    await user.click(screen.getByRole("button", { name: "Join event" }));
+
+    expect(await screen.findByRole("button", { name: "Edit" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(document.querySelector('[data-slot="event-heatmap-grid"]')).not.toBeNull();
+    expect(screen.queryByRole("heading", { name: "Enter your name" })).not.toBeInTheDocument();
+  });
+
+  it("keeps join errors visible before the heatmap is shown", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn(async () => ({
+      ok: false,
+      json: async () => ({ error: "This name is already taken." }),
+    }));
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    renderWithI18n(
+      <PublicEventClient
+        slug="test-event"
+        initialSnapshot={createSnapshot({ withCurrentUser: false })}
+        initialSession={null}
+      />,
+    );
+
+    await user.type(screen.getByLabelText("Your name"), "Felix");
+    await user.click(screen.getByRole("button", { name: "Join event" }));
+
+    expect(await screen.findByText("This name is already taken.")).toBeInTheDocument();
+    expect(document.querySelector('[data-slot="event-heatmap-grid"]')).toBeNull();
+  });
+
+  it("shows closed events without requiring a participant session", () => {
+    renderWithI18n(
+      <PublicEventClient
+        slug="test-event"
+        initialSnapshot={createSnapshot({ status: "CLOSED", withCurrentUser: false })}
+        initialSession={null}
+      />,
+    );
+
     expect(screen.getByRole("button", { name: "Edit" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "View" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText(/Click any slot to see who is available and who is not\./i)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Enter your name" })).not.toBeInTheDocument();
   });
 
   it("stays in view mode when the event is closed", () => {
@@ -851,7 +945,10 @@ describe("PublicEventClient", () => {
         slug="test-event"
         shareUrl="https://tempoll.app/e/test-event"
         initialSnapshot={createSnapshot()}
-        initialSession={null}
+        initialSession={{
+          participantId: "p1",
+          displayName: "Felix",
+        }}
       />,
     );
 
@@ -869,7 +966,10 @@ describe("PublicEventClient", () => {
         slug="test-event"
         shareUrl="https://tempoll.app/e/test-event"
         initialSnapshot={createSnapshot({ dayCount: 7 })}
-        initialSession={null}
+        initialSession={{
+          participantId: "p1",
+          displayName: "Felix",
+        }}
       />,
       { locale: "de" },
     );
