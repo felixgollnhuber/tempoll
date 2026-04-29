@@ -366,6 +366,11 @@ describe("ManageEventClient", () => {
     renderWithI18n(<ManageEventClient initialView={view} timezones={defaultTimezones} />);
 
     await user.click(screen.getByRole("combobox", { name: "Display timezone" }));
+    await user.type(screen.getByPlaceholderText("Search timezones..."), "new");
+
+    expect(screen.getByRole("option", { name: /America\/New_York/ })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /Europe\/Vienna/ })).not.toBeInTheDocument();
+
     await user.click(screen.getByRole("option", { name: /America\/New_York/ }));
 
     expect(screen.getByRole("combobox", { name: "Display timezone" })).toHaveTextContent(

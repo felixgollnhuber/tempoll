@@ -22,6 +22,7 @@ import {
 } from "react";
 
 import { EventMetaDetails } from "@/components/event-meta-details";
+import { TimezoneCombobox } from "@/components/timezone-combobox";
 import {
   buildFinalizedSlot,
   buildProjectedBoard,
@@ -32,19 +33,11 @@ import { useI18n } from "@/lib/i18n/context";
 import { findTimezoneOption } from "@/lib/timezone-options";
 import type { PublicEventSnapshot, SnapshotParticipant, TimezoneOption } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { AUTOMATIC_TIMEZONE_VALUE } from "@/lib/viewer-timezone";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
 export type DraftSelection = Record<string, boolean>;
@@ -1007,25 +1000,16 @@ export function EventHeatmap({
                     >
                       {messages.publicEvent.viewerTimezoneLabel}
                     </Label>
-                    <Select value={viewerTimezoneSelectValue} onValueChange={onViewerTimezoneChange}>
-                      <SelectTrigger
-                        id={viewerTimezoneSelectId}
-                        size="sm"
-                        className="min-w-[11.5rem] bg-background text-xs"
-                      >
-                        <SelectValue placeholder={messages.publicEvent.viewerTimezoneLabel} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={AUTOMATIC_TIMEZONE_VALUE}>
-                          {messages.publicEvent.viewerTimezoneAutomatic}
-                        </SelectItem>
-                        {timezoneOptions.map((timezoneOption) => (
-                          <SelectItem key={timezoneOption.value} value={timezoneOption.value}>
-                            {timezoneOption.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <TimezoneCombobox
+                      id={viewerTimezoneSelectId}
+                      label={messages.publicEvent.viewerTimezoneLabel}
+                      value={viewerTimezoneSelectValue}
+                      options={timezoneOptions}
+                      onValueChange={onViewerTimezoneChange}
+                      placeholder={messages.publicEvent.viewerTimezoneLabel}
+                      size="sm"
+                      includeAutomatic
+                    />
                   </div>
                   {showModeToggle ? (
                     <SegmentedControl>

@@ -18,6 +18,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
+import { TimezoneCombobox } from "@/components/timezone-combobox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -686,32 +687,19 @@ export function CreateEventForm({
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor={eventFieldIds.timezone}>{messages.createEvent.timezoneLabel}</Label>
-                <Select
+                <TimezoneCombobox
+                  id={eventFieldIds.timezone}
+                  label={messages.createEvent.timezoneLabel}
                   value={timezone}
                   onValueChange={(value) => {
                     setTimezone(value);
                     clearErrors("timezone");
                   }}
-                >
-                  <SelectTrigger
-                    id={eventFieldIds.timezone}
-                    aria-invalid={fieldErrors.timezone ? true : undefined}
-                    aria-describedby={fieldErrors.timezone ? "timezone-error" : undefined}
-                    className={cn(
-                      fieldErrors.timezone &&
-                        "border-destructive focus:ring-destructive/20",
-                    )}
-                  >
-                    <SelectValue placeholder={messages.createEvent.timezonePlaceholder} />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-80">
-                    {timezoneOptions.map((timezoneOption) => (
-                      <SelectItem key={timezoneOption.value} value={timezoneOption.value}>
-                        {timezoneOption.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  options={timezoneOptions}
+                  placeholder={messages.createEvent.timezonePlaceholder}
+                  invalid={Boolean(fieldErrors.timezone)}
+                  describedBy={fieldErrors.timezone ? "timezone-error" : undefined}
+                />
                 {fieldErrors.timezone ? (
                   <p id="timezone-error" className="text-sm text-destructive">
                     {fieldErrors.timezone}

@@ -172,6 +172,30 @@ describe("CreateEventForm", () => {
     ]);
   });
 
+  it("filters timezone options by search text and keeps the selected value", async () => {
+    const user = userEvent.setup();
+
+    renderWithI18n(
+      <CreateEventForm
+        timezones={["Europe/Vienna", "Europe/Berlin", "America/New_York"]}
+        timeOptions={defaultTimeOptions}
+        notificationsConfigured={true}
+      />,
+    );
+
+    await user.click(screen.getByRole("combobox", { name: "Timezone" }));
+    await user.type(screen.getByPlaceholderText("Search timezones..."), "berlin");
+
+    expect(screen.getByRole("option", { name: /Europe\/Berlin/ })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /Europe\/Vienna/ })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("option", { name: /Europe\/Berlin/ }));
+
+    expect(screen.getByRole("combobox", { name: "Timezone" })).toHaveTextContent(
+      "Europe/Berlin",
+    );
+  });
+
   it("submits selected daily window and slot size after a successful event creation", async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn().mockResolvedValue({
