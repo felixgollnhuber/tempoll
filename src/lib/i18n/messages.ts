@@ -50,6 +50,8 @@ export const en = {
     and: "and",
     yes: "Yes",
     no: "No",
+    timezoneSearchPlaceholder: "Search timezones...",
+    timezoneSearchEmpty: "No timezones found.",
   },
   appChrome: {
     newEvent: "New event",
@@ -791,6 +793,8 @@ export const de: Messages = {
     and: "und",
     yes: "Ja",
     no: "Nein",
+    timezoneSearchPlaceholder: "Zeitzonen suchen...",
+    timezoneSearchEmpty: "Keine Zeitzonen gefunden.",
   },
   appChrome: {
     newEvent: "Neues Event",
