@@ -61,50 +61,24 @@ export const en = {
     privacy: "Privacy",
   },
   home: {
-    badge: "Free to use, no account required",
-    title: "The free, no-account alternative to When2Meet.",
+    eyebrow: ["A modern When2Meet", "Self-hostable", "Open source"],
+    titleLines: ["Create the board.", "Share the link.", "Find the "],
+    titleAccent: "overlap.",
     description:
-      "Create an event, share the link, and let everyone paint availability on a live heatmap. Organizers get a private manage page, participants join with just a name, and tempoll stays free to use.",
+      "tempoll is a free, self-hostable When2Meet alternative. Paint availability on a live heatmap. Organizers keep a private manage page; participants join with just a name.",
     primaryCta: "Create an event",
-    secondaryCta: "Recent events",
-    features: {
-      liveHeatmap: {
-        title: "Live heatmap",
-        copy: "Availability updates in real time while participants fill in the grid.",
-      },
-      rankedWindows: {
-        title: "Ranked windows",
-        copy: "The best meeting slots are suggested automatically for the full duration.",
-      },
-      simpleSharing: {
-        title: "Simple sharing",
-        copy: "Participants join with a name only while organizers keep a private manage link.",
-      },
-    },
+    secondaryCta: "Source on GitHub",
+    specStrip: ["Live heatmap", "Ranked windows", "Realtime", "Account-free"],
     preview: {
+      eyebrow: "Preview",
       title: "Thursday design review",
-      description: "Preview of the shared availability board",
+      description: "Six people, four days, painted in real time.",
       participants: "{count} participants",
-      topOptionsAttendees: "{count}+ attendees available",
+      topOptionsTitle: "Best meeting windows",
+      topOptionRank: "#{rank}",
+      topOptionsAttendees: "{count}+ available",
       dayLabels: ["Tue", "Wed", "Thu", "Fri"],
       topOptionLabels: ["Thu · 13:00-14:00", "Wed · 11:00-12:00", "Fri · 15:00-16:00"],
-    },
-    highlights: {
-      asyncCollaboration: {
-        title: "Free to use",
-        description:
-          "Create boards, share links, and coordinate without paywalls, seats, or setup friction.",
-      },
-      selfHosting: {
-        title: "Join with just a name",
-        description:
-          "Participants can jump straight into the heatmap while organizers keep a separate private manage link.",
-      },
-      modernTeams: {
-        title: "Live heatmap, clearer picks",
-        description:
-          "Watch overlap build in real time and let the strongest meeting windows rise to the top automatically.",
-      },
     },
   },
   newEventPage: {
@@ -802,50 +776,24 @@ export const de: Messages = {
     privacy: "Datenschutz",
   },
   home: {
-    badge: "Kostenlos nutzbar, ohne Konto",
-    title: "Die kostenlose Alternative zu When2Meet ohne Konto.",
+    eyebrow: ["Modernes When2Meet", "Selbst-hostbar", "Open Source"],
+    titleLines: ["Das Board erstellen.", "Den Link teilen.", "Die "],
+    titleAccent: "Schnittmenge finden.",
     description:
-      "Erstelle ein Event, teile den Link und lass alle ihre Verfügbarkeit direkt auf einer Live-Heatmap markieren. Die organisierende Person erhält eine private Verwaltungsseite, alle anderen steigen nur mit einem Namen ein, und tempoll bleibt kostenlos nutzbar.",
+      "tempoll ist eine kostenlose, selbst-hostbare When2Meet-Alternative. Verfügbarkeit auf einer Live-Heatmap einmalen. Die organisierende Person behält eine private Verwaltungsseite; alle anderen kommen nur mit einem Namen hinein.",
     primaryCta: "Event erstellen",
-    secondaryCta: "Letzte Events",
-    features: {
-      liveHeatmap: {
-        title: "Live-Heatmap",
-        copy: "Verfügbarkeiten aktualisieren sich in Echtzeit, während Teilnehmende das Raster ausfüllen.",
-      },
-      rankedWindows: {
-        title: "Gerankte Zeitfenster",
-        copy: "Die besten Meeting-Slots werden automatisch für die gesamte Dauer vorgeschlagen.",
-      },
-      simpleSharing: {
-        title: "Einfach teilen",
-        copy: "Teilnehmende kommen nur mit einem Namen hinein, während die organisierende Person einen privaten Verwaltungslink behält.",
-      },
-    },
+    secondaryCta: "Quellcode auf GitHub",
+    specStrip: ["Live-Heatmap", "Top-Zeitfenster", "Realtime", "Ohne Konto"],
     preview: {
+      eyebrow: "Vorschau",
       title: "Design-Review am Donnerstag",
-      description: "Vorschau auf das geteilte Verfügbarkeitsboard",
+      description: "Sechs Personen, vier Tage, in Echtzeit gemalt.",
       participants: "{count} Teilnehmende",
-      topOptionsAttendees: "{count}+ Teilnehmende verfügbar",
+      topOptionsTitle: "Beste Meeting-Zeitfenster",
+      topOptionRank: "#{rank}",
+      topOptionsAttendees: "{count}+ verfügbar",
       dayLabels: ["Di", "Mi", "Do", "Fr"],
       topOptionLabels: ["Do · 13:00-14:00", "Mi · 11:00-12:00", "Fr · 15:00-16:00"],
-    },
-    highlights: {
-      asyncCollaboration: {
-        title: "Kostenlos nutzbar",
-        description:
-          "Erstelle Boards, teile Links und koordiniere ohne Paywall, Lizenzen oder Setup-Hürden.",
-      },
-      selfHosting: {
-        title: "Beitritt nur mit Namen",
-        description:
-          "Teilnehmende springen direkt in die Heatmap, während die organisierende Person einen separaten privaten Verwaltungslink behält.",
-      },
-      modernTeams: {
-        title: "Live-Heatmap, klarere Auswahl",
-        description:
-          "Sieh live, wo Überschneidungen entstehen, und lass die besten Meeting-Zeitfenster automatisch nach oben rutschen.",
-      },
     },
   },
   newEventPage: {

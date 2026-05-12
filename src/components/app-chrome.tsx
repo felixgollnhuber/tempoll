@@ -57,11 +57,11 @@ export function AppChrome({
 
   return (
     <>
-      <header className="border-b bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/70">
+      <header className="border-b border-border/70 bg-background">
         <div className="app-shell flex h-16 items-center justify-between gap-3 sm:gap-4">
           <Link
             href="/"
-            className="inline-flex shrink-0 items-center text-base font-semibold tracking-tight sm:text-lg"
+            className="inline-flex shrink-0 items-center font-heading text-base font-semibold tracking-tight sm:text-lg"
           >
             {showLogo && logoSrc ? (
               // eslint-disable-next-line @next/next/no-img-element

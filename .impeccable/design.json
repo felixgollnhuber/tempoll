@@ -1,0 +1,429 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-05-12T17:55:00Z",
+  "title": "Design System: tempoll",
+  "extensions": {
+    "colorMeta": {
+      "tempoll-teal": {
+        "role": "primary",
+        "displayName": "Tempoll Teal",
+        "canonical": "oklch(0.52 0.15 192.8)",
+        "tonalRamp": [
+          "oklch(0.18 0.05 192.8)",
+          "oklch(0.28 0.08 192.8)",
+          "oklch(0.38 0.12 192.8)",
+          "oklch(0.45 0.14 192.8)",
+          "oklch(0.52 0.15 192.8)",
+          "oklch(0.65 0.13 192.8)",
+          "oklch(0.78 0.09 192.8)",
+          "oklch(0.92 0.04 192.8)"
+        ]
+      },
+      "warm-paper": {
+        "role": "neutral",
+        "displayName": "Warm Paper",
+        "canonical": "oklch(0.98 0.012 84.36)",
+        "tonalRamp": [
+          "oklch(0.18 0.02 84.36)",
+          "oklch(0.32 0.02 84.36)",
+          "oklch(0.46 0.015 84.36)",
+          "oklch(0.62 0.015 84.36)",
+          "oklch(0.78 0.012 84.36)",
+          "oklch(0.88 0.012 84.36)",
+          "oklch(0.95 0.012 84.36)",
+          "oklch(0.98 0.012 84.36)"
+        ]
+      },
+      "dusk-ink": {
+        "role": "neutral",
+        "displayName": "Dusk Ink",
+        "canonical": "oklch(0.23 0.02 229.72)",
+        "tonalRamp": [
+          "oklch(0.15 0.02 229.72)",
+          "oklch(0.23 0.02 229.72)",
+          "oklch(0.34 0.02 229.72)",
+          "oklch(0.46 0.02 229.72)",
+          "oklch(0.58 0.02 229.72)",
+          "oklch(0.72 0.018 229.72)",
+          "oklch(0.86 0.012 229.72)",
+          "oklch(0.95 0.008 229.72)"
+        ]
+      },
+      "sand-linen": {
+        "role": "secondary",
+        "displayName": "Sand Linen",
+        "canonical": "oklch(0.93 0.03 79.57)",
+        "tonalRamp": [
+          "oklch(0.22 0.04 79.57)",
+          "oklch(0.36 0.04 79.57)",
+          "oklch(0.5 0.04 79.57)",
+          "oklch(0.64 0.035 79.57)",
+          "oklch(0.78 0.035 79.57)",
+          "oklch(0.88 0.03 79.57)",
+          "oklch(0.93 0.03 79.57)",
+          "oklch(0.97 0.02 79.57)"
+        ]
+      },
+      "apricot-wash": {
+        "role": "secondary",
+        "displayName": "Apricot Wash",
+        "canonical": "oklch(0.92 0.05 67.92)",
+        "tonalRamp": [
+          "oklch(0.22 0.06 67.92)",
+          "oklch(0.36 0.07 67.92)",
+          "oklch(0.5 0.075 67.92)",
+          "oklch(0.62 0.07 67.92)",
+          "oklch(0.74 0.06 67.92)",
+          "oklch(0.85 0.055 67.92)",
+          "oklch(0.92 0.05 67.92)",
+          "oklch(0.97 0.025 67.92)"
+        ]
+      },
+      "page-tint": {
+        "role": "neutral",
+        "displayName": "Page Tint",
+        "canonical": "oklch(0.95 0.015 84.36)",
+        "tonalRamp": [
+          "oklch(0.2 0.02 84.36)",
+          "oklch(0.34 0.02 84.36)",
+          "oklch(0.48 0.018 84.36)",
+          "oklch(0.62 0.018 84.36)",
+          "oklch(0.75 0.015 84.36)",
+          "oklch(0.86 0.015 84.36)",
+          "oklch(0.92 0.015 84.36)",
+          "oklch(0.95 0.015 84.36)"
+        ]
+      },
+      "slate-blue": {
+        "role": "neutral",
+        "displayName": "Slate Blue",
+        "canonical": "oklch(0.52 0.02 230.52)",
+        "tonalRamp": [
+          "oklch(0.18 0.03 230.52)",
+          "oklch(0.3 0.025 230.52)",
+          "oklch(0.42 0.022 230.52)",
+          "oklch(0.52 0.02 230.52)",
+          "oklch(0.64 0.018 230.52)",
+          "oklch(0.78 0.015 230.52)",
+          "oklch(0.88 0.012 230.52)",
+          "oklch(0.95 0.01 230.52)"
+        ]
+      },
+      "paper-edge": {
+        "role": "neutral",
+        "displayName": "Paper Edge",
+        "canonical": "oklch(0.88 0.02 84.36)",
+        "tonalRamp": [
+          "oklch(0.22 0.025 84.36)",
+          "oklch(0.36 0.025 84.36)",
+          "oklch(0.5 0.022 84.36)",
+          "oklch(0.62 0.022 84.36)",
+          "oklch(0.74 0.022 84.36)",
+          "oklch(0.84 0.02 84.36)",
+          "oklch(0.9 0.018 84.36)",
+          "oklch(0.96 0.012 84.36)"
+        ]
+      },
+      "alert-red": {
+        "role": "destructive",
+        "displayName": "Alert Red",
+        "canonical": "oklch(0.62 0.21 25.03)",
+        "tonalRamp": [
+          "oklch(0.22 0.1 25.03)",
+          "oklch(0.32 0.14 25.03)",
+          "oklch(0.45 0.18 25.03)",
+          "oklch(0.55 0.2 25.03)",
+          "oklch(0.62 0.21 25.03)",
+          "oklch(0.74 0.16 25.03)",
+          "oklch(0.86 0.1 25.03)",
+          "oklch(0.94 0.05 25.03)"
+        ]
+      },
+      "dune": {
+        "role": "tertiary",
+        "displayName": "Dune",
+        "canonical": "oklch(0.82 0.09 75.19)",
+        "tonalRamp": [
+          "oklch(0.22 0.05 75.19)",
+          "oklch(0.36 0.07 75.19)",
+          "oklch(0.5 0.09 75.19)",
+          "oklch(0.62 0.1 75.19)",
+          "oklch(0.74 0.1 75.19)",
+          "oklch(0.82 0.09 75.19)",
+          "oklch(0.9 0.06 75.19)",
+          "oklch(0.96 0.03 75.19)"
+        ]
+      },
+      "mint-signal": {
+        "role": "tertiary",
+        "displayName": "Mint Signal",
+        "canonical": "oklch(0.72 0.14 167.12)",
+        "tonalRamp": [
+          "oklch(0.2 0.07 167.12)",
+          "oklch(0.32 0.1 167.12)",
+          "oklch(0.46 0.13 167.12)",
+          "oklch(0.58 0.14 167.12)",
+          "oklch(0.72 0.14 167.12)",
+          "oklch(0.84 0.1 167.12)",
+          "oklch(0.92 0.06 167.12)",
+          "oklch(0.97 0.03 167.12)"
+        ]
+      },
+      "cool-sky": {
+        "role": "tertiary",
+        "displayName": "Cool Sky",
+        "canonical": "oklch(0.68 0.16 202.5)",
+        "tonalRamp": [
+          "oklch(0.2 0.07 202.5)",
+          "oklch(0.32 0.1 202.5)",
+          "oklch(0.45 0.14 202.5)",
+          "oklch(0.56 0.16 202.5)",
+          "oklch(0.68 0.16 202.5)",
+          "oklch(0.8 0.12 202.5)",
+          "oklch(0.9 0.07 202.5)",
+          "oklch(0.96 0.035 202.5)"
+        ]
+      },
+      "lime-flag": {
+        "role": "tertiary",
+        "displayName": "Lime Flag",
+        "canonical": "oklch(0.72 0.14 120.32)",
+        "tonalRamp": [
+          "oklch(0.2 0.07 120.32)",
+          "oklch(0.32 0.1 120.32)",
+          "oklch(0.46 0.13 120.32)",
+          "oklch(0.58 0.14 120.32)",
+          "oklch(0.72 0.14 120.32)",
+          "oklch(0.83 0.1 120.32)",
+          "oklch(0.91 0.06 120.32)",
+          "oklch(0.96 0.03 120.32)"
+        ]
+      },
+      "coral": {
+        "role": "tertiary",
+        "displayName": "Coral",
+        "canonical": "oklch(0.75 0.14 20.1)",
+        "tonalRamp": [
+          "oklch(0.22 0.08 20.1)",
+          "oklch(0.34 0.11 20.1)",
+          "oklch(0.48 0.14 20.1)",
+          "oklch(0.6 0.15 20.1)",
+          "oklch(0.75 0.14 20.1)",
+          "oklch(0.85 0.1 20.1)",
+          "oklch(0.92 0.06 20.1)",
+          "oklch(0.97 0.03 20.1)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Hero headline only. Used on the home page H1 and marketing surfaces. One per page maximum."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Section headings; card titles inside major product surfaces (e.g. event title on the heatmap card)."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Card titles, dialog titles, sidebar section headings. The workhorse heading size in product UI."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Default reading text. Cap at 65–75ch on long-form surfaces (legal pages, setup wizard)."
+      },
+      "body-small": {
+        "displayName": "Body Small",
+        "purpose": "UI text inside controls (buttons, inputs, labels, descriptions)."
+      },
+      "label-eyebrow": {
+        "displayName": "Label / Eyebrow",
+        "purpose": "Eyebrow labels above metadata clusters. Always wide-tracked uppercase — the system's typographic signature."
+      }
+    },
+    "shadows": [
+      {
+        "name": "shadow-sm",
+        "value": "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+        "purpose": "Resting shadow for cards, inputs, outline/secondary/destructive buttons, badges, segmented controls. The default whisper layer."
+      },
+      {
+        "name": "shadow",
+        "value": "0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)",
+        "purpose": "Slightly stronger resting shadow used only on the primary Button variant and the participant colour dot."
+      },
+      {
+        "name": "ambient-background",
+        "value": "radial-gradient(circle at top, color-mix(in srgb, var(--primary) 10%, transparent) 0, transparent 34%), radial-gradient(circle at bottom, color-mix(in srgb, var(--primary) 8%, transparent) 0, transparent 30%), linear-gradient(180deg, color-mix(in srgb, white 55%, transparent) 0%, transparent 100%)",
+        "purpose": "Applied to body. Two faint Tempoll Teal radial washes plus a vertical white-to-transparent linear overlay. Part of the brand, not decoration."
+      }
+    ],
+    "motion": [
+      {
+        "name": "transition-colors",
+        "value": "color, background-color, border-color, text-decoration-color, fill, stroke 150ms cubic-bezier(0.4, 0, 0.2, 1)",
+        "purpose": "Default for hover/focus colour shifts on buttons, links, segmented control items."
+      },
+      {
+        "name": "transition-all",
+        "value": "all 150ms cubic-bezier(0.4, 0, 0.2, 1)",
+        "purpose": "Used on anchors, buttons, inputs, textareas globally for state transitions."
+      },
+      {
+        "name": "heatmap-paint",
+        "value": "instant",
+        "purpose": "Heatmap cell painting under pointer drag must be immediate. No transitions. The tactile signature relies on zero-latency fill."
+      }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" },
+      { "name": "2xl", "value": "1536px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single highest-priority CTA per surface. The only place Tempoll Teal appears as a fill in product UI.",
+      "html": "<button class=\"ds-btn-primary\">Create event</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; height: 2.25rem; padding: 0 1rem; border: none; border-radius: 0.8rem; background-color: oklch(0.52 0.15 192.8); color: oklch(0.98 0.01 84.36); font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif; font-size: 0.875rem; font-weight: 500; line-height: 1; white-space: nowrap; box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1); cursor: pointer; transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-btn-primary:hover { background-color: color-mix(in oklab, oklch(0.52 0.15 192.8) 90%, transparent); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 2px oklch(0.98 0.012 84.36), 0 0 0 4px oklch(0.52 0.15 192.8); } .ds-btn-primary:disabled { opacity: 0.5; pointer-events: none; }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "The default secondary action. Lives on Warm Paper, lifts to Apricot Wash on hover.",
+      "html": "<button class=\"ds-btn-outline\">View recent events</button>",
+      "css": ".ds-btn-outline { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; height: 2.25rem; padding: 0 1rem; border: 1px solid oklch(0.88 0.02 84.36); border-radius: 0.8rem; background-color: oklch(0.98 0.012 84.36); color: oklch(0.23 0.02 229.72); font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif; font-size: 0.875rem; font-weight: 500; line-height: 1; white-space: nowrap; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); cursor: pointer; transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1), color 150ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-btn-outline:hover { background-color: oklch(0.92 0.05 67.92); color: oklch(0.28 0.04 230.11); } .ds-btn-outline:focus-visible { outline: none; box-shadow: 0 0 0 2px oklch(0.98 0.012 84.36), 0 0 0 4px oklch(0.52 0.15 192.8); }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Warm Paper surface with softly rounded corners and whisper shadow. The default container for any meaningful block.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-card-header\"><div class=\"ds-card-eyebrow\"><span class=\"ds-card-eyebrow-item\"><svg viewBox=\"0 0 24 24\" width=\"12\" height=\"12\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3\" y=\"4\" width=\"18\" height=\"18\" rx=\"2\"/><path d=\"M16 2v4M8 2v4M3 10h18\"/></svg>5 days</span><span class=\"ds-card-eyebrow-item\"><svg viewBox=\"0 0 24 24\" width=\"12\" height=\"12\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M12 7v5l3 2\"/></svg>30-min slots</span></div><div class=\"ds-card-title\">Team sync planning</div><div class=\"ds-card-description\">Times shown in Europe/Berlin (CEST).</div></div></div>",
+      "css": ".ds-card { background-color: oklch(0.98 0.012 84.36); color: oklch(0.23 0.02 229.72); border: 1px solid oklch(0.88 0.02 84.36); border-radius: 1.4rem; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); padding: 1rem; font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif; } .ds-card-header { display: flex; flex-direction: column; gap: 0.5rem; } .ds-card-eyebrow { display: flex; flex-wrap: wrap; gap: 0.5rem; font-size: 0.625rem; font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase; color: oklch(0.52 0.02 230.52); } .ds-card-eyebrow-item { display: inline-flex; align-items: center; gap: 0.25rem; } .ds-card-title { font-family: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif; font-size: 1.5rem; font-weight: 600; line-height: 1.15; letter-spacing: -0.01em; color: oklch(0.23 0.02 229.72); } .ds-card-description { font-size: 0.75rem; line-height: 1.5; color: oklch(0.52 0.02 230.52); margin-top: 0.25rem; }"
+    },
+    {
+      "name": "Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Standard text field. Warm Paper fill, Paper Edge border, Tempoll Teal focus ring.",
+      "html": "<input class=\"ds-input\" placeholder=\"Your name\" />",
+      "css": ".ds-input { display: flex; width: 100%; height: 2.25rem; padding: 0.25rem 0.75rem; border: 1px solid oklch(0.88 0.02 84.36); border-radius: 0.8rem; background-color: oklch(0.98 0.012 84.36); color: oklch(0.23 0.02 229.72); font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif; font-size: 0.875rem; line-height: 1.5; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); transition: border-color 150ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-input::placeholder { color: oklch(0.52 0.02 230.52); } .ds-input:focus-visible { outline: none; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05), 0 0 0 2px oklch(0.98 0.012 84.36), 0 0 0 4px oklch(0.52 0.15 192.8); } .ds-input:disabled { opacity: 0.5; cursor: not-allowed; }"
+    },
+    {
+      "name": "Primary Badge",
+      "kind": "chip",
+      "refersTo": "badge-primary",
+      "description": "Inline metadata pill. Sand Linen for the workhorse variant; teal reserved for marketing.",
+      "html": "<div class=\"ds-badge-row\"><span class=\"ds-badge-primary\">6 participants</span><span class=\"ds-badge-secondary\">Account-free</span><span class=\"ds-badge-outline\">CEST</span></div>",
+      "css": ".ds-badge-row { display: inline-flex; gap: 0.5rem; align-items: center; font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif; } .ds-badge-primary { display: inline-flex; align-items: center; padding: 0.125rem 0.625rem; border-radius: 0.8rem; background-color: oklch(0.52 0.15 192.8); color: oklch(0.98 0.01 84.36); font-size: 0.75rem; font-weight: 600; box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1); } .ds-badge-secondary { display: inline-flex; align-items: center; padding: 0.125rem 0.625rem; border-radius: 0.8rem; background-color: oklch(0.93 0.03 79.57); color: oklch(0.28 0.04 230.11); font-size: 0.75rem; font-weight: 600; } .ds-badge-outline { display: inline-flex; align-items: center; padding: 0.125rem 0.625rem; border-radius: 0.8rem; background-color: transparent; color: oklch(0.23 0.02 229.72); font-size: 0.75rem; font-weight: 600; border: 1px solid oklch(0.88 0.02 84.36); }"
+    },
+    {
+      "name": "Segmented Control",
+      "kind": "custom",
+      "refersTo": "segmented-control",
+      "description": "Edit / View mode toggle on the heatmap. A native signature component of tempoll.",
+      "html": "<div class=\"ds-segmented\"><button class=\"ds-segmented-item ds-segmented-item--active\" type=\"button\">Edit</button><button class=\"ds-segmented-item\" type=\"button\">View</button></div>",
+      "css": ".ds-segmented { display: inline-flex; align-items: center; gap: 0.125rem; height: 2rem; padding: 0.125rem; border: 1px solid oklch(0.88 0.02 84.36); border-radius: 0.8rem; background-color: oklch(0.98 0.012 84.36); box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif; } .ds-segmented-item { display: inline-flex; height: 100%; padding: 0 0.75rem; border: none; border-radius: 0.6rem; background-color: transparent; color: oklch(0.23 0.02 229.72); font-size: 0.75rem; font-weight: 500; line-height: 1; white-space: nowrap; cursor: pointer; transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-segmented-item:hover { background-color: oklch(0.95 0.015 84.36); } .ds-segmented-item--active { background-color: oklch(0.93 0.03 79.57); color: oklch(0.28 0.04 230.11); box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); } .ds-segmented-item:focus-visible { outline: none; box-shadow: 0 0 0 2px oklch(0.98 0.012 84.36), 0 0 0 4px oklch(0.52 0.15 192.8); }"
+    },
+    {
+      "name": "Heatmap Density Row",
+      "kind": "custom",
+      "refersTo": "heatmap-cell-full",
+      "description": "The signature single-hue alpha density scale of Tempoll Teal that defines the live availability heatmap. Each cell maps a share of participants available to a step of Tempoll Teal alpha. Painted instantly on pointer drag.",
+      "html": "<div class=\"ds-heatmap\"><div class=\"ds-heatmap-row\"><div class=\"ds-heatmap-axis\">09:00</div><div class=\"ds-cell ds-cell--0\" aria-label=\"0 of 6 available\"></div><div class=\"ds-cell ds-cell--1\" aria-label=\"1 of 6 available\"></div><div class=\"ds-cell ds-cell--2\" aria-label=\"2 of 6 available\"></div><div class=\"ds-cell ds-cell--3\" aria-label=\"3 of 6 available\"></div><div class=\"ds-cell ds-cell--4\" aria-label=\"4 of 6 available\"></div><div class=\"ds-cell ds-cell--5\" aria-label=\"5 of 6 available\"></div><div class=\"ds-cell ds-cell--6\" aria-label=\"6 of 6 available\"></div></div><div class=\"ds-heatmap-row\"><div class=\"ds-heatmap-axis\">09:30</div><div class=\"ds-cell ds-cell--1\"></div><div class=\"ds-cell ds-cell--3 ds-cell--selected\" aria-label=\"Selected by you\"></div><div class=\"ds-cell ds-cell--4\"></div><div class=\"ds-cell ds-cell--6\"></div><div class=\"ds-cell ds-cell--5\"></div><div class=\"ds-cell ds-cell--3\"></div><div class=\"ds-cell ds-cell--2\"></div></div></div>",
+      "css": ".ds-heatmap { display: flex; flex-direction: column; gap: 1px; padding: 1px; background-color: oklch(0.88 0.02 84.36); border: 1px solid oklch(0.88 0.02 84.36); border-radius: 0.8rem; font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif; user-select: none; } .ds-heatmap-row { display: grid; grid-template-columns: 72px repeat(7, minmax(56px, 1fr)); gap: 1px; background-color: oklch(0.88 0.02 84.36); } .ds-heatmap-axis { display: flex; align-items: center; justify-content: flex-end; padding: 0 0.5rem; background-color: oklch(0.98 0.012 84.36); color: oklch(0.52 0.02 230.52); font-size: 0.6875rem; font-weight: 500; } .ds-cell { height: 1.25rem; background-color: oklch(0.98 0.012 84.36); cursor: crosshair; transition: filter 150ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-cell:hover { filter: brightness(0.98); } .ds-cell--0 { background-color: oklch(0.98 0.012 84.36); } .ds-cell--1 { background-color: color-mix(in oklab, oklch(0.52 0.15 192.8) 12%, transparent); } .ds-cell--2 { background-color: color-mix(in oklab, oklch(0.52 0.15 192.8) 24%, transparent); } .ds-cell--3 { background-color: color-mix(in oklab, oklch(0.52 0.15 192.8) 36%, transparent); } .ds-cell--4 { background-color: color-mix(in oklab, oklch(0.52 0.15 192.8) 50%, transparent); } .ds-cell--5 { background-color: color-mix(in oklab, oklch(0.52 0.15 192.8) 65%, transparent); } .ds-cell--6 { background-color: color-mix(in oklab, oklch(0.52 0.15 192.8) 80%, transparent); } .ds-cell--selected { outline: 2px solid oklch(0.52 0.15 192.8); outline-offset: -2px; box-shadow: inset 0 0 0 2px oklch(0.98 0.012 84.36); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Cool Tool",
+    "overview": "tempoll is a tool that looks like it was built by someone who uses it. The aesthetic is functional confidence: the heatmap is the product, and every surrounding element is calibrated to make that grid feel inevitable, fast, and a little bit hand-made. Linear's typographic discipline meets Raycast's small-but-real personality. The bias is always toward density and information over decoration, but never at the cost of warmth.\n\nThe system explicitly rejects three families of look: the Calendly-style SaaS landing (stacked feature shelves, trusted-by logos, hero laptops), the default shadcn / Tailwind-UI demo (slate-on-cream, pill badges, identical icon-plus-heading card grids), and the generic AI tool tells named in PRODUCT.md (gradient text, glassmorphism, hero-metric template, side-stripe borders, em dashes in body copy).\n\nThe atmosphere is warm and daylit, not corporate-neutral. The background is a paper-warm cream with two faint teal radial washes, top and bottom; the foreground text is a deep blue-tinted ink rather than pure black. The signature accent is a single, gathered teal, used sparingly as state and structure, never as decoration. The mood is workshop, not boardroom.",
+    "keyCharacteristics": [
+      "Warm paper background (oklch warm-cream) with two faint primary radial gradients as ambient atmosphere",
+      "One signature accent: Tempoll Teal (oklch(0.52 0.15 192.8)), used as state and information, never as decoration",
+      "Two-font system: Space Grotesk for headings/labels, Manrope for body. No third typeface, no system fallback drift",
+      "Heatmap density-first scheduling grid, kept close to classic When2Meet compactness",
+      "Whisper layering (subtle resting shadows on cards/buttons + ambient background gradient), no glassmorphism, no aggressive elevation",
+      "Small, kept-promises of personality: tactile hover-lifts on the heatmap, a deliberate microcopy voice, visible private-link markers, never decoration for its own sake"
+    ],
+    "rules": [
+      {
+        "name": "The One Teal Rule",
+        "body": "Tempoll Teal is the only saturated hue in the product UI at rest. If you reach for a second branded colour for a button, badge, or surface, stop, it belongs in the chart palette only. The teal's rarity is what makes the heatmap density legible at a glance.",
+        "section": "colors"
+      },
+      {
+        "name": "The Warm Paper Rule",
+        "body": "The app background is never #fff or pure neutral gray. It is always Warm Paper or one of its tinted siblings (Page Tint, Sand Linen). The two radial primary washes on body are part of the brand and must not be flattened to a solid fill.",
+        "section": "colors"
+      },
+      {
+        "name": "The Ink, Not Black, Rule",
+        "body": "Body and heading text is Dusk Ink (oklch with a blue tint), never #000 or oklch(0 0 0). Pure black on warm paper reads cheap.",
+        "section": "colors"
+      },
+      {
+        "name": "The Two-Font Rule",
+        "body": "Two typefaces, no more. Space Grotesk for everything that wants weight and structure (headings, eyebrow labels). Manrope for everything that wants to read like prose (body, descriptions, helper text). Resist the urge to bring in a third face for variety. Variety comes from weight, size, and letter-spacing.",
+        "section": "typography"
+      },
+      {
+        "name": "The Wide-Eyebrow Rule",
+        "body": "Eyebrow labels (text-[10px] to text-[11px]) always carry tracking-[0.14em] to tracking-[0.16em] and uppercase. This is the system's typographic signature, never use those tiny sizes without the wide tracking.",
+        "section": "typography"
+      },
+      {
+        "name": "The No-Italic-Body Rule",
+        "body": "Italic is reserved for genuine quotation or emphasis on a single word. Never italic for ambience or to differentiate metadata.",
+        "section": "typography"
+      },
+      {
+        "name": "The Whisper Rule",
+        "body": "No surface in the product UI rises above shadow (Tailwind default). shadow-md, shadow-lg, shadow-xl are reserved for transient overlays only (popovers, sheets, dialogs).",
+        "section": "elevation"
+      },
+      {
+        "name": "The No-Glass Rule",
+        "body": "backdrop-filter: blur(...) and translucent-with-blur surfaces are prohibited. The existing .glass-card utility is explicitly backdrop-blur-none for that reason.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Background-Is-Brand Rule",
+        "body": "The two radial primary washes on body are part of the design system. Do not replace body background with a solid colour, even on dense product surfaces.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do treat Tempoll Teal as the single saturated hue in product UI at rest. If the design needs a second colour, it belongs in the chart/heatmap palette only.",
+      "Do keep the background as Warm Paper with the two radial teal washes. The wash is brand, not decoration.",
+      "Do lead with density on the heatmap. If the design improves by making the grid smaller and tighter, do that. Density is the feature.",
+      "Do use Dusk Ink (blue-tinted oklch) for foreground text. Never #000, never pure neutral gray.",
+      "Do use Space Grotesk for headings and eyebrow labels, Manrope for body. Two families, no third.",
+      "Do carry eyebrow labels with tracking-[0.14em] to tracking-[0.16em] + uppercase. The wide tracking is the signature.",
+      "Do put personality in motion and microcopy: a tactile hover-lift on heatmap painting, a deliberate sentence in an empty state, a precise focus ring. Earn each one.",
+      "Do keep components quiet at rest, tactile on contact: subtle shadow-sm everywhere, sharper feedback only on hover/focus/active.",
+      "Do mark private organizer links visibly as sensitive in the UI. Privacy is a visual responsibility, not just a backend one.",
+      "Do respect prefers-reduced-motion: skip the heatmap brightness-shift hover when the user has reduced motion enabled."
+    ],
+    "donts": [
+      "Don't use gradient text. The brand is one solid Tempoll Teal, not a gradient sweep.",
+      "Don't use glassmorphism. No backdrop-filter: blur(...) on UI surfaces. The .glass-card utility is intentionally not glass.",
+      "Don't use the hero-metric template (big number + small label + supporting stats + gradient accent). It's the most-trained AI cliche; tempoll's home page is a heatmap preview, not a dashboard.",
+      "Don't repeat icon-plus-heading card grids. The home page has exactly one set of three feature cards by design; don't reach for that pattern again in product UI.",
+      "Don't use side-stripe borders (a colored border-left greater than 1px) on callouts, alerts, or cards. Banned. Use full borders, leading icons, or background tints instead.",
+      "Don't nest cards. A card never contains a card. Use rounded-md muted containers or border-t dividers internally.",
+      "Don't add a third typeface for variety. Variety comes from weight, size, and letter-spacing.",
+      "Don't use em dashes in body copy. Use commas, colons, semicolons, periods, or parentheses.",
+      "Don't lean on shadow-md, shadow-lg, shadow-xl in product UI. Whisper layering is the rule; transient overlays are the only exception.",
+      "Don't dashboardify the heatmap. Oversized cards, your scheduling insights framing, big chart hero treatments, none of it. The heatmap is the product.",
+      "Don't use Calendly-style enterprise copy (Get a demo, Trusted by, Effortless scheduling reimagined). The voice is declarative and concrete.",
+      "Don't introduce a Cream-Slate-Pill-Inter shadcn-default skeleton. The Warm Paper + Tempoll Teal + Space Grotesk + Manrope + rounded-xl Card combination is the answer to is this generic?, keep all four legs of the table."
+    ]
+  }
+}
