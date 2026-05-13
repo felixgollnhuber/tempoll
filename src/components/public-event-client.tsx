@@ -16,6 +16,7 @@ import { formatMeetingWindowLabels } from "@/lib/availability";
 import { useI18n } from "@/lib/i18n/context";
 import { buildTimezoneOptions } from "@/lib/timezone-options";
 import type { PublicEventSnapshot, RealtimeEventPayload } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import { useViewerTimezone } from "@/lib/viewer-timezone";
 
 type PublicEventClientProps = {
@@ -345,12 +346,15 @@ export function PublicEventClient({
           {messages.publicEvent.shareDescription}
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-3 p-4 pt-0">
-        <div className="space-y-2">
-          <Label>{messages.publicEvent.shareUrlLabel}</Label>
-          <div className="rounded-md border bg-muted/20 px-3 py-2 text-sm text-muted-foreground [overflow-wrap:anywhere]">
-            {publicShareUrl}
-          </div>
+      <CardContent className="space-y-2.5 p-4 pt-0">
+        <p className="text-[10px] font-medium tracking-[0.14em] uppercase text-muted-foreground">
+          {messages.publicEvent.shareUrlLabel}
+        </p>
+        <div
+          title={publicShareUrl}
+          className="rounded-md border bg-muted/30 px-3 py-2 text-[11px] leading-snug text-foreground/85 break-all"
+        >
+          {publicShareUrl}
         </div>
         <CopyButton value={publicShareUrl} label={messages.publicEvent.copyShareUrl} />
       </CardContent>
@@ -404,24 +408,51 @@ export function PublicEventClient({
                   duration: snapshot.meetingDurationMinutes,
                 })}
           </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2 p-4 pt-0">
-          {suggestionsWithDisplayLabels.map((suggestion, index) => (
-            <div key={suggestion.slotStart} className="rounded-md border bg-muted/20 px-3 py-2">
-              <p className="text-[11px] font-medium text-muted-foreground">
-                {format(messages.common.option, { count: index + 1 })}
-              </p>
-              <p className="mt-1 text-sm font-semibold text-foreground">{suggestion.displayLabel}</p>
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                {plural(
-                  isFullDayEvent
-                    ? messages.publicEvent.fullDayFree
-                    : messages.publicEvent.fullWindowFree,
-                  suggestion.availableCount,
-                )}
-              </p>
-            </div>
-          ))}
+        </CardHeader>
+        <CardContent className="p-4 pt-0">
+          {suggestionsWithDisplayLabels.length > 0 ? (
+            <ol className="space-y-2">
+              {suggestionsWithDisplayLabels.map((suggestion, index) => {
+                const isTop = index === 0;
+                return (
+                  <li
+                    key={suggestion.slotStart}
+                    className={cn(
+                      "flex items-start gap-3 rounded-md px-3 py-2",
+                      isTop
+                        ? "border border-primary/30 bg-primary/8"
+                        : "border border-transparent",
+                    )}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold tabular-nums",
+                        isTop
+                          ? "bg-primary text-primary-foreground"
+                          : "border border-border bg-background text-muted-foreground",
+                      )}
+                    >
+                      {index + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-foreground">
+                        {suggestion.displayLabel}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        {plural(
+                          isFullDayEvent
+                            ? messages.publicEvent.fullDayFree
+                            : messages.publicEvent.fullWindowFree,
+                          suggestion.availableCount,
+                        )}
+                      </p>
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          ) : null}
         </CardContent>
       </Card>
     ) : null;

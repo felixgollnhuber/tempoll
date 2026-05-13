@@ -777,17 +777,20 @@ export function FullDayAvailability({
           </CardHeader>
           <CardContent className="min-w-0 p-4 pt-0">
             <div className="space-y-3">
-              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
+              <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
                 <div className="min-w-0 space-y-1">
                   <CardTitle className="text-base">{messages.publicEvent.availabilityTitle}</CardTitle>
-                  <CardDescription className="text-xs">
+                  <CardDescription
+                    key={mode}
+                    className="availability-copy-reveal text-xs max-sm:max-w-prose sm:max-w-[min(100%,54ch)]"
+                  >
                     {description ??
                       (supportsEditing
                         ? messages.publicEvent.fullDayAvailabilityDescriptionEdit
                         : messages.publicEvent.fullDayAvailabilityDescriptionView)}
                   </CardDescription>
                 </div>
-                <div className="flex flex-wrap items-center gap-2 md:flex-nowrap md:justify-end">
+                <div className="flex w-full shrink-0 flex-row flex-wrap items-center gap-x-2 gap-y-2 sm:w-auto sm:flex-nowrap sm:justify-self-end sm:justify-end">
                   {showModeToggle ? (
                     <SegmentedControl>
                       <SegmentedControlItem
