@@ -219,13 +219,13 @@ Used **only** in data-visualisation and example contexts (landing-page preview h
 
 tempoll uses **whisper layering**: surfaces sit just barely above the page, conveyed by a *very* subtle resting shadow (`shadow-sm`) on cards, buttons, inputs, and segmented controls, plus an ambient background atmosphere on `body`. No glassmorphism, no backdrop blur, no aggressive `shadow-lg` panels. Depth reads as soft daylight, not as floating chrome.
 
-The `body` element carries two faint radial-gradient washes of Tempoll Teal (top and bottom, both ≤10% alpha) plus a vertical white-to-transparent linear gradient. This is **part of the brand**, not a decoration. It is what stops the warm cream from feeling flat and signals the teal as the room temperature without ever stating it loudly.
+The `body` element carries two faint radial-gradient washes of Tempoll Teal (top and bottom, both ≤10% alpha). This is **part of the brand**, not a decoration. It is what stops the warm cream from feeling flat and signals the teal as the room temperature without ever stating it loudly.
 
 ### Shadow Vocabulary
 
 - **Resting shadow** (`box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05)` — Tailwind `shadow-sm`): default for Card, Input, Button (outline/secondary/destructive variants), Badge (primary/destructive), SegmentedControl. Implies "this is a control or a surface", never "this is floating".
 - **Lifted shadow** (`box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)` — Tailwind `shadow`): the default `Button` primary variant uses this slightly stronger resting shadow to mark it as the primary CTA. Also used on the participant colour dot.
-- **Ambient background gradient** (radial primary/10 at top, primary/8 at bottom + linear white→transparent overlay on body): the room temperature of the app. Not a per-component shadow; a single global wash.
+- **Ambient background gradient** (radial primary/10 at top, radial primary/8 at bottom on body): the room temperature of the app. Not a per-component shadow; a single global wash.
 
 ### Named Rules
 

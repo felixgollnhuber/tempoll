@@ -254,8 +254,8 @@
       },
       {
         "name": "ambient-background",
-        "value": "radial-gradient(circle at top, color-mix(in srgb, var(--primary) 10%, transparent) 0, transparent 34%), radial-gradient(circle at bottom, color-mix(in srgb, var(--primary) 8%, transparent) 0, transparent 30%), linear-gradient(180deg, color-mix(in srgb, white 55%, transparent) 0%, transparent 100%)",
-        "purpose": "Applied to body. Two faint Tempoll Teal radial washes plus a vertical white-to-transparent linear overlay. Part of the brand, not decoration."
+        "value": "radial-gradient(ellipse 70% 50% at 50% 0%, color-mix(in srgb, var(--primary) 10%, transparent) 0%, transparent 70%), radial-gradient(ellipse 80% 60% at 50% 100%, color-mix(in srgb, var(--primary) 8%, transparent) 0%, transparent 70%)",
+        "purpose": "Applied to body. Two faint Tempoll Teal radial washes (top and bottom). Part of the brand, not decoration."
       }
     ],
     "motion": [

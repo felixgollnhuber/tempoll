@@ -1,9 +1,5 @@
 # Product
 
-## Register
-
-product
-
 ## Users
 
 Two audiences, with the primary one carrying the weight:
@@ -63,7 +59,7 @@ Target: **WCAG 2.2 AA** as the default. Not a launch-blocking priority, but anyt
 
 - **Color is never the only signal.** The heatmap density scale varies lightness and saturation, not only hue, so it stays legible for the common color-vision deficiencies.
 - **Reduced motion respected.** Honor `prefers-reduced-motion`. No autoplay decorative motion.
-- **Keyboard reachable.** The heatmap, the create flow, and the organizer manage surface should all be operable by keyboard. Mouse-drag selection has a keyboard equivalent (arrow keys + space/enter).
+- **Keyboard reachable.** The heatmap, the create flow, and the organizer manage surface should all be operable by keyboard. Each slot is a focusable button; Tab/Shift-Tab moves between cells, and Space/Enter toggles selection.
 - **Semantic markup as default.** Real headings, real buttons, real form labels. Radix and shadcn primitives are used as designed, not flattened into divs.
 - **Focus is visible.** No `outline: none` without an equivalent ring.
 - **Text contrast safe by default.** Body and UI text meet AA against the chosen surfaces. Tinted neutrals are checked, not assumed.
