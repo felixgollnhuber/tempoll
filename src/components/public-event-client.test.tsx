@@ -343,6 +343,11 @@ describe("PublicEventClient", () => {
     expect(timezoneSelect).toHaveTextContent("Automatic");
 
     await user.click(timezoneSelect);
+    await user.type(screen.getByPlaceholderText("Search timezones..."), "new");
+
+    expect(screen.getByRole("option", { name: /America\/New_York/ })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Automatic" })).not.toBeInTheDocument();
+
     await user.click(screen.getByRole("option", { name: /America\/New_York/ }));
 
     expect(screen.getByRole("combobox", { name: "Display timezone" })).toHaveTextContent(
