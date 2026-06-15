@@ -911,43 +911,52 @@ export function EventHeatmap({
                   </div>
                 ) : null}
               </div>
-              {showStatusBadge && displayStatus === "CLOSED" ? (
-                <Badge variant="destructive" className="h-7 px-2.5 text-xs">
-                  <LockIcon className="size-3.5" />
-                  {messages.common.closed}
-                </Badge>
-              ) : null}
+              <div className="flex flex-wrap items-center gap-2">
+                {sessionBadgeLabel ? (
+                  <Badge variant="secondary" className="h-7 px-2.5 text-xs">
+                    {sessionBadgeLabel}
+                  </Badge>
+                ) : null}
+                {showStatusBadge && displayStatus === "CLOSED" ? (
+                  <Badge variant="destructive" className="h-7 px-2.5 text-xs">
+                    <LockIcon className="size-3.5" />
+                    {messages.common.closed}
+                  </Badge>
+                ) : null}
+              </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-3">
-              <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
-                <span className="font-medium">{messages.publicEvent.legend}</span>
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t pt-3">
+              <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] text-muted-foreground">
+                <span className="font-medium tracking-[0.14em] uppercase">
+                  {messages.publicEvent.legend}
+                </span>
                 <span className="inline-flex items-center gap-1.5">
                   <span className="size-3 rounded-[3px] border bg-background" />
                   {messages.publicEvent.legendEmpty}
                 </span>
-                <span className="inline-flex items-center gap-1">
+                <span className="inline-flex items-center gap-1.5">
                   <span className={cn("size-3 rounded-[3px]", someOverlapLegendClass)} />
                   {messages.publicEvent.legendSomeOverlap}
                 </span>
-                <span className="inline-flex items-center gap-1">
+                <span className="inline-flex items-center gap-1.5">
                   <span className={cn("size-3 rounded-[3px]", highOverlapLegendClass)} />
                   {messages.publicEvent.legendHighOverlap}
                 </span>
                 {supportsPainting && mode === "edit" ? (
-                  <span className="inline-flex items-center gap-1">
+                  <span className="inline-flex items-center gap-1.5">
                     <span className="size-3 rounded-[3px] bg-primary/24 outline outline-2 -outline-offset-2 outline-primary ring-1 ring-inset ring-background" />
                     {messages.publicEvent.legendYourAvailability}
                   </span>
                 ) : null}
                 {finalizedSlot ? (
-                  <span className="inline-flex items-center gap-1">
+                  <span className="inline-flex items-center gap-1.5">
                     <span className="size-3 rounded-[3px] bg-amber-100 ring-1 ring-inset ring-amber-600/80" />
                     {messages.publicEvent.legendFixedDate}
                   </span>
                 ) : null}
                 {activeParticipant ? (
-                  <span className="inline-flex items-center gap-1">
+                  <span className="inline-flex items-center gap-1.5">
                     <span
                       className="size-3 rounded-[3px] border bg-background"
                       style={getParticipantHighlightStyle({
@@ -961,39 +970,37 @@ export function EventHeatmap({
                   </span>
                 ) : null}
               </div>
-              <div className="flex items-center gap-2">
-                {sessionBadgeLabel ? (
-                  <Badge variant="secondary" className="h-7 px-2.5 text-xs">
-                    {sessionBadgeLabel}
-                  </Badge>
-                ) : null}
-                {showSidebar ? (
-                  <Sheet>
-                    <SheetTrigger asChild>
-                      <Button variant="outline" size="sm" className="xl:hidden">
-                        {messages.common.participants}
-                      </Button>
-                    </SheetTrigger>
-                    <SheetContent side="bottom" className="max-h-[80vh] rounded-t-xl">
-                      <SheetHeader>
-                        <SheetTitle>{messages.common.participants}</SheetTitle>
-                      </SheetHeader>
-                      <div className="pb-6">{participantList()}</div>
-                    </SheetContent>
-                  </Sheet>
-                ) : null}
-              </div>
+              {showSidebar ? (
+                <Sheet>
+                  <SheetTrigger asChild>
+                    <Button variant="outline" size="sm" className="xl:hidden">
+                      {messages.common.participants}
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="bottom" className="max-h-[80vh] rounded-t-xl">
+                    <SheetHeader>
+                      <SheetTitle>{messages.common.participants}</SheetTitle>
+                    </SheetHeader>
+                    <div className="pb-6">{participantList()}</div>
+                  </SheetContent>
+                </Sheet>
+              ) : null}
             </div>
           </CardHeader>
           <CardContent className="min-w-0 p-4 pt-0">
             <div className="space-y-3">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="space-y-1">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+                <div className="min-w-0 space-y-1">
                   <CardTitle className="text-base">{messages.publicEvent.availabilityTitle}</CardTitle>
-                  <CardDescription className="text-xs">{description}</CardDescription>
+                  <CardDescription
+                    key={`${mode}:${usesDateWindowing}`}
+                    className="availability-copy-reveal text-xs max-sm:max-w-prose sm:max-w-[min(100%,54ch)]"
+                  >
+                    {description}
+                  </CardDescription>
                 </div>
-                <div className="flex flex-wrap items-center justify-end gap-2">
-                  <div className="flex items-center gap-2">
+                <div className="flex w-full shrink-0 flex-row flex-wrap items-center gap-x-3 gap-y-2 sm:w-auto sm:flex-nowrap sm:justify-self-end">
+                  <div className="flex shrink-0 items-center gap-2">
                     <Label
                       htmlFor={viewerTimezoneSelectId}
                       className="whitespace-nowrap text-xs text-muted-foreground"
@@ -1032,10 +1039,10 @@ export function EventHeatmap({
               </div>
 
               {usesDateWindowing ? (
-                <div className="flex items-stretch gap-2 rounded-md border border-primary/30 bg-primary/10 p-2 shadow-sm">
+                <div className="flex items-stretch gap-2 rounded-md border bg-muted/30 p-2">
                   <Button
                     type="button"
-                    variant={canShowPreviousDates ? "secondary" : "outline"}
+                    variant="outline"
                     size="sm"
                     aria-label={messages.publicEvent.showPreviousDays}
                     disabled={!canShowPreviousDates}
@@ -1045,13 +1052,13 @@ export function EventHeatmap({
                     <ChevronLeftIcon className="size-4" />
                   </Button>
                   <div className="min-w-0 flex-1 text-center">
-                    <p className="text-[11px] font-semibold uppercase text-primary">
+                    <p className="text-[10px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
                       {dayWindowPrompt}
                     </p>
                     <p aria-live="polite" className="mt-1 truncate text-sm font-semibold text-foreground">
                       {visibleRangeLabel}
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-[11px] text-muted-foreground">
                       {format(messages.publicEvent.dayWindowSummary, {
                         start: clampedVisibleDateStartIndex + 1,
                         end: clampedVisibleDateStartIndex + visibleDates.length,
@@ -1061,7 +1068,7 @@ export function EventHeatmap({
                   </div>
                   <Button
                     type="button"
-                    variant={canShowNextDates ? "default" : "outline"}
+                    variant="outline"
                     size="sm"
                     aria-label={messages.publicEvent.showNextDays}
                     disabled={!canShowNextDates}

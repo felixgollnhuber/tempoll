@@ -3,6 +3,7 @@
 import { addDays, addMonths, eachDayOfInterval, format, isAfter, startOfToday } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import {
+  ArrowRightIcon,
   CalendarDaysIcon,
   CalendarRangeIcon,
   ChevronDownIcon,
@@ -11,11 +12,10 @@ import {
   LinkIcon,
   Loader2Icon,
   MapPinIcon,
-  SparklesIcon,
   VideoIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { type ReactNode, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { TimezoneCombobox } from "@/components/timezone-combobox";
@@ -33,7 +33,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import {
   defaultCreateEventDefaults,
 } from "@/lib/create-event-defaults";
@@ -434,16 +433,13 @@ export function CreateEventForm({
   }
 
   return (
-    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-      <Card>
-        <CardHeader className="space-y-2">
-          <CardTitle className="text-2xl">{messages.createEvent.eventDetailsTitle}</CardTitle>
-          <CardDescription>
-            {messages.createEvent.eventDetailsDescription}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form className="space-y-6" onSubmit={onSubmit}>
+    <div className="grid grid-cols-1 gap-10 xl:grid-cols-[minmax(0,1fr)_320px] xl:gap-12">
+      <form className="space-y-12" onSubmit={onSubmit}>
+        <FormSection
+          index="01"
+          title={messages.createEvent.sections.basics.title}
+          description={messages.createEvent.sections.basics.description}
+        >
             <div className="space-y-2">
               <Label htmlFor="title">{messages.createEvent.titleLabel}</Label>
               <Input
@@ -476,17 +472,17 @@ export function CreateEventForm({
                 <div
                   role="radiogroup"
                   aria-labelledby={eventFieldIds.isOnlineMeeting}
-                  className="grid grid-cols-1 gap-2 sm:grid-cols-2"
+                  className="flex h-10 w-full items-center gap-0.5 rounded-md border bg-background p-0.5 shadow-xs sm:w-fit"
                 >
                   <button
                     type="button"
                     role="radio"
                     aria-checked={!isOnlineMeeting}
                     className={cn(
-                      "flex h-10 items-center justify-center gap-2 rounded-md border px-3 text-sm font-medium transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                      "flex h-full flex-1 items-center justify-center gap-2 rounded-[calc(var(--radius-md)-2px)] px-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex-initial sm:px-5",
                       !isOnlineMeeting
-                        ? "border-primary bg-primary/10 text-foreground"
-                        : "border-input bg-background text-muted-foreground",
+                        ? "bg-primary/10 text-foreground"
+                        : "text-muted-foreground hover:bg-muted/50",
                     )}
                     onClick={() => {
                       setIsOnlineMeeting(false);
@@ -502,10 +498,10 @@ export function CreateEventForm({
                     role="radio"
                     aria-checked={isOnlineMeeting}
                     className={cn(
-                      "flex h-10 items-center justify-center gap-2 rounded-md border px-3 text-sm font-medium transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                      "flex h-full flex-1 items-center justify-center gap-2 rounded-[calc(var(--radius-md)-2px)] px-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex-initial sm:px-5",
                       isOnlineMeeting
-                        ? "border-primary bg-primary/10 text-foreground"
-                        : "border-input bg-background text-muted-foreground",
+                        ? "bg-primary/10 text-foreground"
+                        : "text-muted-foreground hover:bg-muted/50",
                     )}
                     onClick={() => {
                       setIsOnlineMeeting(true);
@@ -581,28 +577,42 @@ export function CreateEventForm({
                 </div>
               )}
             </div>
+        </FormSection>
 
+        <FormSection
+          index="02"
+          title={messages.createEvent.sections.kind.title}
+          description={messages.createEvent.sections.kind.description}
+        >
             <div className="space-y-2">
               <Label id={eventFieldIds.eventType}>{messages.createEvent.eventTypeLabel}</Label>
               <div
                 role="radiogroup"
                 aria-labelledby={eventFieldIds.eventType}
-                className="grid grid-cols-1 gap-3 sm:grid-cols-2"
+                className="grid grid-cols-1 gap-2 sm:grid-cols-2"
               >
                 <button
                   type="button"
                   role="radio"
                   aria-checked={eventType === "time_grid"}
                   className={cn(
-                    "flex items-start gap-3 rounded-md border bg-muted/20 p-3 text-left transition-colors hover:bg-muted/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                    eventType === "time_grid" && "border-primary bg-primary/8",
+                    "flex items-start gap-3 rounded-md border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                    eventType === "time_grid"
+                      ? "border-primary bg-primary/10"
+                      : "border-border bg-background hover:bg-muted/40",
                   )}
                   onClick={() => {
                     selectEventType("time_grid");
                     clearErrors("eventType");
                   }}
                 >
-                  <Clock3Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                  <Clock3Icon
+                    className={cn(
+                      "mt-0.5 size-4 shrink-0",
+                      eventType === "time_grid" ? "text-primary" : "text-muted-foreground",
+                    )}
+                    aria-hidden="true"
+                  />
                   <span className="min-w-0">
                     <span className="block text-sm font-medium">
                       {messages.createEvent.eventTypeTimeGrid}
@@ -617,8 +627,10 @@ export function CreateEventForm({
                   role="radio"
                   aria-checked={eventType === "full_day"}
                   className={cn(
-                    "flex items-start gap-3 rounded-md border bg-muted/20 p-3 text-left transition-colors hover:bg-muted/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                    eventType === "full_day" && "border-primary bg-primary/8",
+                    "flex items-start gap-3 rounded-md border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                    eventType === "full_day"
+                      ? "border-primary bg-primary/10"
+                      : "border-border bg-background hover:bg-muted/40",
                   )}
                   onClick={() => {
                     selectEventType("full_day");
@@ -631,7 +643,13 @@ export function CreateEventForm({
                     );
                   }}
                 >
-                  <CalendarDaysIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                  <CalendarDaysIcon
+                    className={cn(
+                      "mt-0.5 size-4 shrink-0",
+                      eventType === "full_day" ? "text-primary" : "text-muted-foreground",
+                    )}
+                    aria-hidden="true"
+                  />
                   <span className="min-w-0">
                     <span className="block text-sm font-medium">
                       {messages.createEvent.eventTypeFullDay}
@@ -649,7 +667,7 @@ export function CreateEventForm({
                 <Label htmlFor={eventFieldIds.notificationEmail}>
                   {messages.createEvent.notificationEmailLabel}
                 </Label>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   {messages.createEvent.notificationEmailDescription}
                 </p>
                 <Input
@@ -679,11 +697,17 @@ export function CreateEventForm({
                 ) : null}
               </div>
             ) : (
-              <div className="rounded-md border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 {messages.createEvent.notificationEmailUnavailable}
-              </div>
+              </p>
             )}
+        </FormSection>
 
+        <FormSection
+          index="03"
+          title={messages.createEvent.sections.timing.title}
+          description={messages.createEvent.sections.timing.description}
+        >
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor={eventFieldIds.timezone}>{messages.createEvent.timezoneLabel}</Label>
@@ -864,305 +888,358 @@ export function CreateEventForm({
                 ) : null}
               </fieldset>
             </div>
+        </FormSection>
 
-            {eventType === "time_grid" ? (
-              <>
-                <Separator />
-
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor={eventFieldIds.dayStartMinutes}>{messages.createEvent.dailyStartLabel}</Label>
-                <Select
-                  value={String(dayStartMinutes)}
-                  onValueChange={(value) => {
-                    setDayStartMinutes(Number(value));
-                    clearErrors("dayStartMinutes", "dayEndMinutes");
-                  }}
-                >
-                  <SelectTrigger
-                    id={eventFieldIds.dayStartMinutes}
-                    aria-invalid={fieldErrors.dayStartMinutes ? true : undefined}
-                    aria-describedby={
-                      fieldErrors.dayStartMinutes ? "day-start-error" : undefined
-                    }
-                    className={cn(
-                      fieldErrors.dayStartMinutes &&
-                        "border-destructive focus:ring-destructive/20",
-                    )}
-                  >
-                    <SelectValue placeholder={messages.createEvent.dailyStartPlaceholder} />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-80">
-                    {startTimeOptions.map((option) => (
-                      <SelectItem key={option.value} value={String(option.value)}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {fieldErrors.dayStartMinutes ? (
-                  <p id="day-start-error" className="text-sm text-destructive">
-                    {fieldErrors.dayStartMinutes}
-                  </p>
-                ) : null}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor={eventFieldIds.dayEndMinutes}>{messages.createEvent.dailyEndLabel}</Label>
-                <Select
-                  value={String(dayEndMinutes)}
-                  onValueChange={(value) => {
-                    setDayEndMinutes(Number(value));
-                    clearErrors("dayStartMinutes", "dayEndMinutes");
-                  }}
-                >
-                  <SelectTrigger
-                    id={eventFieldIds.dayEndMinutes}
-                    aria-invalid={fieldErrors.dayEndMinutes ? true : undefined}
-                    aria-describedby={fieldErrors.dayEndMinutes ? "day-end-error" : undefined}
-                    className={cn(
-                      fieldErrors.dayEndMinutes &&
-                        "border-destructive focus:ring-destructive/20",
-                    )}
-                  >
-                    <SelectValue placeholder={messages.createEvent.dailyEndPlaceholder} />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-80">
-                    {endTimeOptions.map((option) => (
-                      <SelectItem key={option.value} value={String(option.value)}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {fieldErrors.dayEndMinutes ? (
-                  <p id="day-end-error" className="text-sm text-destructive">
-                    {fieldErrors.dayEndMinutes}
-                  </p>
-                ) : null}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor={eventFieldIds.slotMinutes}>{messages.createEvent.slotSizeLabel}</Label>
-                <Select
-                  value={String(slotMinutes)}
-                  onValueChange={(value) => {
-                    setSlotMinutes(Number(value));
-                    clearErrors("slotMinutes", "meetingDurationMinutes");
-                  }}
-                >
-                  <SelectTrigger
-                    id={eventFieldIds.slotMinutes}
-                    aria-invalid={fieldErrors.slotMinutes ? true : undefined}
-                    aria-describedby={fieldErrors.slotMinutes ? "slot-size-error" : undefined}
-                    className={cn(
-                      fieldErrors.slotMinutes &&
-                        "border-destructive focus:ring-destructive/20",
-                    )}
-                  >
-                    <SelectValue placeholder={messages.createEvent.slotSizePlaceholder} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {slotMinuteOptions.map((minutes) => (
-                      <SelectItem key={minutes} value={String(minutes)}>
-                        {formatMessage(messages.createEvent.minutesShort, { count: minutes })}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {fieldErrors.slotMinutes ? (
-                  <p id="slot-size-error" className="text-sm text-destructive">
-                    {fieldErrors.slotMinutes}
-                  </p>
-                ) : null}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor={eventFieldIds.meetingDurationMinutes}>
-                  {messages.createEvent.meetingDurationLabel}
-                </Label>
-                <Select
-                  value={String(meetingDurationMinutes)}
-                  onValueChange={(value) => {
-                    setMeetingDurationMinutes(Number(value));
-                    clearErrors("slotMinutes", "meetingDurationMinutes");
-                  }}
-                >
-                  <SelectTrigger
-                    id={eventFieldIds.meetingDurationMinutes}
-                    aria-invalid={fieldErrors.meetingDurationMinutes ? true : undefined}
-                    aria-describedby={
-                      fieldErrors.meetingDurationMinutes
-                        ? "meeting-duration-error"
-                        : undefined
-                    }
-                    className={cn(
-                      fieldErrors.meetingDurationMinutes &&
-                        "border-destructive focus:ring-destructive/20",
-                    )}
-                  >
-                    <SelectValue placeholder={messages.createEvent.meetingDurationPlaceholder} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {meetingDurationOptions.map((minutes) => (
-                      <SelectItem key={minutes} value={String(minutes)}>
-                        {formatMessage(messages.createEvent.minutesShort, { count: minutes })}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {fieldErrors.meetingDurationMinutes ? (
-                  <p id="meeting-duration-error" className="text-sm text-destructive">
-                    {fieldErrors.meetingDurationMinutes}
-                  </p>
-                ) : null}
-              </div>
-                </div>
-              </>
-            ) : (
-              <>
-                <Separator />
-
-                <div className="max-w-md space-y-2">
-                  <Label htmlFor={eventFieldIds.fullDayStartMinutes}>
-                    {messages.createEvent.fullDayStartTimeLabel}
+        {eventType === "time_grid" ? (
+          <FormSection
+            index="04"
+            title={messages.createEvent.sections.grid.title}
+            description={messages.createEvent.sections.grid.description}
+          >
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium">
+                {messages.createEvent.dailyWindowLabel}
+              </legend>
+              <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 sm:gap-3">
+                <div>
+                  <Label htmlFor={eventFieldIds.dayStartMinutes} className="sr-only">
+                    {messages.createEvent.dailyStartLabel}
                   </Label>
-                  <p className="text-sm text-muted-foreground">
-                    {messages.createEvent.fullDayStartTimeDescription}
-                  </p>
                   <Select
-                    value={
-                      fullDayStartMinutes === undefined
-                        ? "none"
-                        : String(fullDayStartMinutes)
-                    }
+                    value={String(dayStartMinutes)}
                     onValueChange={(value) => {
-                      setFullDayStartMinutes(value === "none" ? undefined : Number(value));
-                      clearErrors("fullDayStartMinutes");
+                      setDayStartMinutes(Number(value));
+                      clearErrors("dayStartMinutes", "dayEndMinutes");
                     }}
                   >
                     <SelectTrigger
-                      id={eventFieldIds.fullDayStartMinutes}
-                      aria-invalid={fieldErrors.fullDayStartMinutes ? true : undefined}
+                      id={eventFieldIds.dayStartMinutes}
+                      aria-invalid={fieldErrors.dayStartMinutes ? true : undefined}
                       aria-describedby={
-                        fieldErrors.fullDayStartMinutes
-                          ? "full-day-start-error"
-                          : undefined
+                        fieldErrors.dayStartMinutes ? "day-start-error" : undefined
                       }
                       className={cn(
-                        fieldErrors.fullDayStartMinutes &&
+                        "w-full",
+                        fieldErrors.dayStartMinutes &&
                           "border-destructive focus:ring-destructive/20",
                       )}
                     >
-                      <SelectValue placeholder={messages.createEvent.fullDayStartTimePlaceholder} />
+                      <SelectValue placeholder={messages.createEvent.dailyStartPlaceholder} />
                     </SelectTrigger>
                     <SelectContent className="max-h-80">
-                      <SelectItem value="none">
-                        {messages.createEvent.fullDayStartTimePlaceholder}
-                      </SelectItem>
-                      {timeOptions
-                        .filter((option) => option.value < 24 * 60)
-                        .map((option) => (
-                          <SelectItem key={option.value} value={String(option.value)}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
+                      {startTimeOptions.map((option) => (
+                        <SelectItem key={option.value} value={String(option.value)}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
-                  {fieldErrors.fullDayStartMinutes ? (
-                    <p id="full-day-start-error" className="text-sm text-destructive">
-                      {fieldErrors.fullDayStartMinutes}
-                    </p>
-                  ) : null}
                 </div>
-              </>
+                <ArrowRightIcon
+                  className="size-4 shrink-0 text-muted-foreground"
+                  aria-hidden="true"
+                />
+                <div>
+                  <Label htmlFor={eventFieldIds.dayEndMinutes} className="sr-only">
+                    {messages.createEvent.dailyEndLabel}
+                  </Label>
+                  <Select
+                    value={String(dayEndMinutes)}
+                    onValueChange={(value) => {
+                      setDayEndMinutes(Number(value));
+                      clearErrors("dayStartMinutes", "dayEndMinutes");
+                    }}
+                  >
+                    <SelectTrigger
+                      id={eventFieldIds.dayEndMinutes}
+                      aria-invalid={fieldErrors.dayEndMinutes ? true : undefined}
+                      aria-describedby={
+                        fieldErrors.dayEndMinutes ? "day-end-error" : undefined
+                      }
+                      className={cn(
+                        "w-full",
+                        fieldErrors.dayEndMinutes &&
+                          "border-destructive focus:ring-destructive/20",
+                      )}
+                    >
+                      <SelectValue placeholder={messages.createEvent.dailyEndPlaceholder} />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-80">
+                      {endTimeOptions.map((option) => (
+                        <SelectItem key={option.value} value={String(option.value)}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              {fieldErrors.dayStartMinutes ? (
+                <p id="day-start-error" className="text-sm text-destructive">
+                  {fieldErrors.dayStartMinutes}
+                </p>
+              ) : null}
+              {fieldErrors.dayEndMinutes ? (
+                <p id="day-end-error" className="text-sm text-destructive">
+                  {fieldErrors.dayEndMinutes}
+                </p>
+              ) : null}
+            </fieldset>
+
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium">
+                {messages.createEvent.granularityLabel}
+              </legend>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor={eventFieldIds.slotMinutes} className="sr-only">
+                    {messages.createEvent.slotSizeLabel}
+                  </Label>
+                  <Select
+                    value={String(slotMinutes)}
+                    onValueChange={(value) => {
+                      setSlotMinutes(Number(value));
+                      clearErrors("slotMinutes", "meetingDurationMinutes");
+                    }}
+                  >
+                    <SelectTrigger
+                      id={eventFieldIds.slotMinutes}
+                      aria-invalid={fieldErrors.slotMinutes ? true : undefined}
+                      aria-describedby={
+                        fieldErrors.slotMinutes ? "slot-size-error" : undefined
+                      }
+                      className={cn(
+                        "w-full",
+                        fieldErrors.slotMinutes &&
+                          "border-destructive focus:ring-destructive/20",
+                      )}
+                    >
+                      <SelectValue placeholder={messages.createEvent.slotSizePlaceholder} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {slotMinuteOptions.map((minutes) => (
+                        <SelectItem key={minutes} value={String(minutes)}>
+                          {formatMessage(messages.createEvent.minutesShort, { count: minutes })}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor={eventFieldIds.meetingDurationMinutes} className="sr-only">
+                    {messages.createEvent.meetingDurationLabel}
+                  </Label>
+                  <Select
+                    value={String(meetingDurationMinutes)}
+                    onValueChange={(value) => {
+                      setMeetingDurationMinutes(Number(value));
+                      clearErrors("slotMinutes", "meetingDurationMinutes");
+                    }}
+                  >
+                    <SelectTrigger
+                      id={eventFieldIds.meetingDurationMinutes}
+                      aria-invalid={fieldErrors.meetingDurationMinutes ? true : undefined}
+                      aria-describedby={
+                        fieldErrors.meetingDurationMinutes
+                          ? "meeting-duration-error"
+                          : undefined
+                      }
+                      className={cn(
+                        "w-full",
+                        fieldErrors.meetingDurationMinutes &&
+                          "border-destructive focus:ring-destructive/20",
+                      )}
+                    >
+                      <SelectValue placeholder={messages.createEvent.meetingDurationPlaceholder} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {meetingDurationOptions.map((minutes) => (
+                        <SelectItem key={minutes} value={String(minutes)}>
+                          {formatMessage(messages.createEvent.minutesShort, { count: minutes })}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              {fieldErrors.slotMinutes ? (
+                <p id="slot-size-error" className="text-sm text-destructive">
+                  {fieldErrors.slotMinutes}
+                </p>
+              ) : null}
+              {fieldErrors.meetingDurationMinutes ? (
+                <p id="meeting-duration-error" className="text-sm text-destructive">
+                  {fieldErrors.meetingDurationMinutes}
+                </p>
+              ) : null}
+            </fieldset>
+          </FormSection>
+        ) : (
+          <FormSection
+            index="04"
+            title={messages.createEvent.sections.startTime.title}
+            description={messages.createEvent.sections.startTime.description}
+          >
+            <div className="max-w-md space-y-2">
+              <Label htmlFor={eventFieldIds.fullDayStartMinutes}>
+                {messages.createEvent.fullDayStartTimeLabel}
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                {messages.createEvent.fullDayStartTimeDescription}
+              </p>
+              <Select
+                value={
+                  fullDayStartMinutes === undefined
+                    ? "none"
+                    : String(fullDayStartMinutes)
+                }
+                onValueChange={(value) => {
+                  setFullDayStartMinutes(value === "none" ? undefined : Number(value));
+                  clearErrors("fullDayStartMinutes");
+                }}
+              >
+                <SelectTrigger
+                  id={eventFieldIds.fullDayStartMinutes}
+                  aria-invalid={fieldErrors.fullDayStartMinutes ? true : undefined}
+                  aria-describedby={
+                    fieldErrors.fullDayStartMinutes ? "full-day-start-error" : undefined
+                  }
+                  className={cn(
+                    fieldErrors.fullDayStartMinutes &&
+                      "border-destructive focus:ring-destructive/20",
+                  )}
+                >
+                  <SelectValue placeholder={messages.createEvent.fullDayStartTimePlaceholder} />
+                </SelectTrigger>
+                <SelectContent className="max-h-80">
+                  <SelectItem value="none">
+                    {messages.createEvent.fullDayStartTimePlaceholder}
+                  </SelectItem>
+                  {timeOptions
+                    .filter((option) => option.value < 24 * 60)
+                    .map((option) => (
+                      <SelectItem key={option.value} value={String(option.value)}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              {fieldErrors.fullDayStartMinutes ? (
+                <p id="full-day-start-error" className="text-sm text-destructive">
+                  {fieldErrors.fullDayStartMinutes}
+                </p>
+              ) : null}
+            </div>
+          </FormSection>
+        )}
+
+        <div className="space-y-3 border-t pt-6">
+          {errorMessage ? <p className="text-sm text-destructive">{errorMessage}</p> : null}
+          <Button type="submit" size="lg" className="w-full sm:w-auto" disabled={isPending}>
+            {isPending ? (
+              <Loader2Icon className="size-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <ArrowRightIcon className="size-4" aria-hidden="true" />
             )}
+            {messages.createEvent.createButton}
+          </Button>
+        </div>
+      </form>
 
-            {errorMessage ? <p className="text-sm text-destructive">{errorMessage}</p> : null}
-
-            <Button type="submit" size="lg" className="w-full sm:w-auto" disabled={isPending}>
-              {isPending ? <Loader2Icon className="size-4 animate-spin" /> : <SparklesIcon className="size-4" />}
-              {messages.createEvent.createButton}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-
-      <div className="space-y-6">
-        <Card>
+      <aside className="space-y-6">
+        <Card className="sticky top-24">
           <CardHeader className="space-y-2">
-            <CardTitle>{messages.createEvent.previewTitle}</CardTitle>
+            <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+              {messages.createEvent.previewTitle}
+            </p>
+            <CardTitle className="text-xl">
+              {title || messages.createEvent.untitledEvent}
+            </CardTitle>
             <CardDescription>
-              {messages.createEvent.previewDescription}
+              {selectedTimezoneOption?.label ?? timezone}
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-1">
-              <p className="text-xl font-semibold">{title || messages.createEvent.untitledEvent}</p>
-              <p className="text-sm text-muted-foreground">
-                {selectedTimezoneOption?.label ?? timezone}
-              </p>
-            </div>
-            <Separator />
-            <dl className="space-y-3 text-sm">
-              <div className="flex items-center justify-between gap-4">
-                <dt className="text-muted-foreground">{messages.createEvent.previewFields.dateRange}</dt>
-                <dd className="text-right font-medium">{selectedRangeLabel}</dd>
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <dt className="text-muted-foreground">{messages.createEvent.previewFields.eventType}</dt>
-                <dd className="text-right font-medium">{selectedEventTypeLabel}</dd>
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <dt className="text-muted-foreground">{messages.createEvent.previewFields.daysShown}</dt>
-                <dd className="font-medium">{selectedFilteredRangeDays}</dd>
-              </div>
+          <CardContent>
+            <dl className="divide-y divide-border/60 text-sm">
+              <PreviewRow
+                label={messages.createEvent.previewFields.dateRange}
+                value={selectedRangeLabel}
+              />
+              <PreviewRow
+                label={messages.createEvent.previewFields.eventType}
+                value={selectedEventTypeLabel}
+              />
+              <PreviewRow
+                label={messages.createEvent.previewFields.daysShown}
+                value={String(selectedFilteredRangeDays)}
+              />
               {eventType === "time_grid" ? (
                 <>
-                  <div className="flex items-center justify-between gap-4">
-                    <dt className="text-muted-foreground">{messages.createEvent.previewFields.dailyWindow}</dt>
-                    <dd className="font-medium">
-                      {getTimeLabel(dayStartMinutes)} - {getTimeLabel(dayEndMinutes)}
-                    </dd>
-                  </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <dt className="text-muted-foreground">{messages.createEvent.previewFields.granularity}</dt>
-                    <dd className="font-medium">
-                      {formatMessage(messages.createEvent.minutesShort, { count: slotMinutes })}
-                    </dd>
-                  </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <dt className="text-muted-foreground">{messages.createEvent.previewFields.rankedWindow}</dt>
-                    <dd className="font-medium">
-                      {formatMessage(messages.createEvent.minutesShort, {
-                        count: meetingDurationMinutes,
-                      })}
-                    </dd>
-                  </div>
+                  <PreviewRow
+                    label={messages.createEvent.previewFields.dailyWindow}
+                    value={`${getTimeLabel(dayStartMinutes)} - ${getTimeLabel(dayEndMinutes)}`}
+                  />
+                  <PreviewRow
+                    label={messages.createEvent.previewFields.granularity}
+                    value={formatMessage(messages.createEvent.minutesShort, {
+                      count: slotMinutes,
+                    })}
+                  />
+                  <PreviewRow
+                    label={messages.createEvent.previewFields.rankedWindow}
+                    value={formatMessage(messages.createEvent.minutesShort, {
+                      count: meetingDurationMinutes,
+                    })}
+                  />
                 </>
               ) : fullDayStartMinutes !== undefined ? (
-                <div className="flex items-center justify-between gap-4">
-                  <dt className="text-muted-foreground">
-                    {messages.createEvent.previewFields.startTime}
-                  </dt>
-                  <dd className="font-medium">{getTimeLabel(fullDayStartMinutes)}</dd>
-                </div>
+                <PreviewRow
+                  label={messages.createEvent.previewFields.startTime}
+                  value={getTimeLabel(fullDayStartMinutes)}
+                />
               ) : null}
             </dl>
           </CardContent>
         </Card>
+      </aside>
+    </div>
+  );
+}
 
-        <Card>
-          <CardHeader className="space-y-2">
-            <CardTitle>{messages.createEvent.whatGetsCreatedTitle}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
-            <p>{messages.createEvent.whatGetsCreatedItems.publicPage}</p>
-            <p>{messages.createEvent.whatGetsCreatedItems.privatePage}</p>
-            <p>{messages.createEvent.whatGetsCreatedItems.liveGrid}</p>
-          </CardContent>
-        </Card>
+type FormSectionProps = {
+  index: string;
+  title: string;
+  description?: string;
+  children: ReactNode;
+};
+
+function FormSection({ index, title, description, children }: FormSectionProps) {
+  return (
+    <section className="grid gap-6 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)] sm:gap-10">
+      <div className="space-y-1.5 sm:pt-1">
+        <p className="flex items-baseline gap-3 text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+          <span className="tabular-nums text-primary/70">{index}</span>
+          <span className="text-foreground">{title}</span>
+        </p>
+        {description ? (
+          <p className="text-xs leading-relaxed text-muted-foreground">{description}</p>
+        ) : null}
       </div>
+      <div className="space-y-5">{children}</div>
+    </section>
+  );
+}
+
+type PreviewRowProps = {
+  label: string;
+  value: string;
+};
+
+function PreviewRow({ label, value }: PreviewRowProps) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-2.5 first:pt-0 last:pb-0">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="text-right font-medium tabular-nums">{value}</dd>
     </div>
   );
 }
