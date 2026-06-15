@@ -88,9 +88,30 @@ export const en = {
       "Pick one date range, choose the daily window, and generate a shareable event link.",
   },
   createEvent: {
-    eventDetailsTitle: "Event details",
-    eventDetailsDescription:
-      "Set one date range, choose available weekdays and the daily window, then share a single link.",
+    sections: {
+      basics: {
+        title: "Basics",
+        description: "What this event is and how people will meet.",
+      },
+      kind: {
+        title: "Kind",
+        description: "How people pick: by time slot, or by whole day.",
+      },
+      timing: {
+        title: "Timing",
+        description: "When the event window lives.",
+      },
+      grid: {
+        title: "Grid",
+        description: "How the day is sliced and which window we rank.",
+      },
+      startTime: {
+        title: "Start time",
+        description: "An optional anchor for the final date.",
+      },
+    },
+    dailyWindowLabel: "Daily window",
+    granularityLabel: "Granularity",
     titleLabel: "Event title",
     titlePlaceholder: "Design review, sprint planning, dinner with friends...",
     eventTypeLabel: "Event type",
@@ -158,13 +179,6 @@ export const en = {
       dailyWindow: "Daily window",
       granularity: "Granularity",
       rankedWindow: "Ranked window",
-    },
-    whatGetsCreatedTitle: "What gets created",
-    whatGetsCreatedItems: {
-      publicPage: "A public event page people can join without creating an account.",
-      privatePage: "A private organizer page for renaming participants and closing the poll.",
-      liveGrid:
-        "A live availability grid for the selected weekdays between the chosen start and end date.",
     },
     range: {
       selected: "{count} selected",
@@ -803,9 +817,30 @@ export const de: Messages = {
       "Wähle einen Datumsbereich, lege das tägliche Zeitfenster fest und erzeuge einen teilbaren Event-Link.",
   },
   createEvent: {
-    eventDetailsTitle: "Event-Details",
-    eventDetailsDescription:
-      "Lege einen Datumsbereich fest, wähle verfügbare Wochentage und das tägliche Zeitfenster und teile anschließend einen einzigen Link.",
+    sections: {
+      basics: {
+        title: "Grundlagen",
+        description: "Worum es geht und wie ihr euch trefft.",
+      },
+      kind: {
+        title: "Art",
+        description: "Wählt jemand Zeitfenster, oder ganze Tage.",
+      },
+      timing: {
+        title: "Zeitraum",
+        description: "Wann das Event-Fenster liegt.",
+      },
+      grid: {
+        title: "Raster",
+        description: "Wie der Tag geschnitten wird und welches Fenster gerankt wird.",
+      },
+      startTime: {
+        title: "Startzeit",
+        description: "Optionaler Anker für das finale Datum.",
+      },
+    },
+    dailyWindowLabel: "Tägliches Zeitfenster",
+    granularityLabel: "Granularität",
     titleLabel: "Event-Titel",
     titlePlaceholder: "Design-Review, Sprint-Planung, Abendessen mit Freund:innen...",
     eventTypeLabel: "Event-Art",
@@ -875,15 +910,6 @@ export const de: Messages = {
       dailyWindow: "Tägliches Zeitfenster",
       granularity: "Granularität",
       rankedWindow: "Geranktes Fenster",
-    },
-    whatGetsCreatedTitle: "Was erstellt wird",
-    whatGetsCreatedItems: {
-      publicPage:
-        "Eine öffentliche Event-Seite, der man ohne Konto beitreten kann.",
-      privatePage:
-        "Eine private Verwaltungsseite zum Umbenennen von Teilnehmenden und Schließen der Umfrage.",
-      liveGrid:
-        "Ein Live-Verfügbarkeitsraster für die ausgewählten Wochentage zwischen Start- und Enddatum.",
     },
     range: {
       selected: "{count} ausgewählt",
