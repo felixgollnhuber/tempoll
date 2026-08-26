@@ -71,7 +71,9 @@ export function PublicEventClient({
   const [session, setSession] = useState<ParticipantSessionState>(initialSession);
   const [name, setName] = useState("");
   const [selectedMap, setSelectedMap] = useState(() => getSelectedMap(initialSnapshot));
-  const [mode, setMode] = useState<BoardMode>(() => getInitialMode(initialHasEditableSession));
+  const [preferredMode, setPreferredMode] = useState<BoardMode>(() =>
+    getInitialMode(initialHasEditableSession),
+  );
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
   const [draftVersion, setDraftVersion] = useState(0);
@@ -95,9 +97,13 @@ export function PublicEventClient({
   const applySnapshot = useCallback((nextSnapshot: PublicEventSnapshot) => {
     setSnapshot(nextSnapshot);
     setSelectedMap(getSelectedMap(nextSnapshot));
+    if (nextSnapshot.status !== "OPEN") {
+      setPreferredMode("view");
+    }
     lastSavedSignatureRef.current = getSelectedSlotStarts(nextSnapshot).join("|");
   }, []);
   const canEdit = Boolean(session && snapshot.status === "OPEN");
+  const mode = canEdit ? preferredMode : "view";
   const shouldShowPreJoin = !session && snapshot.status === "OPEN";
   const trimmedName = name.trim();
   const canJoin =
@@ -265,12 +271,6 @@ export function PublicEventClient({
     snapshot.slots,
   ]);
 
-  useEffect(() => {
-    if (!canEdit) {
-      setMode("view");
-    }
-  }, [canEdit]);
-
   async function handleJoin() {
     if (!canJoin) {
       return;
@@ -302,7 +302,7 @@ export function PublicEventClient({
     }
 
     setSession(payload.session);
-    setMode("edit");
+    setPreferredMode("edit");
     setName("");
     toast.success(messages.publicEvent.joined);
     await fetchSnapshot();
@@ -536,7 +536,7 @@ export function PublicEventClient({
         <FullDayAvailability
           snapshot={snapshot}
           mode={mode}
-          onModeChange={setMode}
+          onModeChange={setPreferredMode}
           canEdit={canEdit}
           selectedMap={selectedMap}
           onUpdateDay={updateCell}
@@ -548,7 +548,7 @@ export function PublicEventClient({
         <EventHeatmap
           snapshot={snapshot}
           mode={mode}
-          onModeChange={setMode}
+          onModeChange={setPreferredMode}
           canEdit={canEdit}
           selectedMap={selectedMap}
           onUpdateCell={updateCell}

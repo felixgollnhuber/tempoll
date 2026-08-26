@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 
 import { getViewerTimezone } from "@/lib/availability";
 
@@ -93,6 +93,14 @@ export function getViewerTimezoneServerSnapshot() {
   return null;
 }
 
+function subscribeDetectedViewerTimezone() {
+  return () => {};
+}
+
+function readDetectedViewerTimezone() {
+  return normalizeViewerTimezone(getViewerTimezone());
+}
+
 export function resolveViewerTimezone({
   detectedTimezone,
   eventTimezone,
@@ -117,11 +125,14 @@ export function useViewerTimezone(eventTimezone: string, supportedTimezones: rea
     readStoredViewerTimezone,
     getViewerTimezoneServerSnapshot,
   );
-  const [detectedViewerTimezone, setDetectedViewerTimezone] = useState<string | null>(null);
-
-  useEffect(() => {
-    setDetectedViewerTimezone(normalizeViewerTimezone(getViewerTimezone(), supportedTimezones));
-  }, [supportedTimezones]);
+  const detectedViewerTimezone = normalizeViewerTimezone(
+    useSyncExternalStore(
+      subscribeDetectedViewerTimezone,
+      readDetectedViewerTimezone,
+      getViewerTimezoneServerSnapshot,
+    ),
+    supportedTimezones,
+  );
 
   const viewerTimezone = resolveViewerTimezone({
     detectedTimezone: detectedViewerTimezone,
