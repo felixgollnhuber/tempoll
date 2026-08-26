@@ -2,6 +2,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { EventHeatmap } from "./event-heatmap";
 import { PublicEventClient } from "./public-event-client";
 import { renderWithI18n } from "@/test/render-with-i18n";
 import type { PublicEventSnapshot } from "@/lib/types";
@@ -1297,5 +1298,55 @@ describe("PublicEventClient", () => {
       expect(heatmapGrid).not.toBeNull();
       expect(heatmapGrid?.style.gridTemplateColumns).toContain("minmax(72px, 1fr)");
     });
+  });
+});
+
+describe("EventHeatmap", () => {
+  it("clears an uncontrolled participant highlight when the participant disappears", () => {
+    const initialSnapshot = createSnapshot();
+    const onActiveParticipantChange = vi.fn();
+    const renderHeatmap = (snapshot: PublicEventSnapshot) => (
+      <EventHeatmap
+        snapshot={snapshot}
+        mode="view"
+        canEdit={false}
+        finalSlotStart={null}
+        viewerTimezone="Europe/Vienna"
+        viewerTimezoneSelectValue="__automatic__"
+        onViewerTimezoneChange={vi.fn()}
+        onActiveParticipantChange={onActiveParticipantChange}
+      />
+    );
+    const view = renderWithI18n(renderHeatmap(initialSnapshot));
+
+    fireEvent.click(screen.getByRole("button", { name: /^Gabriel/i }));
+    expect(screen.getByText("Gabriel highlighted")).toBeInTheDocument();
+
+    const snapshotWithoutGabriel = {
+      ...initialSnapshot,
+      participants: initialSnapshot.participants.filter((participant) => participant.id !== "p2"),
+      slots: initialSnapshot.slots.map((slot) => {
+        const participantIds = slot.participantIds.filter((participantId) => participantId !== "p2");
+
+        return {
+          ...slot,
+          participantIds,
+          availabilityCount: participantIds.length,
+        };
+      }),
+    };
+
+    view.rerender(renderHeatmap(snapshotWithoutGabriel));
+
+    expect(onActiveParticipantChange).toHaveBeenLastCalledWith(null);
+    expect(screen.queryByText("Gabriel highlighted")).not.toBeInTheDocument();
+
+    view.rerender(renderHeatmap(initialSnapshot));
+
+    expect(screen.getByRole("button", { name: /^Gabriel/i })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    expect(screen.queryByText("Gabriel highlighted")).not.toBeInTheDocument();
   });
 });

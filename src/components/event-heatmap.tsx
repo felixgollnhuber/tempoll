@@ -326,8 +326,13 @@ export function EventHeatmap({
   const effectiveSelectedMap = selectedMap ?? getSelectedMap(snapshot);
   const supportsPainting = canEdit && Boolean(onUpdateCell);
   const currentParticipantId = snapshot.currentParticipant?.id ?? null;
-  const activeParticipantId =
+  const requestedActiveParticipantId =
     activeParticipantIdProp === undefined ? internalActiveParticipantId : activeParticipantIdProp;
+  const activeParticipant = requestedActiveParticipantId
+    ? snapshot.participants.find((participant) => participant.id === requestedActiveParticipantId) ??
+      null
+    : null;
+  const activeParticipantId = activeParticipant?.id ?? null;
   const cellHeightClass = getCellHeightClass(snapshot.slotMinutes);
   const getParticipantLabel = useCallback(
     (participant: SnapshotParticipant) =>
@@ -357,12 +362,6 @@ export function EventHeatmap({
       snapshot.timezone,
     ],
   );
-
-  useEffect(() => {
-    if (mode === "edit") {
-      setActiveSlotStart(null);
-    }
-  }, [mode]);
 
   const measureGridContainer = useCallback(() => {
     const nextWidth = gridContainerRef.current?.clientWidth || window.innerWidth;
@@ -394,20 +393,23 @@ export function EventHeatmap({
   }, [measureGridContainer]);
 
   useEffect(() => {
-    if (!activeParticipantId) {
+    if (!requestedActiveParticipantId || activeParticipant) {
       return;
     }
 
-    const participantExists = snapshot.participants.some(
-      (participant) => participant.id === activeParticipantId,
-    );
-    if (!participantExists) {
-      if (activeParticipantIdProp === undefined) {
-        setInternalActiveParticipantId(null);
-      }
-      onActiveParticipantChange?.(null);
+    if (activeParticipantIdProp === undefined) {
+      // Participant removals arrive through external snapshots and must invalidate local selection.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setInternalActiveParticipantId(null);
     }
-  }, [activeParticipantId, activeParticipantIdProp, onActiveParticipantChange, snapshot.participants]);
+
+    onActiveParticipantChange?.(null);
+  }, [
+    activeParticipant,
+    activeParticipantIdProp,
+    onActiveParticipantChange,
+    requestedActiveParticipantId,
+  ]);
 
   const slotMap = useMemo(
     () =>
@@ -575,11 +577,12 @@ export function EventHeatmap({
       }),
     );
   }, [visibleProjectedSlots, visibleTimeRows]);
-  const activeParticipant =
-    activeParticipantId
-      ? snapshot.participants.find((participant) => participant.id === activeParticipantId) ?? null
+  const activeSlotCandidate =
+    mode === "view" && activeSlotStart ? (projectedSlotMap.get(activeSlotStart) ?? null) : null;
+  const activeSlot =
+    activeSlotCandidate && visibleDateKeys.has(activeSlotCandidate.projectedDateKey)
+      ? activeSlotCandidate
       : null;
-  const activeSlot = activeSlotStart ? (projectedSlotMap.get(activeSlotStart) ?? null) : null;
   const activeSlotDetails = useMemo(() => {
     if (!activeSlot) {
       return null;
@@ -656,34 +659,29 @@ export function EventHeatmap({
     );
   }, [finalizedSlot, projectedBoard.slots]);
 
-  useEffect(() => {
-    setVisibleDateStartIndex((current) =>
-      clampVisibleDateStartIndex(current, projectedBoard.dates.length, visibleDayCount || 1),
-    );
-  }, [projectedBoard.dates.length, visibleDayCount]);
-
-  useEffect(() => {
-    if (!activeSlotStart || mode !== "view") {
-      return;
-    }
-
-    const slot = projectedSlotMap.get(activeSlotStart);
-    if (!slot || !visibleDateKeys.has(slot.projectedDateKey)) {
-      setActiveSlotStart(null);
-    }
-  }, [activeSlotStart, mode, projectedSlotMap, visibleDateKeys]);
-
   const moveVisibleDateWindow = useCallback(
     (direction: -1 | 1) => {
-      setVisibleDateStartIndex((current) =>
+      setVisibleDateStartIndex(
         clampVisibleDateStartIndex(
-          current + direction,
+          clampedVisibleDateStartIndex + direction,
           projectedBoard.dates.length,
           visibleDayCount || 1,
         ),
       );
+      setActiveSlotStart(null);
     },
-    [projectedBoard.dates.length, visibleDayCount],
+    [clampedVisibleDateStartIndex, projectedBoard.dates.length, visibleDayCount],
+  );
+
+  const handleModeChange = useCallback(
+    (nextMode: BoardMode) => {
+      if (nextMode === "edit") {
+        setActiveSlotStart(null);
+      }
+
+      onModeChange?.(nextMode);
+    },
+    [onModeChange],
   );
 
   const paintCellInSession = useCallback(
@@ -1023,13 +1021,13 @@ export function EventHeatmap({
                       <SegmentedControlItem
                         active={mode === "edit"}
                         disabled={!supportsPainting}
-                        onClick={() => onModeChange?.("edit")}
+                        onClick={() => handleModeChange("edit")}
                       >
                         {messages.publicEvent.editMode}
                       </SegmentedControlItem>
                       <SegmentedControlItem
                         active={mode === "view"}
-                        onClick={() => onModeChange?.("view")}
+                        onClick={() => handleModeChange("view")}
                       >
                         {messages.publicEvent.viewMode}
                       </SegmentedControlItem>
@@ -1152,7 +1150,7 @@ export function EventHeatmap({
                               time: timeLabel,
                             });
 
-                        const isActiveViewSlot = mode === "view" && activeSlotStart === slot.slotStart;
+                        const isActiveViewSlot = activeSlot?.slotStart === slot.slotStart;
                         const showCurrentUserSelection = supportsPainting && mode === "edit" && slot.selectedByCurrentUser;
                         const isHighlightedParticipantAvailable = activeParticipantId
                           ? slot.participantIds.includes(activeParticipantId)
