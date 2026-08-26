@@ -397,8 +397,19 @@ export function EventHeatmap({
       return;
     }
 
+    if (activeParticipantIdProp === undefined) {
+      // Participant removals arrive through external snapshots and must invalidate local selection.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setInternalActiveParticipantId(null);
+    }
+
     onActiveParticipantChange?.(null);
-  }, [activeParticipant, onActiveParticipantChange, requestedActiveParticipantId]);
+  }, [
+    activeParticipant,
+    activeParticipantIdProp,
+    onActiveParticipantChange,
+    requestedActiveParticipantId,
+  ]);
 
   const slotMap = useMemo(
     () =>
