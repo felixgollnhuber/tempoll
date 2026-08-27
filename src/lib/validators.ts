@@ -6,7 +6,8 @@ import type { Messages } from "@/lib/i18n/messages";
 const dateKeyRegex = /^\d{4}-\d{2}-\d{2}$/;
 const slotMinuteSet = new Set<number>(slotMinuteOptions);
 const meetingDurationSet = new Set<number>(meetingDurationOptions);
-const fullDayDateLimit = 366;
+export const timeGridDateLimit = 31;
+export const fullDayDateLimit = 366;
 const availabilitySelectionLimit = 3000;
 
 const optionalFullDayStartMinutesSchema = z.preprocess(
@@ -95,7 +96,7 @@ export function createEventCreateSchema(messages: Messages) {
       notificationEmail: createOptionalEmailSchema(messages).optional(),
     })
     .superRefine((data, ctx) => {
-      if (data.eventType === "time_grid" && data.dates.length > 31) {
+      if (data.eventType === "time_grid" && data.dates.length > timeGridDateLimit) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["dates"],
@@ -188,5 +189,36 @@ export function createManageUpdateSchema(messages: Messages) {
       action: z.literal("updateNotificationEmail"),
       notificationEmail: createOptionalEmailSchema(messages).optional(),
     }),
-  ]);
+    z.object({
+      action: z.literal("updateSchedule"),
+      dates: z
+        .array(z.string().regex(dateKeyRegex, messages.validation.eventCreate.validCalendarDates))
+        .min(1, messages.validation.eventCreate.chooseStartAndEndDate),
+      dayStartMinutes: z
+        .number()
+        .int()
+        .min(0, messages.validation.eventCreate.validDailyStart)
+        .max(23 * 60 + 30, messages.validation.eventCreate.validDailyStart)
+        .optional(),
+      dayEndMinutes: z
+        .number()
+        .int()
+        .min(30, messages.validation.eventCreate.validDailyEnd)
+        .max(24 * 60, messages.validation.eventCreate.validDailyEnd)
+        .optional(),
+    }),
+  ]).superRefine((data, ctx) => {
+    if (
+      data.action === "updateSchedule" &&
+      data.dayStartMinutes != null &&
+      data.dayEndMinutes != null &&
+      data.dayEndMinutes <= data.dayStartMinutes
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["dayEndMinutes"],
+        message: messages.validation.eventCreate.endAfterStart,
+      });
+    }
+  });
 }

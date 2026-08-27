@@ -14,7 +14,9 @@ import {
   getAllowedFullDaySlotStarts,
   getAllowedFinalSlotStarts,
   getAllowedSlotStarts,
+  sortDateKeys,
 } from "@/lib/availability";
+import { fullDayDateLimit, timeGridDateLimit } from "@/lib/validators";
 import {
   buildManageKey,
   buildManageUrl,
@@ -30,7 +32,7 @@ import {
   parseParticipantCookieValue,
   pickParticipantColor,
 } from "@/lib/tokens";
-import { conflict, notFound, serviceUnavailable, unauthorized } from "@/lib/errors";
+import { badRequest, conflict, notFound, serviceUnavailable, unauthorized } from "@/lib/errors";
 import type {
   AvailabilityBatchMutation,
   CreateEventResult,
@@ -572,6 +574,12 @@ export async function updateManagedEvent(
     | {
         action: "updateNotificationEmail";
         notificationEmail?: string;
+      }
+    | {
+        action: "updateSchedule";
+        dates: string[];
+        dayStartMinutes?: number;
+        dayEndMinutes?: number;
       },
 ) {
   const event = await verifyManageKey(manageKey);
@@ -667,6 +675,88 @@ export async function updateManagedEvent(
 
       throw error;
     }
+  }
+
+  if (input.action === "updateSchedule") {
+    if (event.status === "CLOSED") {
+      throw conflict("event_closed");
+    }
+
+    const eventType = event.type === "FULL_DAY" ? "full_day" : "time_grid";
+    const nextDateKeys = sortDateKeys(input.dates);
+    const maxDates = eventType === "full_day" ? fullDayDateLimit : timeGridDateLimit;
+    if (nextDateKeys.length > maxDates) {
+      throw badRequest("too_many_dates");
+    }
+
+    const nextDayStartMinutes =
+      eventType === "time_grid" && input.dayStartMinutes != null
+        ? input.dayStartMinutes
+        : event.dayStartMinutes;
+    const nextDayEndMinutes =
+      eventType === "time_grid" && input.dayEndMinutes != null
+        ? input.dayEndMinutes
+        : event.dayEndMinutes;
+
+    if (nextDayEndMinutes <= nextDayStartMinutes) {
+      throw badRequest("invalid_day_window");
+    }
+
+    const allowedSlotStarts =
+      eventType === "full_day"
+        ? getAllowedFullDaySlotStarts({
+            dates: nextDateKeys,
+            timezone: event.timezone,
+          })
+        : getAllowedSlotStarts({
+            dates: nextDateKeys,
+            timezone: event.timezone,
+            dayStartMinutes: nextDayStartMinutes,
+            dayEndMinutes: nextDayEndMinutes,
+            slotMinutes: event.slotMinutes,
+          });
+    const allowedSlotStartDates = Array.from(allowedSlotStarts).map((iso) => new Date(iso));
+
+    const currentDateKeys = new Set(event.dates.map((date) => date.dateKey));
+    const nextDateKeySet = new Set(nextDateKeys);
+    const removedDateKeys = [...currentDateKeys].filter((dateKey) => !nextDateKeySet.has(dateKey));
+    const addedDateKeys = nextDateKeys.filter((dateKey) => !currentDateKeys.has(dateKey));
+
+    await prisma.$transaction([
+      ...(eventType === "time_grid" &&
+      (nextDayStartMinutes !== event.dayStartMinutes || nextDayEndMinutes !== event.dayEndMinutes)
+        ? [
+            prisma.event.update({
+              where: { id: event.id },
+              data: {
+                dayStartMinutes: nextDayStartMinutes,
+                dayEndMinutes: nextDayEndMinutes,
+              },
+            }),
+          ]
+        : []),
+      ...(removedDateKeys.length
+        ? [
+            prisma.eventDate.deleteMany({
+              where: { eventId: event.id, dateKey: { in: removedDateKeys } },
+            }),
+          ]
+        : []),
+      ...(addedDateKeys.length
+        ? [
+            prisma.eventDate.createMany({
+              data: addedDateKeys.map((dateKey) => ({ eventId: event.id, dateKey })),
+              skipDuplicates: true,
+            }),
+          ]
+        : []),
+      prisma.availabilitySlot.deleteMany({
+        where: {
+          eventId: event.id,
+          slotStartAt: { notIn: allowedSlotStartDates },
+        },
+      }),
+    ]);
   }
 
   if (input.action === "updateNotificationEmail") {

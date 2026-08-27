@@ -684,4 +684,99 @@ describe("ManageEventClient", () => {
 
     expect(screen.queryByText("Best windows right now")).not.toBeInTheDocument();
   });
+
+  it("shows the dates & times editor while the event is open and hides it once closed", () => {
+    const openView = createManageView({ status: "OPEN" });
+    const { unmount } = renderWithI18n(<ManageEventClient initialView={openView} />);
+    expect(screen.getByText("Dates & times")).toBeInTheDocument();
+    unmount();
+
+    const closedView = createManageView({
+      status: "CLOSED",
+      finalizedSlot: buildPublishedFinalizedSlot(
+        createManageView().snapshot,
+        "2026-04-02T07:00:00.000Z",
+      ),
+    });
+    renderWithI18n(<ManageEventClient initialView={closedView} />);
+    expect(screen.queryByText("Dates & times")).not.toBeInTheDocument();
+  });
+
+  it("saves a widened daily window immediately without a confirmation dialog", async () => {
+    const view = createManageView();
+    const fetchMock = installManageFetchMock(view);
+    const user = userEvent.setup();
+
+    renderWithI18n(<ManageEventClient initialView={view} />);
+
+    await user.click(screen.getByRole("combobox", { name: "Daily end" }));
+    await user.click(screen.getByRole("option", { name: "11:30" }));
+    await user.click(screen.getByRole("button", { name: "Save dates & times" }));
+
+    expect(screen.queryByText("Delete marked availability?")).not.toBeInTheDocument();
+
+    await waitFor(() => {
+      const scheduleCall = fetchMock.mock.calls.find(
+        ([input, init]) =>
+          String(input) === `/api/manage/${view.manageKey}` &&
+          (init as RequestInit | undefined)?.method === "PATCH" &&
+          String((init as RequestInit).body).includes("updateSchedule"),
+      );
+      expect(scheduleCall).toBeTruthy();
+      const body = JSON.parse(String((scheduleCall![1] as RequestInit).body));
+      expect(body).toMatchObject({
+        action: "updateSchedule",
+        dates: ["2026-04-02"],
+        dayStartMinutes: 9 * 60,
+        dayEndMinutes: 11 * 60 + 30,
+      });
+    });
+  });
+
+  it("confirms before saving a change that deletes marked availability", async () => {
+    const view = createManageView();
+    const fetchMock = installManageFetchMock(view);
+    const user = userEvent.setup();
+
+    renderWithI18n(<ManageEventClient initialView={view} />);
+
+    // Narrowing the day to 10:00 removes the 10:00 slot, which has one vote.
+    const dailyEnd = screen.getByRole("combobox", { name: "Daily end" });
+    await user.click(dailyEnd);
+    await user.click(screen.getByRole("option", { name: "10:00" }));
+    expect(dailyEnd).toHaveTextContent("10:00");
+    await user.click(screen.getByRole("button", { name: "Save dates & times" }));
+
+    expect(await screen.findByText("Delete marked availability?")).toBeInTheDocument();
+    expect(
+      screen.getByText(/1 availability mark across 1 participant/),
+    ).toBeInTheDocument();
+
+    // No PATCH should be sent until the organizer confirms.
+    expect(
+      fetchMock.mock.calls.some(
+        ([, init]) =>
+          (init as RequestInit | undefined)?.method === "PATCH" &&
+          String((init as RequestInit).body).includes("updateSchedule"),
+      ),
+    ).toBe(false);
+
+    await user.click(screen.getByRole("button", { name: "Delete and save" }));
+
+    await waitFor(() => {
+      const scheduleCall = fetchMock.mock.calls.find(
+        ([input, init]) =>
+          String(input) === `/api/manage/${view.manageKey}` &&
+          (init as RequestInit | undefined)?.method === "PATCH" &&
+          String((init as RequestInit).body).includes("updateSchedule"),
+      );
+      expect(scheduleCall).toBeTruthy();
+      const body = JSON.parse(String((scheduleCall![1] as RequestInit).body));
+      expect(body).toMatchObject({
+        action: "updateSchedule",
+        dates: ["2026-04-02"],
+        dayEndMinutes: 10 * 60,
+      });
+    });
+  });
 });

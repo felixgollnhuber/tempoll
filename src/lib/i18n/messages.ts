@@ -405,6 +405,34 @@ export const en = {
       "Select a day to inspect availability and close the event from the day action.",
     openHeatmapDescriptionWindowed:
       "Select a slot to inspect availability and close the event from the slot action. Use the arrows to move through the date range.",
+    scheduleTitle: "Dates & times",
+    scheduleDescription:
+      "Add or remove dates, or adjust the daily time window. Removing a date or time also deletes any availability already marked there.",
+    scheduleDatesLabel: "Dates",
+    schedulePickDates: "Choose dates",
+    scheduleDatesSelected: {
+      one: "{count} date",
+      other: "{count} dates",
+    },
+    scheduleDayStartLabel: "Daily start",
+    scheduleDayEndLabel: "Daily end",
+    scheduleSave: "Save dates & times",
+    scheduleSaved: "Dates & times updated",
+    scheduleNoChanges: "There are no changes to save.",
+    scheduleDatesRequired: "Pick at least one date.",
+    scheduleInvalidWindow: "The daily end time must be after the start time.",
+    scheduleConfirmTitle: "Delete marked availability?",
+    scheduleConfirmMarks: {
+      one: "{count} availability mark",
+      other: "{count} availability marks",
+    },
+    scheduleConfirmParticipants: {
+      one: "{count} participant",
+      other: "{count} participants",
+    },
+    scheduleConfirmDescription:
+      "Saving removes {marks} across {participants}. Deleted availability can't be recovered.",
+    scheduleConfirmAction: "Delete and save",
     peopleAvailable: {
       one: "{count} person available",
       other: "{count} people available",
@@ -1147,6 +1175,34 @@ export const de: Messages = {
       "Wähle einen Tag aus, um die Verfügbarkeit zu prüfen und das Event über die Tagesaktion zu schließen.",
     openHeatmapDescriptionWindowed:
       "Wähle einen Slot aus, um die Verfügbarkeit zu prüfen und das Event über die Slot-Aktion zu schließen. Mit den Pfeilen bewegst du dich durch den Datumsbereich.",
+    scheduleTitle: "Termine & Zeiten",
+    scheduleDescription:
+      "Füge Termine hinzu oder entferne sie oder passe das tägliche Zeitfenster an. Beim Entfernen eines Termins oder einer Zeit werden auch bereits markierte Verfügbarkeiten gelöscht.",
+    scheduleDatesLabel: "Termine",
+    schedulePickDates: "Termine auswählen",
+    scheduleDatesSelected: {
+      one: "{count} Termin",
+      other: "{count} Termine",
+    },
+    scheduleDayStartLabel: "Tagesbeginn",
+    scheduleDayEndLabel: "Tagesende",
+    scheduleSave: "Termine & Zeiten speichern",
+    scheduleSaved: "Termine & Zeiten aktualisiert",
+    scheduleNoChanges: "Es gibt keine Änderungen zum Speichern.",
+    scheduleDatesRequired: "Wähle mindestens einen Termin aus.",
+    scheduleInvalidWindow: "Das Tagesende muss nach dem Tagesbeginn liegen.",
+    scheduleConfirmTitle: "Markierte Verfügbarkeit löschen?",
+    scheduleConfirmMarks: {
+      one: "{count} Verfügbarkeitsmarkierung",
+      other: "{count} Verfügbarkeitsmarkierungen",
+    },
+    scheduleConfirmParticipants: {
+      one: "{count} teilnehmende Person",
+      other: "{count} teilnehmende Personen",
+    },
+    scheduleConfirmDescription:
+      "Beim Speichern werden {marks} von {participants} entfernt. Gelöschte Verfügbarkeit kann nicht wiederhergestellt werden.",
+    scheduleConfirmAction: "Löschen und speichern",
     peopleAvailable: {
       one: "{count} Person verfügbar",
       other: "{count} Personen verfügbar",

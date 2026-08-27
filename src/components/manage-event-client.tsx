@@ -1,7 +1,15 @@
 "use client";
 
+import type { Locale } from "date-fns";
 import Link from "next/link";
-import { Loader2Icon, LockIcon, Trash2Icon, UnlockIcon } from "lucide-react";
+import {
+  CalendarIcon,
+  ChevronDownIcon,
+  Loader2Icon,
+  LockIcon,
+  Trash2Icon,
+  UnlockIcon,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
@@ -22,16 +30,28 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { formatMeetingWindowLabels } from "@/lib/availability";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { buildTimeOptions, formatMeetingWindowLabels } from "@/lib/availability";
 import { useI18n } from "@/lib/i18n/context";
+import type { MessageValues, PluralMessage } from "@/lib/i18n/format";
+import type { Messages } from "@/lib/i18n/messages";
 import { buildTimezoneOptions } from "@/lib/timezone-options";
 import type {
   ManageEventNotificationState,
   ManageEventView,
   PublicEventSnapshot,
+  SnapshotSlot,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useViewerTimezone } from "@/lib/viewer-timezone";
@@ -48,7 +68,8 @@ type PendingAction =
   | "reopenEvent"
   | "renameParticipant"
   | "removeParticipant"
-  | "updateNotificationEmail";
+  | "updateNotificationEmail"
+  | "updateSchedule";
 
 type RefreshSnapshotOptions = {
   preserveDirtyTitle?: boolean;
@@ -58,7 +79,7 @@ export function ManageEventClient({
   initialView,
   timezones = [],
 }: ManageEventClientProps) {
-  const { messages, format, plural, locale } = useI18n();
+  const { messages, format, plural, locale, dateFnsLocale } = useI18n();
   const [snapshot, setSnapshot] = useState<PublicEventSnapshot>(initialView.snapshot);
   const [notification, setNotification] = useState<ManageEventNotificationState>(
     initialView.notification,
@@ -317,6 +338,31 @@ export function ManageEventClient({
             preserveDirtyTitle: true,
           });
         },
+      },
+    );
+  }
+
+  function saveSchedule(payload: {
+    dates: string[];
+    dayStartMinutes?: number;
+    dayEndMinutes?: number;
+  }) {
+    performManageAction(
+      "updateSchedule",
+      () =>
+        fetch(manageActionUrl, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            action: "updateSchedule",
+            ...payload,
+          }),
+        }),
+      {
+        successMessage: messages.manageEvent.scheduleSaved,
+        errorMessage: messages.errors.routeFallbacks.updateEvent,
       },
     );
   }
@@ -665,6 +711,24 @@ export function ManageEventClient({
         <aside className="order-1 min-w-0 space-y-5 xl:order-2">
           {statusCard}
 
+          {snapshot.status === "OPEN" ? (
+            <ScheduleEditorCard
+              key={`${snapshot.dates.map((date) => date.dateKey).join(",")}|${snapshot.dayStartMinutes}|${snapshot.dayEndMinutes}`}
+              messages={messages}
+              format={format}
+              plural={plural}
+              dateFnsLocale={dateFnsLocale}
+              isFullDayEvent={isFullDayEvent}
+              slots={snapshot.slots}
+              initialDateKeys={snapshot.dates.map((date) => date.dateKey)}
+              initialDayStartMinutes={snapshot.dayStartMinutes}
+              initialDayEndMinutes={snapshot.dayEndMinutes}
+              isPending={isPending}
+              isSaving={pendingAction === "updateSchedule"}
+              onSave={saveSchedule}
+            />
+          ) : null}
+
           <Card>
             <CardHeader>
               <CardTitle>{messages.manageEvent.shareLinksTitle}</CardTitle>
@@ -814,5 +878,266 @@ export function ManageEventClient({
         </div>
       </div>
     </div>
+  );
+}
+
+function dateKeyToDate(dateKey: string) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function dateToDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function sortDateKeys(dateKeys: string[]) {
+  return [...dateKeys].sort((a, b) => a.localeCompare(b));
+}
+
+type ScheduleEditorCardProps = {
+  messages: Messages;
+  format: (template: string, values?: MessageValues) => string;
+  plural: (message: PluralMessage, count: number, values?: MessageValues) => string;
+  dateFnsLocale: Locale;
+  isFullDayEvent: boolean;
+  slots: SnapshotSlot[];
+  initialDateKeys: string[];
+  initialDayStartMinutes: number;
+  initialDayEndMinutes: number;
+  isPending: boolean;
+  isSaving: boolean;
+  onSave: (payload: {
+    dates: string[];
+    dayStartMinutes?: number;
+    dayEndMinutes?: number;
+  }) => void;
+};
+
+function ScheduleEditorCard({
+  messages,
+  format,
+  plural,
+  dateFnsLocale,
+  isFullDayEvent,
+  slots,
+  initialDateKeys,
+  initialDayStartMinutes,
+  initialDayEndMinutes,
+  isPending,
+  isSaving,
+  onSave,
+}: ScheduleEditorCardProps) {
+  const scheduleMessages = messages.manageEvent;
+  const timeOptions = useMemo(() => buildTimeOptions(30), []);
+  const [selectedDateKeys, setSelectedDateKeys] = useState(() => sortDateKeys(initialDateKeys));
+  const [dayStartMinutes, setDayStartMinutes] = useState(initialDayStartMinutes);
+  const [dayEndMinutes, setDayEndMinutes] = useState(initialDayEndMinutes);
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+
+  const selectedDates = useMemo(
+    () => selectedDateKeys.map((dateKey) => dateKeyToDate(dateKey)),
+    [selectedDateKeys],
+  );
+  const nextDateKeySet = useMemo(() => new Set(selectedDateKeys), [selectedDateKeys]);
+
+  const datesChanged =
+    selectedDateKeys.join(",") !== sortDateKeys(initialDateKeys).join(",");
+  const windowChanged =
+    !isFullDayEvent &&
+    (dayStartMinutes !== initialDayStartMinutes || dayEndMinutes !== initialDayEndMinutes);
+  const hasChanges = datesChanged || windowChanged;
+  const hasNoDates = selectedDateKeys.length === 0;
+  const hasInvalidWindow = !isFullDayEvent && dayEndMinutes <= dayStartMinutes;
+
+  const removedSlots = useMemo(
+    () =>
+      slots.filter((slot) => {
+        if (!nextDateKeySet.has(slot.dateKey)) {
+          return true;
+        }
+        if (!isFullDayEvent && (slot.minutes < dayStartMinutes || slot.minutes >= dayEndMinutes)) {
+          return true;
+        }
+        return false;
+      }),
+    [slots, nextDateKeySet, isFullDayEvent, dayStartMinutes, dayEndMinutes],
+  );
+  const deletedVotes = useMemo(
+    () => removedSlots.reduce((total, slot) => total + slot.availabilityCount, 0),
+    [removedSlots],
+  );
+  const affectedParticipants = useMemo(() => {
+    const participantIds = new Set<string>();
+    for (const slot of removedSlots) {
+      for (const participantId of slot.participantIds) {
+        participantIds.add(participantId);
+      }
+    }
+    return participantIds.size;
+  }, [removedSlots]);
+
+  const startTimeOptions = timeOptions.filter((option) => option.value < dayEndMinutes);
+  const endTimeOptions = timeOptions.filter((option) => option.value > dayStartMinutes);
+  const canSave = hasChanges && !hasNoDates && !hasInvalidWindow && !isPending;
+
+  function submit() {
+    onSave({
+      dates: selectedDateKeys,
+      ...(isFullDayEvent ? {} : { dayStartMinutes, dayEndMinutes }),
+    });
+  }
+
+  function handleSaveClick() {
+    if (!canSave) {
+      return;
+    }
+    if (deletedVotes > 0) {
+      setIsConfirmOpen(true);
+      return;
+    }
+    submit();
+  }
+
+  return (
+    <Card>
+      <CardHeader className="p-4 pb-2">
+        <CardTitle className="text-sm">{scheduleMessages.scheduleTitle}</CardTitle>
+        <CardDescription className="text-xs">
+          {scheduleMessages.scheduleDescription}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3 p-4 pt-0">
+        <div className="space-y-2">
+          <Label className="text-xs">{scheduleMessages.scheduleDatesLabel}</Label>
+          <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
+            <PopoverTrigger asChild>
+              <Button type="button" variant="outline" className="h-9 w-full justify-between font-normal">
+                <span className="flex min-w-0 items-center gap-2">
+                  <CalendarIcon className="size-4 text-muted-foreground" />
+                  <span className="truncate">{scheduleMessages.schedulePickDates}</span>
+                </span>
+                <span className="ml-3 flex shrink-0 items-center gap-2">
+                  <Badge variant="secondary" className="rounded-full px-2.5">
+                    {plural(scheduleMessages.scheduleDatesSelected, selectedDateKeys.length)}
+                  </Badge>
+                  <ChevronDownIcon className="size-4 text-muted-foreground" />
+                </span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="start"
+              sideOffset={8}
+              className="w-[min(22rem,calc(100vw-2rem))] p-0"
+            >
+              <div className="p-3">
+                <Calendar
+                  mode="multiple"
+                  numberOfMonths={1}
+                  selected={selectedDates}
+                  defaultMonth={selectedDates[0]}
+                  weekStartsOn={1}
+                  onSelect={(dates) =>
+                    setSelectedDateKeys(sortDateKeys((dates ?? []).map(dateToDateKey)))
+                  }
+                  locale={dateFnsLocale}
+                  className="mx-auto"
+                />
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        {isFullDayEvent ? null : (
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label className="text-xs">{scheduleMessages.scheduleDayStartLabel}</Label>
+              <Select
+                value={String(dayStartMinutes)}
+                onValueChange={(value) => setDayStartMinutes(Number(value))}
+              >
+                <SelectTrigger className="w-full" aria-label={scheduleMessages.scheduleDayStartLabel}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="max-h-80">
+                  {startTimeOptions.map((option) => (
+                    <SelectItem key={option.value} value={String(option.value)}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">{scheduleMessages.scheduleDayEndLabel}</Label>
+              <Select
+                value={String(dayEndMinutes)}
+                onValueChange={(value) => setDayEndMinutes(Number(value))}
+              >
+                <SelectTrigger className="w-full" aria-label={scheduleMessages.scheduleDayEndLabel}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="max-h-80">
+                  {endTimeOptions.map((option) => (
+                    <SelectItem key={option.value} value={String(option.value)}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        )}
+
+        {hasNoDates ? (
+          <p className="text-xs text-destructive">{scheduleMessages.scheduleDatesRequired}</p>
+        ) : hasInvalidWindow ? (
+          <p className="text-xs text-destructive">{scheduleMessages.scheduleInvalidWindow}</p>
+        ) : null}
+
+        <Button
+          type="button"
+          size="sm"
+          className="w-full"
+          disabled={!canSave || isSaving}
+          onClick={handleSaveClick}
+        >
+          {isSaving ? <Loader2Icon className="size-4 animate-spin" /> : null}
+          {scheduleMessages.scheduleSave}
+        </Button>
+      </CardContent>
+
+      <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{scheduleMessages.scheduleConfirmTitle}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {format(scheduleMessages.scheduleConfirmDescription, {
+                marks: plural(scheduleMessages.scheduleConfirmMarks, deletedVotes),
+                participants: plural(
+                  scheduleMessages.scheduleConfirmParticipants,
+                  affectedParticipants,
+                ),
+              })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{messages.common.cancel}</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                setIsConfirmOpen(false);
+                submit();
+              }}
+            >
+              {scheduleMessages.scheduleConfirmAction}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Card>
   );
 }

@@ -4,6 +4,7 @@ import { getMessages } from "@/lib/i18n/messages";
 import {
   createAvailabilityMutationSchema,
   createEventCreateSchema,
+  createManageUpdateSchema,
 } from "@/lib/validators";
 
 const messages = getMessages("en");
@@ -118,5 +119,45 @@ describe("validators", () => {
         selectedSlotStarts,
       }).success,
     ).toBe(true);
+  });
+
+  it("accepts an updateSchedule action with dates and an optional daily window", () => {
+    const withWindow = createManageUpdateSchema(messages).safeParse({
+      action: "updateSchedule",
+      dates: ["2026-04-02", "2026-04-03"],
+      dayStartMinutes: 9 * 60,
+      dayEndMinutes: 17 * 60,
+    });
+    expect(withWindow.success).toBe(true);
+
+    const datesOnly = createManageUpdateSchema(messages).safeParse({
+      action: "updateSchedule",
+      dates: ["2026-04-02"],
+    });
+    expect(datesOnly.success).toBe(true);
+  });
+
+  it("rejects an updateSchedule action with no dates", () => {
+    const result = createManageUpdateSchema(messages).safeParse({
+      action: "updateSchedule",
+      dates: [],
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.path).toEqual(["dates"]);
+  });
+
+  it("rejects an updateSchedule window where the end is not after the start", () => {
+    const result = createManageUpdateSchema(messages).safeParse({
+      action: "updateSchedule",
+      dates: ["2026-04-02"],
+      dayStartMinutes: 17 * 60,
+      dayEndMinutes: 9 * 60,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]).toMatchObject({
+      path: ["dayEndMinutes"],
+    });
   });
 });

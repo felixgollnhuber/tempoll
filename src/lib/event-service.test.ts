@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { buildSlotStart } from "@/lib/availability";
+import { buildSlotStart, getAllowedSlotStarts } from "@/lib/availability";
 import { hashSecret } from "@/lib/tokens";
 
 const prisma = {
@@ -14,6 +14,14 @@ const prisma = {
     update: vi.fn(),
     deleteMany: vi.fn(),
   },
+  eventDate: {
+    deleteMany: vi.fn(),
+    createMany: vi.fn(),
+  },
+  availabilitySlot: {
+    deleteMany: vi.fn(),
+  },
+  $transaction: vi.fn(async (operations: unknown[]) => operations),
 };
 
 const publishEventUpdate = vi.fn();
@@ -224,5 +232,178 @@ describe("updateManagedEvent", () => {
     });
 
     expect(updateNotificationRecipient).toHaveBeenCalledWith("event_1", "");
+  });
+});
+
+function createManagedEventWithDates(
+  dateKeys: string[],
+  overrides: { status?: "OPEN" | "CLOSED" } = {},
+) {
+  const base = createManagedEvent();
+  return {
+    ...base,
+    ...overrides,
+    dates: dateKeys.map((dateKey, index) => ({
+      id: `date_${index + 1}`,
+      eventId: base.id,
+      dateKey,
+      createdAt: new Date("2026-03-28T10:00:00.000Z"),
+    })),
+  };
+}
+
+function prunedNotInIso() {
+  const call = prisma.availabilitySlot.deleteMany.mock.calls[0]?.[0] as
+    | { where: { eventId: string; slotStartAt: { notIn: Date[] } } }
+    | undefined;
+  if (!call) {
+    throw new Error("availabilitySlot.deleteMany was not called");
+  }
+  return {
+    eventId: call.where.eventId,
+    allowed: call.where.slotStartAt.notIn.map((date) => date.toISOString()).sort(),
+  };
+}
+
+describe("updateManagedEvent updateSchedule", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.resetModules();
+    prisma.event.findUnique.mockResolvedValue(createManagedEvent());
+    prisma.event.update.mockResolvedValue(undefined);
+    publishEventUpdate.mockResolvedValue(undefined);
+  });
+
+  it("adds a date without removing existing dates or narrowing votes", async () => {
+    prisma.event.findUnique.mockResolvedValue(createManagedEventWithDates(["2026-04-02"]));
+    const { updateManagedEvent } = await import("./event-service");
+
+    await updateManagedEvent("event_1.secret", {
+      action: "updateSchedule",
+      dates: ["2026-04-02", "2026-04-03"],
+    });
+
+    expect(prisma.eventDate.createMany).toHaveBeenCalledWith({
+      data: [{ eventId: "event_1", dateKey: "2026-04-03" }],
+      skipDuplicates: true,
+    });
+    expect(prisma.eventDate.deleteMany).not.toHaveBeenCalled();
+    // Window unchanged, so the event row is not touched.
+    expect(prisma.event.update).not.toHaveBeenCalled();
+
+    const expectedAllowed = Array.from(
+      getAllowedSlotStarts({
+        dates: ["2026-04-02", "2026-04-03"],
+        timezone: "Europe/Vienna",
+        dayStartMinutes: 9 * 60,
+        dayEndMinutes: 11 * 60,
+        slotMinutes: 30,
+      }),
+    ).sort();
+    const pruned = prunedNotInIso();
+    expect(pruned.eventId).toBe("event_1");
+    expect(pruned.allowed).toEqual(expectedAllowed);
+    expect(publishEventUpdate).toHaveBeenCalledWith({
+      eventId: "event_1",
+      kind: "event-updated",
+      participantId: undefined,
+    });
+  });
+
+  it("removes a date and prunes votes that fall outside the remaining dates", async () => {
+    prisma.event.findUnique.mockResolvedValue(
+      createManagedEventWithDates(["2026-04-02", "2026-04-03"]),
+    );
+    const { updateManagedEvent } = await import("./event-service");
+
+    await updateManagedEvent("event_1.secret", {
+      action: "updateSchedule",
+      dates: ["2026-04-02"],
+    });
+
+    expect(prisma.eventDate.deleteMany).toHaveBeenCalledWith({
+      where: { eventId: "event_1", dateKey: { in: ["2026-04-03"] } },
+    });
+    expect(prisma.eventDate.createMany).not.toHaveBeenCalled();
+
+    const expectedAllowed = Array.from(
+      getAllowedSlotStarts({
+        dates: ["2026-04-02"],
+        timezone: "Europe/Vienna",
+        dayStartMinutes: 9 * 60,
+        dayEndMinutes: 11 * 60,
+        slotMinutes: 30,
+      }),
+    ).sort();
+    const pruned = prunedNotInIso();
+    expect(pruned.allowed).toEqual(expectedAllowed);
+    // None of the still-allowed slots may fall on the removed date.
+    expect(pruned.allowed.some((iso) => iso.includes("2026-04-03"))).toBe(false);
+  });
+
+  it("narrows the daily window and prunes out-of-window votes", async () => {
+    prisma.event.findUnique.mockResolvedValue(createManagedEventWithDates(["2026-04-02"]));
+    const { updateManagedEvent } = await import("./event-service");
+
+    await updateManagedEvent("event_1.secret", {
+      action: "updateSchedule",
+      dates: ["2026-04-02"],
+      dayStartMinutes: 9 * 60,
+      dayEndMinutes: 10 * 60,
+    });
+
+    expect(prisma.event.update).toHaveBeenCalledWith({
+      where: { id: "event_1" },
+      data: { dayStartMinutes: 9 * 60, dayEndMinutes: 10 * 60 },
+    });
+
+    const expectedAllowed = Array.from(
+      getAllowedSlotStarts({
+        dates: ["2026-04-02"],
+        timezone: "Europe/Vienna",
+        dayStartMinutes: 9 * 60,
+        dayEndMinutes: 10 * 60,
+        slotMinutes: 30,
+      }),
+    ).sort();
+    const pruned = prunedNotInIso();
+    // 9:00-10:00 at 30-minute slots leaves exactly two allowed slot starts.
+    expect(pruned.allowed).toHaveLength(2);
+    expect(pruned.allowed).toEqual(expectedAllowed);
+  });
+
+  it("rejects schedule edits while the event is closed", async () => {
+    prisma.event.findUnique.mockResolvedValue(
+      createManagedEventWithDates(["2026-04-02"], { status: "CLOSED" }),
+    );
+    const { updateManagedEvent } = await import("./event-service");
+
+    await expect(
+      updateManagedEvent("event_1.secret", {
+        action: "updateSchedule",
+        dates: ["2026-04-02", "2026-04-03"],
+      }),
+    ).rejects.toMatchObject({ code: "event_closed" });
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects when too many dates are supplied for a time-grid event", async () => {
+    prisma.event.findUnique.mockResolvedValue(createManagedEventWithDates(["2026-04-02"]));
+    const { updateManagedEvent } = await import("./event-service");
+
+    const tooManyDates = Array.from({ length: 32 }, (_unused, index) => {
+      const day = String(index + 1).padStart(2, "0");
+      return `2026-05-${day}`;
+    });
+
+    await expect(
+      updateManagedEvent("event_1.secret", {
+        action: "updateSchedule",
+        dates: tooManyDates,
+      }),
+    ).rejects.toMatchObject({ code: "too_many_dates" });
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 });
