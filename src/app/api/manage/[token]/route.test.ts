@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { notFound, serviceUnavailable } from "@/lib/errors";
+import { badRequest, conflict, notFound, serviceUnavailable } from "@/lib/errors";
 
 const updateManagedEvent = vi.fn();
 const getClientIp = vi.fn();
@@ -154,6 +154,71 @@ describe("PATCH /api/manage/[token]", () => {
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toEqual({
       error: "Email alerts are not available on this host.",
+    });
+  });
+
+  it("returns a specific localized date-limit error for schedule updates", async () => {
+    updateManagedEvent.mockRejectedValue(
+      badRequest("too_many_dates", {
+        params: { limit: 31 },
+      }),
+    );
+
+    const { PATCH } = await import("./route");
+    const response = await PATCH(
+      new Request("https://tempoll.example.com/api/manage/private-token", {
+        method: "PATCH",
+        body: JSON.stringify({
+          action: "updateSchedule",
+          dates: ["2026-04-02"],
+          expectedScheduleSignature: '[["2026-04-02"],540,660]',
+          expectedDeletedVotes: 0,
+          expectedAffectedParticipants: 0,
+        }),
+        headers: {
+          "Accept-Language": "en-US",
+          "Content-Type": "application/json",
+        },
+      }),
+      {
+        params: Promise.resolve({ token: "private-token" }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "This event can include up to 31 dates.",
+    });
+  });
+
+  it("returns a specific conflict when the deletion preview became stale", async () => {
+    updateManagedEvent.mockRejectedValue(conflict("schedule_preview_stale"));
+
+    const { PATCH } = await import("./route");
+    const response = await PATCH(
+      new Request("https://tempoll.example.com/api/manage/private-token", {
+        method: "PATCH",
+        body: JSON.stringify({
+          action: "updateSchedule",
+          dates: ["2026-04-02"],
+          expectedScheduleSignature: '[["2026-04-02"],540,660]',
+          expectedDeletedVotes: 0,
+          expectedAffectedParticipants: 0,
+        }),
+        headers: {
+          "Accept-Language": "en-US",
+          "Content-Type": "application/json",
+        },
+      }),
+      {
+        params: Promise.resolve({ token: "private-token" }),
+      },
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error:
+        "Availability changed while you reviewed this update. Check the new deletion count and try again.",
     });
   });
 });
