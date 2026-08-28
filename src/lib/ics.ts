@@ -1,5 +1,7 @@
 import { formatInTimeZone } from "date-fns-tz";
 
+import { getNextDateKey } from "@/lib/availability";
+
 function escapeIcsText(value: string) {
   return value
     .replace(/\\/g, "\\\\")
@@ -59,9 +61,7 @@ export function buildEventCalendarFile({
     isOnlineMeeting && meetingLink?.trim() ? `Meeting link: ${meetingLink.trim()}` : null,
   ].filter(Boolean);
   const description = descriptionLines.join("\n");
-  const allDayNextDateKey = allDayDateKey
-    ? formatInTimeZone(new Date(slotEnd), timezone, "yyyy-MM-dd")
-    : null;
+  const allDayNextDateKey = allDayDateKey ? getNextDateKey(allDayDateKey) : null;
 
   const lines = [
     "BEGIN:VCALENDAR",

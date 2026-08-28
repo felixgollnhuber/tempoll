@@ -15,6 +15,7 @@ const prisma = {
   event: {
     findUnique: vi.fn(),
   },
+  $queryRaw: vi.fn(),
   $transaction: vi.fn(),
 };
 
@@ -121,8 +122,9 @@ function createEventSnapshotSource(selectedSlotStarts: string[]) {
 describe("saveAvailability", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    prisma.$transaction.mockImplementation(async (operations: Array<Promise<unknown>>) =>
-      Promise.all(operations),
+    prisma.$queryRaw.mockResolvedValue([{ id: "event_1" }]);
+    prisma.$transaction.mockImplementation(
+      async (operation: (transaction: typeof prisma) => Promise<unknown>) => operation(prisma),
     );
     prisma.participant.update.mockResolvedValue(undefined);
     prisma.availabilitySlot.deleteMany.mockResolvedValue(undefined);
@@ -145,7 +147,8 @@ describe("saveAvailability", () => {
       "participant_1.secret-token",
     );
 
-    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
     expect(publishEventUpdate).not.toHaveBeenCalled();
     expect(queueAvailabilityDigest).not.toHaveBeenCalled();
     expect(prisma.participant.update).toHaveBeenCalledWith({
@@ -221,5 +224,35 @@ describe("saveAvailability", () => {
         },
       ],
     });
+  });
+
+  it("revalidates selected slots against the schedule after acquiring the event lock", async () => {
+    const oldSlotStart = buildSlotStart("2026-04-02", 9 * 60, "Europe/Vienna");
+    const beforeLock = createParticipantForMutation([]);
+    const afterLock = createParticipantForMutation([]);
+    afterLock.event.dayStartMinutes = 10 * 60;
+    afterLock.event.dayEndMinutes = 11 * 60;
+    prisma.participant.findUnique
+      .mockResolvedValueOnce(beforeLock)
+      .mockResolvedValueOnce(afterLock);
+
+    const { saveAvailability } = await import("./event-service");
+
+    await expect(
+      saveAvailability(
+        "team-sync",
+        "en",
+        {
+          selectedSlotStarts: [oldSlotStart],
+        },
+        "participant_1.secret-token",
+      ),
+    ).rejects.toMatchObject({ code: "invalid_slots" });
+
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
+    expect(prisma.availabilitySlot.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.availabilitySlot.createMany).not.toHaveBeenCalled();
+    expect(publishEventUpdate).not.toHaveBeenCalled();
+    expect(queueAvailabilityDigest).not.toHaveBeenCalled();
   });
 });

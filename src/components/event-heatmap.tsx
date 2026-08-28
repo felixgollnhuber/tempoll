@@ -68,6 +68,7 @@ type EventHeatmapProps = {
   showFixedDateAction?: boolean;
   onFixedDateAction?: (slotStart: string) => void;
   isFixedDateActionPending?: boolean;
+  isFixedDateActionDisabled?: boolean;
   sessionBadgeLabel?: string | null;
   showModeToggle?: boolean;
   showSidebar?: boolean;
@@ -302,6 +303,7 @@ export function EventHeatmap({
   showFixedDateAction = false,
   onFixedDateAction,
   isFixedDateActionPending = false,
+  isFixedDateActionDisabled = false,
   sessionBadgeLabel = null,
   showModeToggle = true,
   showSidebar = true,
@@ -1331,7 +1333,9 @@ export function EventHeatmap({
                               size="sm"
                               variant={activeSlotDetails.isFinalSlotStart ? "secondary" : "default"}
                               disabled={
-                                isFixedDateActionPending || activeSlotDetails.isFinalSlotStart
+                                isFixedDateActionDisabled ||
+                                isFixedDateActionPending ||
+                                activeSlotDetails.isFinalSlotStart
                               }
                               onClick={() => onFixedDateAction?.(activeSlotDetails.slot.slotStart)}
                             >

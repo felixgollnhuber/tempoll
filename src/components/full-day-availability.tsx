@@ -27,7 +27,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import type { BoardMode } from "@/components/event-heatmap";
-import { formatFullDayDateLabel, minutesToLabel } from "@/lib/availability";
+import {
+  formatFullDayDateLabel,
+  isExistingZonedWallTime,
+  minutesToLabel,
+} from "@/lib/availability";
 import type { AppLocale } from "@/lib/i18n/locale";
 import { useI18n } from "@/lib/i18n/context";
 import type { PublicEventSnapshot, SnapshotParticipant, SnapshotSlot } from "@/lib/types";
@@ -49,6 +53,7 @@ type FullDayAvailabilityProps = {
   showFixedDateAction?: boolean;
   onFixedDateAction?: (slotStart: string) => void;
   isFixedDateActionPending?: boolean;
+  isFixedDateActionDisabled?: boolean;
   sessionBadgeLabel?: string | null;
   showModeToggle?: boolean;
   showSidebar?: boolean;
@@ -267,6 +272,7 @@ export function FullDayAvailability({
   showFixedDateAction = false,
   onFixedDateAction,
   isFixedDateActionPending = false,
+  isFixedDateActionDisabled = false,
   sessionBadgeLabel = null,
   showModeToggle = true,
   showSidebar = true,
@@ -363,7 +369,16 @@ export function FullDayAvailability({
   const shouldShowFixedDateAction = showFixedDateAction && Boolean(onFixedDateAction);
   const supportsPainting = supportsEditing && Boolean(onUpdateDay);
   const fullDayStartTimeLabel =
-    snapshot.fullDayStartMinutes === null || snapshot.fullDayStartMinutes === undefined
+    snapshot.fullDayStartMinutes === null ||
+    snapshot.fullDayStartMinutes === undefined ||
+    snapshot.dates.some(
+      (date) =>
+        !isExistingZonedWallTime({
+          dateKey: date.dateKey,
+          minutes: snapshot.fullDayStartMinutes ?? 0,
+          timezone: snapshot.timezone,
+        }),
+    )
       ? null
       : minutesToLabel(snapshot.fullDayStartMinutes);
 
@@ -970,7 +985,11 @@ export function FullDayAvailability({
                             type="button"
                             size="sm"
                             variant={activeSlotDetails.isFinalSlotStart ? "secondary" : "default"}
-                            disabled={isFixedDateActionPending || activeSlotDetails.isFinalSlotStart}
+                            disabled={
+                              isFixedDateActionDisabled ||
+                              isFixedDateActionPending ||
+                              activeSlotDetails.isFinalSlotStart
+                            }
                             onClick={() => onFixedDateAction?.(activeSlotDetails.slot.slotStart)}
                           >
                             {isFixedDateActionPending ? (
