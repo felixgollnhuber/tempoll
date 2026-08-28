@@ -1129,6 +1129,84 @@ describe("ManageEventClient", () => {
     );
   });
 
+  it("applies a valid schedule refresh when a later refresh fails", async () => {
+    const eventSource = installEventSourceCapture();
+    const view = createManageView();
+    let resolveFirst!: (response: Response) => void;
+    const firstResponse = new Promise<Response>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const fetchMock = vi
+      .fn()
+      .mockReturnValueOnce(firstResponse)
+      .mockResolvedValueOnce({ ok: false } as Response);
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    renderWithI18n(<ManageEventClient initialView={view} />);
+    eventSource.emit("event-update");
+    eventSource.emit("event-update");
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+    resolveFirst({
+      ok: true,
+      json: async () => ({
+        snapshot: {
+          ...view.snapshot,
+          status: "CLOSED",
+        },
+      }),
+    } as Response);
+
+    await waitFor(() => expect(screen.getAllByText("Closed").length).toBeGreaterThan(0));
+  });
+
+  it("does not let an older refresh overwrite a local participant rename", async () => {
+    const eventSource = installEventSourceCapture();
+    const view = createManageView();
+    let resolveRefresh!: (response: Response) => void;
+    const refreshResponse = new Promise<Response>((resolve) => {
+      resolveRefresh = resolve;
+    });
+    let eventRefreshCount = 0;
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === `/api/events/${view.snapshot.slug}`) {
+        eventRefreshCount += 1;
+        return eventRefreshCount === 1
+          ? refreshResponse
+          : Promise.resolve({ ok: false } as Response);
+      }
+
+      if (String(input) === `/api/manage/${view.manageKey}` && init?.method === "PATCH") {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ ok: true }),
+        } as Response);
+      }
+
+      throw new Error(`Unhandled fetch call: ${String(input)}`);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const user = userEvent.setup();
+
+    renderWithI18n(<ManageEventClient initialView={view} />);
+    eventSource.emit("event-update");
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    const participantInput = screen.getByDisplayValue("Felix");
+    await user.clear(participantInput);
+    await user.type(participantInput, "Felix Updated");
+    await user.tab();
+    await waitFor(() => expect(screen.getByText("Felix Updated")).toBeInTheDocument());
+
+    resolveRefresh({
+      ok: true,
+      json: async () => ({ snapshot: view.snapshot }),
+    } as Response);
+
+    await waitFor(() => expect(eventRefreshCount).toBe(2));
+    expect(screen.getByText("Felix Updated")).toBeInTheDocument();
+  });
+
   it("preserves a dirty draft while another organizer closes and reopens the event", async () => {
     const eventSource = installEventSourceCapture();
     const view = createManageView();

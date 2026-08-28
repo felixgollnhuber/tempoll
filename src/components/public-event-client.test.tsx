@@ -630,6 +630,43 @@ describe("PublicEventClient", () => {
     vi.useRealTimers();
   });
 
+  it("applies a valid refresh when a later refresh fails", async () => {
+    const eventSource = installEventSourceCapture();
+    const initialSnapshot = createSnapshot({ withCurrentUser: false });
+    const closedSnapshot: PublicEventSnapshot = {
+      ...initialSnapshot,
+      status: "CLOSED",
+    };
+    let resolveFirstRefresh!: (response: Response) => void;
+    const firstRefreshResponse = new Promise<Response>((resolve) => {
+      resolveFirstRefresh = resolve;
+    });
+    const fetchMock = vi
+      .fn()
+      .mockReturnValueOnce(firstRefreshResponse)
+      .mockResolvedValueOnce({ ok: false } as Response);
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    renderWithI18n(
+      <PublicEventClient
+        slug="test-event"
+        initialSnapshot={initialSnapshot}
+        initialSession={null}
+      />,
+    );
+
+    eventSource.emit("event-update", { kind: "event-updated", eventId: "event_1" });
+    eventSource.emit("event-update", { kind: "event-updated", eventId: "event_1" });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+    resolveFirstRefresh({
+      ok: true,
+      json: async () => ({ snapshot: closedSnapshot }),
+    } as Response);
+
+    await waitFor(() => expect(screen.getAllByText("Closed").length).toBeGreaterThan(0));
+  });
+
   it("does not let an availability response overwrite an observed organizer update", async () => {
     vi.useFakeTimers();
     const eventSource = installEventSourceCapture();

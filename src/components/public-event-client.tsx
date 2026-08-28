@@ -82,6 +82,7 @@ export function PublicEventClient({
   const availabilityDraftDirtyRef = useRef(false);
   const snapshotEpochRef = useRef(0);
   const snapshotFetchSequenceRef = useRef(0);
+  const snapshotAppliedFetchSequenceRef = useRef(0);
   const localAvailabilityEchoRef = useRef<{
     participantId: string;
     expiresAt: number;
@@ -194,12 +195,16 @@ export function PublicEventClient({
         }
 
         const payload = (await response.json()) as { snapshot?: PublicEventSnapshot };
-        if (!payload.snapshot || fetchSequence !== snapshotFetchSequenceRef.current) {
+        if (
+          !payload.snapshot ||
+          fetchSequence < snapshotAppliedFetchSequenceRef.current
+        ) {
           return false;
         }
         if (snapshotEpochRef.current !== fetchStartEpoch) {
           continue;
         }
+        snapshotAppliedFetchSequenceRef.current = fetchSequence;
         applySnapshot(payload.snapshot, { preserveDirtySelection: true });
         return true;
       } catch {
