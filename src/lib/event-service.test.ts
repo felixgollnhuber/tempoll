@@ -567,6 +567,28 @@ describe("updateManagedEvent updateSchedule", () => {
     expect(prisma.availabilitySlot.deleteMany).not.toHaveBeenCalled();
   });
 
+  it("rejects a schedule when any selected date has no finalizable meeting window", async () => {
+    const event = createManagedEventWithDates(["2026-03-30"]);
+    prisma.event.findUnique.mockResolvedValue(event);
+    const { updateManagedEvent } = await import("./event-service");
+
+    await expect(
+      updateManagedEvent("event_1.secret", {
+        action: "updateSchedule",
+        dates: ["2026-03-29", "2026-03-30"],
+        dayStartMinutes: 2 * 60,
+        dayEndMinutes: 3 * 60,
+        ...schedulePreview(event),
+      }),
+    ).rejects.toMatchObject({
+      code: "schedule_no_valid_meeting_window",
+      params: { duration: 60 },
+    });
+
+    expect(prisma.eventDate.createMany).not.toHaveBeenCalled();
+    expect(prisma.availabilitySlot.deleteMany).not.toHaveBeenCalled();
+  });
+
   it("rejects a slot that would end after a half-hour daily boundary", async () => {
     const event = {
       ...createManagedEventWithDates(["2026-04-02"]),

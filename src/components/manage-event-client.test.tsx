@@ -2,7 +2,7 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { buildFinalizedSlot, buildScheduleSignature } from "@/lib/availability";
+import { buildFinalizedSlot, buildScheduleSignature, buildSnapshot } from "@/lib/availability";
 import type { ManageEventView, PublicEventSnapshot } from "@/lib/types";
 import { renderWithI18n } from "@/test/render-with-i18n";
 import { ManageEventClient } from "./manage-event-client";
@@ -891,6 +891,36 @@ describe("ManageEventClient", () => {
       "true",
     );
     expect(dailyEnd).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("button", { name: "Save dates & times" })).toBeDisabled();
+  });
+
+  it("blocks a schedule when an added date has no finalizable meeting window", async () => {
+    const view = createManageView();
+    view.snapshot = buildSnapshot({
+      id: view.snapshot.id,
+      slug: view.snapshot.slug,
+      title: view.snapshot.title,
+      eventType: "time_grid",
+      locale: "en",
+      timezone: "Europe/Vienna",
+      status: "OPEN",
+      slotMinutes: 30,
+      meetingDurationMinutes: 60,
+      dayStartMinutes: 2 * 60,
+      dayEndMinutes: 3 * 60,
+      dates: ["2026-03-30"],
+      participants: [],
+      finalSlotStart: null,
+    });
+    const user = userEvent.setup();
+
+    renderWithI18n(<ManageEventClient initialView={view} />);
+    await user.click(screen.getByLabelText("Dates"));
+    await user.click(getCalendarDayButton(new Date(2026, 2, 29)));
+
+    expect(
+      screen.getByText("Choose dates and times with room for the full 60-minute meeting."),
+    ).toHaveAttribute("role", "alert");
     expect(screen.getByRole("button", { name: "Save dates & times" })).toBeDisabled();
   });
 

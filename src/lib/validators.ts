@@ -8,7 +8,7 @@ import {
 } from "@/lib/constants";
 import {
   doesZonedCivilDateExist,
-  getAllowedFinalSlotStarts,
+  hasFinalizableMeetingWindowOnEveryDate,
   isExistingZonedWallTime,
 } from "@/lib/availability";
 import type { Messages } from "@/lib/i18n/messages";
@@ -184,14 +184,14 @@ export function createEventCreateSchema(messages: Messages) {
         dayWindowIsValid &&
         slotConfigurationIsValid &&
         timezoneIsValid &&
-        getAllowedFinalSlotStarts({
+        !hasFinalizableMeetingWindowOnEveryDate({
           dates: data.dates,
           timezone: data.timezone,
           dayStartMinutes: data.dayStartMinutes,
           dayEndMinutes: data.dayEndMinutes,
           slotMinutes: data.slotMinutes,
           meetingDurationMinutes: data.meetingDurationMinutes,
-        }).size === 0
+        })
       ) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,

@@ -17,6 +17,7 @@ import {
   getAllowedFullDaySlotStarts,
   getAllowedFinalSlotStarts,
   getAllowedSlotStarts,
+  hasFinalizableMeetingWindowOnEveryDate,
   isExistingZonedWallTime,
   sortDateKeys,
 } from "@/lib/availability";
@@ -695,14 +696,14 @@ async function updateLockedSchedule(
 
   if (
     eventType === "time_grid" &&
-    getAllowedFinalSlotStarts({
+    !hasFinalizableMeetingWindowOnEveryDate({
       dates: nextDateKeys,
       timezone: event.timezone,
       dayStartMinutes: nextDayStartMinutes,
       dayEndMinutes: nextDayEndMinutes,
       slotMinutes: event.slotMinutes,
       meetingDurationMinutes: event.meetingDurationMinutes,
-    }).size === 0
+    })
   ) {
     throw badRequest("schedule_no_valid_meeting_window", {
       params: {

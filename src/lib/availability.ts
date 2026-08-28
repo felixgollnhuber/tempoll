@@ -1142,3 +1142,36 @@ export function getAllowedFinalSlotStarts({
     }).map((meetingWindow) => meetingWindow.slotStart),
   );
 }
+
+export function hasFinalizableMeetingWindowOnEveryDate({
+  dates,
+  timezone,
+  dayStartMinutes,
+  dayEndMinutes,
+  slotMinutes,
+  meetingDurationMinutes,
+}: {
+  dates: string[];
+  timezone: string;
+  dayStartMinutes: number;
+  dayEndMinutes: number;
+  slotMinutes: number;
+  meetingDurationMinutes: number;
+}) {
+  const sortedDates = sortDateKeys(dates);
+
+  return (
+    sortedDates.length > 0 &&
+    sortedDates.every(
+      (dateKey) =>
+        buildMeetingWindows({
+          dates: [dateKey],
+          timezone,
+          dayStartMinutes,
+          dayEndMinutes,
+          slotMinutes,
+          meetingDurationMinutes,
+        }).length > 0,
+    )
+  );
+}

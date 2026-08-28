@@ -56,7 +56,7 @@ import {
   buildTimeOptions,
   doesZonedCivilDateExist,
   formatMeetingWindowLabels,
-  getAllowedFinalSlotStarts,
+  hasFinalizableMeetingWindowOnEveryDate,
   isExistingZonedWallTime,
   sortDateKeys,
 } from "@/lib/availability";
@@ -1183,14 +1183,14 @@ function ScheduleEditorCard({
       !isFullDayEvent &&
       !hasNoDates &&
       !hasInvalidWindow &&
-      getAllowedFinalSlotStarts({
+      !hasFinalizableMeetingWindowOnEveryDate({
         dates: selectedDateKeys,
         timezone,
         dayStartMinutes,
         dayEndMinutes,
         slotMinutes,
         meetingDurationMinutes,
-      }).size === 0,
+      }),
     [
       dayEndMinutes,
       dayStartMinutes,

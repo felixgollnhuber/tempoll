@@ -13,6 +13,7 @@ import {
   getAllowedFullDaySlotStarts,
   getAllowedFinalSlotStarts,
   getAllowedSlotStarts,
+  hasFinalizableMeetingWindowOnEveryDate,
   isExistingZonedWallTime,
 } from "./availability";
 
@@ -391,6 +392,29 @@ describe("availability helpers", () => {
         meetingDurationMinutes: 60,
       }),
     ).toEqual(new Set());
+  });
+
+  it("requires a finalizable meeting window on every selected date", () => {
+    const schedule = {
+      timezone: "Europe/Vienna",
+      dayStartMinutes: 2 * 60,
+      dayEndMinutes: 3 * 60,
+      slotMinutes: 30,
+      meetingDurationMinutes: 60,
+    };
+
+    expect(
+      hasFinalizableMeetingWindowOnEveryDate({
+        ...schedule,
+        dates: ["2026-03-29", "2026-03-30"],
+      }),
+    ).toBe(false);
+    expect(
+      hasFinalizableMeetingWindowOnEveryDate({
+        ...schedule,
+        dates: ["2026-03-30", "2026-03-31"],
+      }),
+    ).toBe(true);
   });
 
   it("rejects meetings whose real DST-adjusted end is after the daily end", () => {

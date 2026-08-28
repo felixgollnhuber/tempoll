@@ -258,6 +258,23 @@ describe("validators", () => {
     );
   });
 
+  it("requires every time-grid date to have a finalizable meeting window", () => {
+    const result = createEventCreateSchema(messages).safeParse({
+      ...createEventInput("time_grid", ["2026-03-29", "2026-03-30"]),
+      dayStartMinutes: 2 * 60,
+      dayEndMinutes: 3 * 60,
+      meetingDurationMinutes: 60,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues).toContainEqual(
+      expect.objectContaining({
+        path: ["dayEndMinutes"],
+        message: "Choose dates and a daily window with room for the full meeting duration.",
+      }),
+    );
+  });
+
   it("rejects nonexistent full-day dates and timed starts", () => {
     const skippedDate = createEventCreateSchema(messages).safeParse({
       ...createEventInput("full_day", ["2011-12-30"]),
