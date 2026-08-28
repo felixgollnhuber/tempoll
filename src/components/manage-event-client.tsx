@@ -1,8 +1,25 @@
 "use client";
 
+import type { Locale } from "date-fns";
 import Link from "next/link";
-import { Loader2Icon, LockIcon, Trash2Icon, UnlockIcon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import {
+  CalendarIcon,
+  ChevronDownIcon,
+  Loader2Icon,
+  LockIcon,
+  Trash2Icon,
+  UnlockIcon,
+} from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { toast } from "sonner";
 
 import { EventHeatmap } from "@/components/event-heatmap";
@@ -22,16 +39,38 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { formatMeetingWindowLabels } from "@/lib/availability";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  buildScheduleSignature,
+  buildTimeOptions,
+  doesZonedCivilDateExist,
+  formatMeetingWindowLabels,
+  hasFinalizableMeetingWindowOnEveryDate,
+  isExistingZonedWallTime,
+  sortDateKeys,
+} from "@/lib/availability";
+import { fullDayDateLimit, timeGridDateLimit } from "@/lib/constants";
 import { useI18n } from "@/lib/i18n/context";
+import type { MessageValues, PluralMessage } from "@/lib/i18n/format";
+import type { Messages } from "@/lib/i18n/messages";
 import { buildTimezoneOptions } from "@/lib/timezone-options";
 import type {
   ManageEventNotificationState,
   ManageEventView,
   PublicEventSnapshot,
+  SnapshotParticipant,
+  SnapshotSlot,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useViewerTimezone } from "@/lib/viewer-timezone";
@@ -48,17 +87,126 @@ type PendingAction =
   | "reopenEvent"
   | "renameParticipant"
   | "removeParticipant"
-  | "updateNotificationEmail";
+  | "updateNotificationEmail"
+  | "updateSchedule";
 
 type RefreshSnapshotOptions = {
   preserveDirtyTitle?: boolean;
 };
 
+type ScheduleValues = {
+  dates: string[];
+  dayStartMinutes: number;
+  dayEndMinutes: number;
+};
+
+type ScheduleEditorState = {
+  saved: ScheduleValues;
+  draft: ScheduleValues;
+  hasRemoteConflict: boolean;
+};
+
+type ScheduleEditorAction =
+  | { type: "edit"; value: ScheduleValues }
+  | { type: "serverReceived"; value: ScheduleValues; discardDraft: boolean }
+  | { type: "useLatest" }
+  | { type: "keepChanges" };
+
+function getScheduleValues(snapshot: PublicEventSnapshot): ScheduleValues {
+  return {
+    dates: sortDateKeys(snapshot.dates.map((date) => date.dateKey)),
+    dayStartMinutes: snapshot.dayStartMinutes,
+    dayEndMinutes: snapshot.dayEndMinutes,
+  };
+}
+
+function getScheduleSignature(value: ScheduleValues) {
+  return buildScheduleSignature({
+    dates: value.dates,
+    dayStartMinutes: value.dayStartMinutes,
+    dayEndMinutes: value.dayEndMinutes,
+  });
+}
+
+function createScheduleEditorState(value: ScheduleValues): ScheduleEditorState {
+  return {
+    saved: value,
+    draft: value,
+    hasRemoteConflict: false,
+  };
+}
+
+function scheduleEditorReducer(
+  state: ScheduleEditorState,
+  action: ScheduleEditorAction,
+): ScheduleEditorState {
+  if (action.type === "edit") {
+    return {
+      ...state,
+      draft: action.value,
+      hasRemoteConflict:
+        getScheduleSignature(action.value) === getScheduleSignature(state.saved)
+          ? false
+          : state.hasRemoteConflict,
+    };
+  }
+
+  if (action.type === "useLatest") {
+    return {
+      saved: state.saved,
+      draft: state.saved,
+      hasRemoteConflict: false,
+    };
+  }
+
+  if (action.type === "keepChanges") {
+    return {
+      ...state,
+      hasRemoteConflict: false,
+    };
+  }
+
+  const nextSaved = action.value;
+  if (action.discardDraft) {
+    return createScheduleEditorState(nextSaved);
+  }
+
+  const previousSavedSignature = getScheduleSignature(state.saved);
+  const nextSavedSignature = getScheduleSignature(nextSaved);
+  if (previousSavedSignature === nextSavedSignature) {
+    return state;
+  }
+
+  const draftSignature = getScheduleSignature(state.draft);
+  if (draftSignature === previousSavedSignature || draftSignature === nextSavedSignature) {
+    return createScheduleEditorState(nextSaved);
+  }
+
+  return {
+    saved: nextSaved,
+    draft: state.draft,
+    hasRemoteConflict: true,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+async function readJsonRecord(response: Response) {
+  try {
+    const value: unknown = await response.json();
+    return isRecord(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
 export function ManageEventClient({
   initialView,
   timezones = [],
 }: ManageEventClientProps) {
-  const { messages, format, plural, locale } = useI18n();
+  const { messages, format, plural, locale, dateFnsLocale } = useI18n();
   const [snapshot, setSnapshot] = useState<PublicEventSnapshot>(initialView.snapshot);
   const [notification, setNotification] = useState<ManageEventNotificationState>(
     initialView.notification,
@@ -70,9 +218,17 @@ export function ManageEventClient({
   const [requestedActiveParticipantId, setRequestedActiveParticipantId] = useState<string | null>(
     null,
   );
+  const [scheduleEditorState, dispatchScheduleEditor] = useReducer(
+    scheduleEditorReducer,
+    getScheduleValues(initialView.snapshot),
+    createScheduleEditorState,
+  );
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [isReopenDialogOpen, setIsReopenDialogOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const snapshotLocalMutationEpochRef = useRef(0);
+  const snapshotRefreshSequenceRef = useRef(0);
+  const snapshotAppliedRefreshSequenceRef = useRef(0);
   const hasAnyAvailability = snapshot.participants.some(
     (participant) => participant.selectedSlotCount > 0,
   );
@@ -157,19 +313,54 @@ export function ManageEventClient({
 
   const refreshSnapshot = useCallback(
     async ({ preserveDirtyTitle = false }: RefreshSnapshotOptions = {}) => {
-      const response = await fetch(`/api/events/${initialView.snapshot.slug}`, {
-        cache: "no-store",
-      });
+      for (let attempt = 1; attempt <= 2; attempt += 1) {
+        const refreshSequence = snapshotRefreshSequenceRef.current + 1;
+        snapshotRefreshSequenceRef.current = refreshSequence;
+        const refreshStartLocalMutationEpoch = snapshotLocalMutationEpochRef.current;
 
-      if (!response.ok) {
-        return;
+        try {
+          const response = await fetch(`/api/events/${initialView.snapshot.slug}`, {
+            cache: "no-store",
+          });
+          if (!response.ok) {
+            return false;
+          }
+
+          const payload = await readJsonRecord(response);
+          if (!payload || !isRecord(payload.snapshot)) {
+            return false;
+          }
+
+          if (refreshSequence < snapshotAppliedRefreshSequenceRef.current) {
+            return false;
+          }
+
+          if (
+            snapshotLocalMutationEpochRef.current !== refreshStartLocalMutationEpoch
+          ) {
+            continue;
+          }
+
+          const nextSnapshot = payload.snapshot as PublicEventSnapshot;
+          snapshotAppliedRefreshSequenceRef.current = refreshSequence;
+          setSnapshot(nextSnapshot);
+          dispatchScheduleEditor({
+            type: "serverReceived",
+            value: getScheduleValues(nextSnapshot),
+            discardDraft: false,
+          });
+          setTitle((currentTitle) =>
+            preserveDirtyTitle && currentTitle !== snapshot.title
+              ? currentTitle
+              : nextSnapshot.title,
+          );
+          return true;
+        } catch {
+          return false;
+        }
       }
 
-      const payload = (await response.json()) as { snapshot: PublicEventSnapshot };
-      setSnapshot(payload.snapshot);
-      setTitle((currentTitle) =>
-        preserveDirtyTitle && currentTitle !== snapshot.title ? currentTitle : payload.snapshot.title,
-      );
+      return false;
     },
     [initialView.snapshot.slug, snapshot.title],
   );
@@ -190,11 +381,13 @@ export function ManageEventClient({
       errorMessage,
       onSuccess,
       preserveDirtyTitleOnRefresh = true,
+      refreshSnapshotOnError = false,
       successMessage,
     }: {
       successMessage: string;
       errorMessage: string;
       preserveDirtyTitleOnRefresh?: boolean;
+      refreshSnapshotOnError?: boolean;
       onSuccess?: (payload: {
         error?: string;
         notification?: ManageEventNotificationState;
@@ -206,12 +399,28 @@ export function ManageEventClient({
     startTransition(async () => {
       try {
         const response = await request();
-        const payload = (await response.json()) as {
-          error?: string;
-          notification?: ManageEventNotificationState;
+        const rawPayload = await readJsonRecord(response);
+        const payload = {
+          error:
+            rawPayload && typeof rawPayload.error === "string" ? rawPayload.error : undefined,
+          notification:
+            rawPayload && isRecord(rawPayload.notification)
+              ? (rawPayload.notification as ManageEventNotificationState)
+              : undefined,
         };
         if (!response.ok) {
           toast.error(payload.error ?? errorMessage);
+          if (refreshSnapshotOnError) {
+            await refreshSnapshot({ preserveDirtyTitle: true });
+          }
+          return;
+        }
+
+        if (!rawPayload || rawPayload.ok !== true) {
+          toast.error(errorMessage);
+          if (refreshSnapshotOnError) {
+            await refreshSnapshot({ preserveDirtyTitle: true });
+          }
           return;
         }
 
@@ -225,6 +434,11 @@ export function ManageEventClient({
         await refreshSnapshot({
           preserveDirtyTitle: preserveDirtyTitleOnRefresh,
         });
+      } catch {
+        toast.error(errorMessage);
+        if (refreshSnapshotOnError) {
+          await refreshSnapshot({ preserveDirtyTitle: true });
+        }
       } finally {
         setPendingAction(null);
       }
@@ -321,6 +535,35 @@ export function ManageEventClient({
     );
   }
 
+  function saveSchedule(payload: {
+    dates: string[];
+    dayStartMinutes?: number;
+    dayEndMinutes?: number;
+    expectedScheduleSignature: string;
+    expectedDeletedVotes: number;
+    expectedAffectedParticipants: number;
+  }) {
+    performManageAction(
+      "updateSchedule",
+      () =>
+        fetch(manageActionUrl, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            action: "updateSchedule",
+            ...payload,
+          }),
+        }),
+      {
+        successMessage: messages.manageEvent.scheduleSaved,
+        errorMessage: messages.errors.routeFallbacks.updateEvent,
+        refreshSnapshotOnError: true,
+      },
+    );
+  }
+
   function handleFixedDateAction(slotStart: string) {
     if (snapshot.status === "OPEN") {
       closeEvent(slotStart);
@@ -351,6 +594,7 @@ export function ManageEventClient({
         successMessage: messages.manageEvent.participantRenamed,
         errorMessage: messages.errors.routeFallbacks.updateEvent,
         onSuccess: () => {
+          snapshotLocalMutationEpochRef.current += 1;
           setSnapshot((current) => ({
             ...current,
             participants: current.participants.map((participant) =>
@@ -665,6 +909,31 @@ export function ManageEventClient({
         <aside className="order-1 min-w-0 space-y-5 xl:order-2">
           {statusCard}
 
+          {snapshot.status === "OPEN" ? (
+            <ScheduleEditorCard
+              messages={messages}
+              format={format}
+              plural={plural}
+              dateFnsLocale={dateFnsLocale}
+              isFullDayEvent={isFullDayEvent}
+              slots={snapshot.slots}
+              participants={snapshot.participants}
+              value={scheduleEditorState.draft}
+              expectedScheduleSignature={getScheduleSignature(scheduleEditorState.saved)}
+              hasRemoteConflict={scheduleEditorState.hasRemoteConflict}
+              timezone={snapshot.timezone}
+              slotMinutes={snapshot.slotMinutes}
+              meetingDurationMinutes={snapshot.meetingDurationMinutes}
+              fullDayStartMinutes={snapshot.fullDayStartMinutes ?? null}
+              isPending={isPending}
+              isSaving={pendingAction === "updateSchedule"}
+              onChange={(value) => dispatchScheduleEditor({ type: "edit", value })}
+              onUseLatest={() => dispatchScheduleEditor({ type: "useLatest" })}
+              onKeepChanges={() => dispatchScheduleEditor({ type: "keepChanges" })}
+              onSave={saveSchedule}
+            />
+          ) : null}
+
           <Card>
             <CardHeader>
               <CardTitle>{messages.manageEvent.shareLinksTitle}</CardTitle>
@@ -769,6 +1038,7 @@ export function ManageEventClient({
               isFixedDateActionPending={
                 pendingAction === "closeEvent" || pendingAction === "updateFixedDate"
               }
+              isFixedDateActionDisabled={isPending || pendingAction !== null}
               onFixedDateAction={handleFixedDateAction}
               activeParticipantId={activeParticipantId}
               onActiveParticipantChange={setRequestedActiveParticipantId}
@@ -797,6 +1067,7 @@ export function ManageEventClient({
               isFixedDateActionPending={
                 pendingAction === "closeEvent" || pendingAction === "updateFixedDate"
               }
+              isFixedDateActionDisabled={isPending || pendingAction !== null}
               onFixedDateAction={handleFixedDateAction}
               activeParticipantId={activeParticipantId}
               onActiveParticipantChange={setRequestedActiveParticipantId}
@@ -814,5 +1085,501 @@ export function ManageEventClient({
         </div>
       </div>
     </div>
+  );
+}
+
+function dateKeyToDate(dateKey: string) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function dateToDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+type ScheduleEditorCardProps = {
+  messages: Messages;
+  format: (template: string, values?: MessageValues) => string;
+  plural: (message: PluralMessage, count: number, values?: MessageValues) => string;
+  dateFnsLocale: Locale;
+  isFullDayEvent: boolean;
+  slots: SnapshotSlot[];
+  participants: SnapshotParticipant[];
+  value: ScheduleValues;
+  expectedScheduleSignature: string;
+  hasRemoteConflict: boolean;
+  timezone: string;
+  slotMinutes: number;
+  meetingDurationMinutes: number;
+  fullDayStartMinutes: number | null;
+  isPending: boolean;
+  isSaving: boolean;
+  onChange: (value: ScheduleValues) => void;
+  onUseLatest: () => void;
+  onKeepChanges: () => void;
+  onSave: (payload: {
+    dates: string[];
+    dayStartMinutes?: number;
+    dayEndMinutes?: number;
+    expectedScheduleSignature: string;
+    expectedDeletedVotes: number;
+    expectedAffectedParticipants: number;
+  }) => void;
+};
+
+function ScheduleEditorCard({
+  messages,
+  format,
+  plural,
+  dateFnsLocale,
+  isFullDayEvent,
+  slots,
+  participants,
+  value,
+  expectedScheduleSignature,
+  hasRemoteConflict,
+  timezone,
+  slotMinutes,
+  meetingDurationMinutes,
+  fullDayStartMinutes,
+  isPending,
+  isSaving,
+  onChange,
+  onUseLatest,
+  onKeepChanges,
+  onSave,
+}: ScheduleEditorCardProps) {
+  const scheduleMessages = messages.manageEvent;
+  const timeOptions = useMemo(() => buildTimeOptions(30), []);
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const datesTriggerId = useId();
+  const datesHelpId = useId();
+  const datesErrorId = useId();
+  const dayStartTriggerId = useId();
+  const dayEndTriggerId = useId();
+  const windowErrorId = useId();
+  const dateLimit = isFullDayEvent ? fullDayDateLimit : timeGridDateLimit;
+  const selectedDateKeys = value.dates;
+  const { dayStartMinutes, dayEndMinutes } = value;
+
+  const selectedDates = useMemo(
+    () => selectedDateKeys.map((dateKey) => dateKeyToDate(dateKey)),
+    [selectedDateKeys],
+  );
+  const nextDateKeySet = useMemo(() => new Set(selectedDateKeys), [selectedDateKeys]);
+
+  const draftScheduleSignature = getScheduleSignature(value);
+  const hasChanges = draftScheduleSignature !== expectedScheduleSignature;
+  const hasNoDates = selectedDateKeys.length === 0;
+  const hasTooManyDates = selectedDateKeys.length > dateLimit;
+  const hasInvalidWindow = !isFullDayEvent && dayEndMinutes <= dayStartMinutes;
+  const hasUnavailableFullDayDate =
+    isFullDayEvent &&
+    selectedDateKeys.some(
+      (dateKey) => !doesZonedCivilDateExist({ dateKey, timezone }),
+    );
+  const hasUnavailableFullDayStart =
+    isFullDayEvent &&
+    fullDayStartMinutes != null &&
+    selectedDateKeys.some(
+      (dateKey) =>
+        !isExistingZonedWallTime({
+          dateKey,
+          minutes: fullDayStartMinutes,
+          timezone,
+        }),
+    );
+  const hasNoValidMeetingWindow = useMemo(
+    () =>
+      !isFullDayEvent &&
+      !hasNoDates &&
+      !hasInvalidWindow &&
+      !hasFinalizableMeetingWindowOnEveryDate({
+        dates: selectedDateKeys,
+        timezone,
+        dayStartMinutes,
+        dayEndMinutes,
+        slotMinutes,
+        meetingDurationMinutes,
+      }),
+    [
+      dayEndMinutes,
+      dayStartMinutes,
+      hasInvalidWindow,
+      hasNoDates,
+      isFullDayEvent,
+      meetingDurationMinutes,
+      selectedDateKeys,
+      slotMinutes,
+      timezone,
+    ],
+  );
+
+  const removedSlots = useMemo(
+    () => {
+      const isRetained = (slot: SnapshotSlot) =>
+        nextDateKeySet.has(slot.dateKey) &&
+        (isFullDayEvent || (slot.minutes >= dayStartMinutes && slot.minutes < dayEndMinutes));
+      const retainedSlotStarts = new Set(
+        slots.filter(isRetained).map((slot) => slot.slotStart),
+      );
+      const removedBySlotStart = new Map<string, SnapshotSlot>();
+
+      for (const slot of slots) {
+        if (!isRetained(slot) && !retainedSlotStarts.has(slot.slotStart)) {
+          removedBySlotStart.set(slot.slotStart, slot);
+        }
+      }
+
+      return Array.from(removedBySlotStart.values());
+    },
+    [slots, nextDateKeySet, isFullDayEvent, dayStartMinutes, dayEndMinutes],
+  );
+  const visibleSlotCountsByParticipant = useMemo(() => {
+    const slotStartsByParticipant = new Map<string, Set<string>>();
+    for (const slot of slots) {
+      for (const participantId of slot.participantIds) {
+        const slotStarts = slotStartsByParticipant.get(participantId) ?? new Set<string>();
+        slotStarts.add(slot.slotStart);
+        slotStartsByParticipant.set(participantId, slotStarts);
+      }
+    }
+    return new Map(
+      Array.from(slotStartsByParticipant, ([participantId, slotStarts]) => [
+        participantId,
+        slotStarts.size,
+      ]),
+    );
+  }, [slots]);
+  const orphanedVotesByParticipant = useMemo(
+    () =>
+      new Map(
+        participants
+          .map((participant) => [
+            participant.id,
+            Math.max(
+              0,
+              participant.selectedSlotCount -
+                (visibleSlotCountsByParticipant.get(participant.id) ?? 0),
+            ),
+          ] as const)
+          .filter((entry) => entry[1] > 0),
+      ),
+    [participants, visibleSlotCountsByParticipant],
+  );
+  const deletedVotes = useMemo(
+    () =>
+      removedSlots.reduce((total, slot) => total + slot.availabilityCount, 0) +
+      Array.from(orphanedVotesByParticipant.values()).reduce(
+        (total, orphanedVotes) => total + orphanedVotes,
+        0,
+      ),
+    [orphanedVotesByParticipant, removedSlots],
+  );
+  const affectedParticipants = useMemo(() => {
+    const participantIds = new Set(orphanedVotesByParticipant.keys());
+    for (const slot of removedSlots) {
+      for (const participantId of slot.participantIds) {
+        participantIds.add(participantId);
+      }
+    }
+    return participantIds.size;
+  }, [orphanedVotesByParticipant, removedSlots]);
+
+  const startTimeOptions = timeOptions.filter((option) => option.value < dayEndMinutes);
+  const endTimeOptions = timeOptions.filter((option) => option.value > dayStartMinutes);
+  const isDateLimitReached = selectedDateKeys.length >= dateLimit;
+  const hasDateError =
+    hasNoDates ||
+    hasTooManyDates ||
+    hasUnavailableFullDayDate ||
+    hasUnavailableFullDayStart;
+  const hasWindowError = hasInvalidWindow || hasNoValidMeetingWindow;
+  const canSave =
+    hasChanges &&
+    !hasDateError &&
+    !hasWindowError &&
+    !hasRemoteConflict &&
+    !isPending;
+
+  function updateValue(patch: Partial<ScheduleValues>) {
+    onChange({
+      ...value,
+      ...patch,
+    });
+  }
+
+  function submit() {
+    if (!canSave) {
+      return;
+    }
+
+    onSave({
+      dates: selectedDateKeys,
+      ...(isFullDayEvent ? {} : { dayStartMinutes, dayEndMinutes }),
+      expectedScheduleSignature,
+      expectedDeletedVotes: deletedVotes,
+      expectedAffectedParticipants: affectedParticipants,
+    });
+  }
+
+  function handleSaveClick() {
+    if (!canSave) {
+      return;
+    }
+    if (deletedVotes > 0) {
+      setIsConfirmOpen(true);
+      return;
+    }
+    submit();
+  }
+
+  return (
+    <Card>
+      <CardHeader className="p-4 pb-2">
+        <CardTitle className="text-sm">{scheduleMessages.scheduleTitle}</CardTitle>
+        <CardDescription className="text-xs">
+          {scheduleMessages.scheduleDescription}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3 p-4 pt-0">
+        {hasRemoteConflict ? (
+          <div
+            role="status"
+            aria-live="polite"
+            className="space-y-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3"
+          >
+            <div>
+              <p className="text-xs font-medium text-foreground">
+                {scheduleMessages.scheduleRemoteChangeTitle}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {scheduleMessages.scheduleRemoteChangeDescription}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={isPending}
+                onClick={() => {
+                  setIsConfirmOpen(false);
+                  setIsDatePickerOpen(false);
+                  onUseLatest();
+                }}
+              >
+                {scheduleMessages.scheduleUseLatest}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                disabled={isPending}
+                onClick={() => {
+                  setIsConfirmOpen(false);
+                  onKeepChanges();
+                }}
+              >
+                {scheduleMessages.scheduleKeepChanges}
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="space-y-2">
+          <Label htmlFor={datesTriggerId} className="text-xs">
+            {scheduleMessages.scheduleDatesLabel}
+          </Label>
+          <Popover
+            open={isDatePickerOpen}
+            onOpenChange={(open) => setIsDatePickerOpen(open && !isPending && !hasRemoteConflict)}
+          >
+            <PopoverTrigger asChild>
+              <Button
+                id={datesTriggerId}
+                type="button"
+                variant="outline"
+                disabled={isPending || hasRemoteConflict}
+                aria-invalid={hasDateError || undefined}
+                aria-describedby={`${datesHelpId}${hasDateError ? ` ${datesErrorId}` : ""}`}
+                className="h-9 w-full justify-between font-normal"
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  <CalendarIcon className="size-4 text-muted-foreground" />
+                  <span className="truncate">{scheduleMessages.schedulePickDates}</span>
+                </span>
+                <span className="ml-3 flex shrink-0 items-center gap-2">
+                  <Badge variant="secondary" className="rounded-full px-2.5">
+                    {plural(scheduleMessages.scheduleDatesSelected, selectedDateKeys.length)}
+                  </Badge>
+                  <ChevronDownIcon className="size-4 text-muted-foreground" />
+                </span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="start"
+              sideOffset={8}
+              className="w-[min(22rem,calc(100vw-2rem))] p-0"
+            >
+              <div className="p-3">
+                <Calendar
+                  mode="multiple"
+                  numberOfMonths={1}
+                  selected={selectedDates}
+                  defaultMonth={selectedDates[0]}
+                  weekStartsOn={1}
+                  disabled={(date) =>
+                    isPending ||
+                    hasRemoteConflict ||
+                    (isDateLimitReached && !nextDateKeySet.has(dateToDateKey(date)))
+                  }
+                  onSelect={(dates) => {
+                    const nextDateKeys = sortDateKeys((dates ?? []).map(dateToDateKey));
+                    if (nextDateKeys.length <= dateLimit) {
+                      updateValue({ dates: nextDateKeys });
+                    }
+                  }}
+                  locale={dateFnsLocale}
+                  className="mx-auto"
+                />
+              </div>
+            </PopoverContent>
+          </Popover>
+          <p id={datesHelpId} className="text-xs text-muted-foreground">
+            {format(scheduleMessages.scheduleDateLimit, { count: dateLimit })}
+          </p>
+          {hasDateError ? (
+            <p id={datesErrorId} role="alert" className="text-xs text-destructive">
+              {hasNoDates
+                ? scheduleMessages.scheduleDatesRequired
+                : hasTooManyDates
+                  ? format(scheduleMessages.scheduleDateLimit, { count: dateLimit })
+                  : hasUnavailableFullDayDate
+                    ? messages.validation.eventCreate.fullDayDateUnavailable
+                    : messages.validation.eventCreate.fullDayStartUnavailable}
+            </p>
+          ) : null}
+        </div>
+
+        {isFullDayEvent ? null : (
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label htmlFor={dayStartTriggerId} className="text-xs">
+                {scheduleMessages.scheduleDayStartLabel}
+              </Label>
+              <Select
+                value={String(dayStartMinutes)}
+                disabled={isPending || hasRemoteConflict}
+                onValueChange={(nextValue) =>
+                  updateValue({ dayStartMinutes: Number(nextValue) })
+                }
+              >
+                <SelectTrigger
+                  id={dayStartTriggerId}
+                  className="w-full"
+                  aria-invalid={hasWindowError || undefined}
+                  aria-describedby={hasWindowError ? windowErrorId : undefined}
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="max-h-80">
+                  {startTimeOptions.map((option) => (
+                    <SelectItem key={option.value} value={String(option.value)}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor={dayEndTriggerId} className="text-xs">
+                {scheduleMessages.scheduleDayEndLabel}
+              </Label>
+              <Select
+                value={String(dayEndMinutes)}
+                disabled={isPending || hasRemoteConflict}
+                onValueChange={(nextValue) =>
+                  updateValue({ dayEndMinutes: Number(nextValue) })
+                }
+              >
+                <SelectTrigger
+                  id={dayEndTriggerId}
+                  className="w-full"
+                  aria-invalid={hasWindowError || undefined}
+                  aria-describedby={hasWindowError ? windowErrorId : undefined}
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="max-h-80">
+                  {endTimeOptions.map((option) => (
+                    <SelectItem key={option.value} value={String(option.value)}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        )}
+
+        {hasWindowError ? (
+          <p id={windowErrorId} role="alert" className="text-xs text-destructive">
+            {hasInvalidWindow
+              ? scheduleMessages.scheduleInvalidWindow
+              : format(scheduleMessages.scheduleNoValidMeetingWindow, {
+                  duration: meetingDurationMinutes,
+                })}
+          </p>
+        ) : null}
+
+        <Button
+          type="button"
+          size="sm"
+          className="w-full"
+          disabled={!canSave || isSaving}
+          onClick={handleSaveClick}
+        >
+          {isSaving ? <Loader2Icon className="size-4 animate-spin" /> : null}
+          {scheduleMessages.scheduleSave}
+        </Button>
+      </CardContent>
+
+      <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{scheduleMessages.scheduleConfirmTitle}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {hasRemoteConflict
+                ? `${scheduleMessages.scheduleRemoteChangeTitle} ${scheduleMessages.scheduleRemoteChangeDescription}`
+                : format(scheduleMessages.scheduleConfirmDescription, {
+                    marks: plural(scheduleMessages.scheduleConfirmMarks, deletedVotes),
+                    participants: plural(
+                      scheduleMessages.scheduleConfirmParticipants,
+                      affectedParticipants,
+                    ),
+                  })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{messages.common.cancel}</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={!canSave || isSaving}
+              onClick={() => {
+                setIsConfirmOpen(false);
+                submit();
+              }}
+            >
+              {scheduleMessages.scheduleConfirmAction}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Card>
   );
 }

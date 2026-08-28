@@ -1,13 +1,48 @@
 import { z } from "zod";
 
-import { meetingDurationOptions, slotMinuteOptions } from "@/lib/constants";
+import {
+  fullDayDateLimit,
+  meetingDurationOptions,
+  slotMinuteOptions,
+  timeGridDateLimit,
+} from "@/lib/constants";
+import {
+  doesZonedCivilDateExist,
+  hasFinalizableMeetingWindowOnEveryDate,
+  isExistingZonedWallTime,
+} from "@/lib/availability";
 import type { Messages } from "@/lib/i18n/messages";
 
-const dateKeyRegex = /^\d{4}-\d{2}-\d{2}$/;
 const slotMinuteSet = new Set<number>(slotMinuteOptions);
 const meetingDurationSet = new Set<number>(meetingDurationOptions);
-const fullDayDateLimit = 366;
-const availabilitySelectionLimit = 3000;
+const availabilitySelectionLimit = 4000;
+const supportedCalendarYearMin = 1900;
+const supportedCalendarYearMax = 9998;
+const isoDateKeySchema = z.iso.date();
+
+function isSupportedCalendarDate(value: string) {
+  if (!isoDateKeySchema.safeParse(value).success) {
+    return false;
+  }
+
+  const year = Number(value.slice(0, 4));
+  return year >= supportedCalendarYearMin && year <= supportedCalendarYearMax;
+}
+
+function isValidTimezone(value: string) {
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: value }).format(0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function createDateKeySchema(messages: Messages) {
+  return z.string().refine(isSupportedCalendarDate, {
+    message: messages.validation.eventCreate.validCalendarDates,
+  });
+}
 
 const optionalFullDayStartMinutesSchema = z.preprocess(
   (value) => (value === null || value === undefined || value === "" ? undefined : value),
@@ -69,10 +104,15 @@ export function createEventCreateSchema(messages: Messages) {
           message: messages.validation.eventCreate.meetingLinkUrl,
         })
         .optional(),
-      timezone: z.string().trim().min(1, messages.validation.eventCreate.timezoneRequired),
+      timezone: z
+        .string()
+        .trim()
+        .min(1, messages.validation.eventCreate.timezoneRequired)
+        .refine(isValidTimezone, messages.validation.eventCreate.timezoneRequired),
       dates: z
-        .array(z.string().regex(dateKeyRegex, messages.validation.eventCreate.validCalendarDates))
-        .min(1, messages.validation.eventCreate.chooseStartAndEndDate),
+        .array(createDateKeySchema(messages))
+        .min(1, messages.validation.eventCreate.chooseStartAndEndDate)
+        .max(fullDayDateLimit, messages.validation.eventCreate.fullDayDateRangeMax),
       fullDayStartMinutes: optionalFullDayStartMinutesSchema,
       dayStartMinutes: z
         .number()
@@ -95,7 +135,7 @@ export function createEventCreateSchema(messages: Messages) {
       notificationEmail: createOptionalEmailSchema(messages).optional(),
     })
     .superRefine((data, ctx) => {
-      if (data.eventType === "time_grid" && data.dates.length > 31) {
+      if (data.eventType === "time_grid" && data.dates.length > timeGridDateLimit) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["dates"],
@@ -116,6 +156,86 @@ export function createEventCreateSchema(messages: Messages) {
           code: z.ZodIssueCode.custom,
           path: ["dayEndMinutes"],
           message: messages.validation.eventCreate.endAfterStart,
+        });
+      }
+
+      const datesAreSafeToEnumerate =
+        data.dates.length > 0 &&
+        data.dates.length <= fullDayDateLimit &&
+        data.dates.every(isSupportedCalendarDate);
+      const dayWindowIsValid =
+        Number.isInteger(data.dayStartMinutes) &&
+        Number.isInteger(data.dayEndMinutes) &&
+        data.dayStartMinutes >= 0 &&
+        data.dayStartMinutes <= 23 * 60 + 30 &&
+        data.dayEndMinutes >= 30 &&
+        data.dayEndMinutes <= 24 * 60 &&
+        data.dayEndMinutes > data.dayStartMinutes;
+      const slotConfigurationIsValid =
+        slotMinuteSet.has(data.slotMinutes) &&
+        meetingDurationSet.has(data.meetingDurationMinutes) &&
+        data.meetingDurationMinutes % data.slotMinutes === 0;
+      const timezoneIsValid = isValidTimezone(data.timezone);
+
+      if (
+        data.eventType === "time_grid" &&
+        data.dates.length <= timeGridDateLimit &&
+        datesAreSafeToEnumerate &&
+        dayWindowIsValid &&
+        slotConfigurationIsValid &&
+        timezoneIsValid &&
+        !hasFinalizableMeetingWindowOnEveryDate({
+          dates: data.dates,
+          timezone: data.timezone,
+          dayStartMinutes: data.dayStartMinutes,
+          dayEndMinutes: data.dayEndMinutes,
+          slotMinutes: data.slotMinutes,
+          meetingDurationMinutes: data.meetingDurationMinutes,
+        })
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["dayEndMinutes"],
+          message: messages.validation.eventCreate.meetingWindowRequired,
+        });
+      }
+
+      if (
+        data.eventType === "full_day" &&
+        datesAreSafeToEnumerate &&
+        timezoneIsValid &&
+        data.dates.some(
+          (dateKey) => !doesZonedCivilDateExist({ dateKey, timezone: data.timezone }),
+        )
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["dates"],
+          message: messages.validation.eventCreate.fullDayDateUnavailable,
+        });
+      }
+
+      if (
+        data.eventType === "full_day" &&
+        datesAreSafeToEnumerate &&
+        timezoneIsValid &&
+        data.fullDayStartMinutes != null &&
+        Number.isInteger(data.fullDayStartMinutes) &&
+        data.fullDayStartMinutes >= 0 &&
+        data.fullDayStartMinutes <= 23 * 60 + 30 &&
+        data.dates.some(
+          (dateKey) =>
+            !isExistingZonedWallTime({
+              dateKey,
+              minutes: data.fullDayStartMinutes ?? 0,
+              timezone: data.timezone,
+            }),
+        )
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["fullDayStartMinutes"],
+          message: messages.validation.eventCreate.fullDayStartUnavailable,
         });
       }
 
@@ -188,5 +308,42 @@ export function createManageUpdateSchema(messages: Messages) {
       action: z.literal("updateNotificationEmail"),
       notificationEmail: createOptionalEmailSchema(messages).optional(),
     }),
-  ]);
+    z.object({
+      action: z.literal("updateSchedule"),
+      dates: z
+        .array(createDateKeySchema(messages))
+        .min(1, messages.validation.eventCreate.chooseStartAndEndDate)
+        .max(fullDayDateLimit, messages.validation.eventCreate.fullDayDateRangeMax),
+      dayStartMinutes: z
+        .number()
+        .int()
+        .min(0, messages.validation.eventCreate.validDailyStart)
+        .max(23 * 60 + 30, messages.validation.eventCreate.validDailyStart)
+        .optional(),
+      dayEndMinutes: z
+        .number()
+        .int()
+        .min(30, messages.validation.eventCreate.validDailyEnd)
+        .max(24 * 60, messages.validation.eventCreate.validDailyEnd)
+        .optional(),
+      expectedScheduleSignature: z.string().min(1).max(10_000),
+      expectedDeletedVotes: z.number().int().min(0),
+      expectedAffectedParticipants: z.number().int().min(0),
+    }),
+  ]).superRefine((data, ctx) => {
+    if (
+      data.action === "updateSchedule" &&
+      data.dayStartMinutes != null &&
+      data.dayEndMinutes != null &&
+      data.dayEndMinutes <= data.dayStartMinutes
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["dayEndMinutes"],
+        message: messages.validation.eventCreate.endAfterStart,
+      });
+    }
+  });
 }
+
+export type ManageUpdateInput = z.infer<ReturnType<typeof createManageUpdateSchema>>;

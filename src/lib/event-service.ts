@@ -7,13 +7,19 @@ import {
   updateNotificationRecipient,
 } from "@/lib/availability-notifications";
 import { appConfig, isNotificationDeliveryConfigured } from "@/lib/config";
+import { fullDayDateLimit, timeGridDateLimit } from "@/lib/constants";
 import type { AppLocale } from "@/lib/i18n/locale";
 import { prisma } from "@/lib/prisma";
 import {
+  buildScheduleSignature,
   buildSnapshot,
+  doesZonedCivilDateExist,
   getAllowedFullDaySlotStarts,
   getAllowedFinalSlotStarts,
   getAllowedSlotStarts,
+  hasFinalizableMeetingWindowOnEveryDate,
+  isExistingZonedWallTime,
+  sortDateKeys,
 } from "@/lib/availability";
 import {
   buildManageKey,
@@ -30,7 +36,7 @@ import {
   parseParticipantCookieValue,
   pickParticipantColor,
 } from "@/lib/tokens";
-import { conflict, notFound, serviceUnavailable, unauthorized } from "@/lib/errors";
+import { badRequest, conflict, notFound, serviceUnavailable, unauthorized } from "@/lib/errors";
 import type {
   AvailabilityBatchMutation,
   CreateEventResult,
@@ -40,6 +46,7 @@ import type {
   PublicEventSnapshot,
 } from "@/lib/types";
 import { publishEventUpdate } from "@/lib/realtime";
+import type { ManageUpdateInput } from "@/lib/validators";
 
 type EventWithRelations = Prisma.EventGetPayload<{
   include: {
@@ -63,6 +70,11 @@ type EventWithRelations = Prisma.EventGetPayload<{
     availabilityNotification: true;
   };
 }>;
+
+type EventReader = Pick<Prisma.TransactionClient, "event">;
+type EventLockMode = "share" | "update";
+
+const lockedEventTransactionAttempts = 3;
 
 async function getEventWithRelationsBySlug(slug: string) {
   return prisma.event.findUnique({
@@ -90,8 +102,8 @@ async function getEventWithRelationsBySlug(slug: string) {
   });
 }
 
-async function getEventWithRelationsById(id: string) {
-  return prisma.event.findUnique({
+async function getEventWithRelationsById(id: string, client: EventReader = prisma) {
+  return client.event.findUnique({
     where: { id },
     include: {
       dates: {
@@ -114,6 +126,74 @@ async function getEventWithRelationsById(id: string) {
       availabilityNotification: true,
     },
   });
+}
+
+async function lockEventRow(
+  transaction: Prisma.TransactionClient,
+  eventId: string,
+  mode: EventLockMode,
+) {
+  const rows =
+    mode === "share"
+      ? await transaction.$queryRaw<Array<{ id: string }>>`
+          SELECT "id" FROM "Event" WHERE "id" = ${eventId} FOR SHARE
+        `
+      : await transaction.$queryRaw<Array<{ id: string }>>`
+          SELECT "id" FROM "Event" WHERE "id" = ${eventId} FOR UPDATE
+        `;
+
+  return rows.length > 0;
+}
+
+async function lockParticipantRow(
+  transaction: Prisma.TransactionClient,
+  participantId: string,
+) {
+  const rows = await transaction.$queryRaw<Array<{ id: string }>>`
+    SELECT "id" FROM "Participant" WHERE "id" = ${participantId} FOR UPDATE
+  `;
+
+  return rows.length > 0;
+}
+
+async function runLockedEventTransaction<T>({
+  eventId,
+  mode,
+  missingCode,
+  operation,
+}: {
+  eventId: string;
+  mode: EventLockMode;
+  missingCode: "event_not_found" | "manage_key_invalid";
+  operation: (transaction: Prisma.TransactionClient) => Promise<T>;
+}) {
+  for (let attempt = 1; attempt <= lockedEventTransactionAttempts; attempt += 1) {
+    try {
+      return await prisma.$transaction(
+        async (transaction) => {
+          if (!(await lockEventRow(transaction, eventId, mode))) {
+            throw notFound(missingCode);
+          }
+
+          return operation(transaction);
+        },
+        {
+          isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+          maxWait: 5_000,
+          timeout: 10_000,
+        },
+      );
+    } catch (error) {
+      const shouldRetry =
+        error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034";
+
+      if (!shouldRetry || attempt === lockedEventTransactionAttempts) {
+        throw error;
+      }
+    }
+  }
+
+  throw new Error("Locked event transaction exhausted unexpectedly.");
 }
 
 function toSnapshot(
@@ -352,49 +432,6 @@ export async function joinParticipant(slug: string, displayName: string) {
   };
 }
 
-async function verifyParticipantMutation(slug: string, cookieValue?: string) {
-  const participant = await getParticipantForSession(slug, cookieValue);
-
-  if (!participant) {
-    throw unauthorized("participant_session_missing");
-  }
-
-  const participantWithDates = await prisma.participant.findUnique({
-    where: { id: participant.id },
-    include: {
-      event: {
-        include: {
-          dates: {
-            orderBy: {
-              dateKey: "asc",
-            },
-          },
-          availabilityNotification: {
-            select: {
-              recipientEmail: true,
-            },
-          },
-        },
-      },
-      availabilitySlots: {
-        select: {
-          slotStartAt: true,
-        },
-      },
-    },
-  });
-
-  if (!participantWithDates || participantWithDates.event.slug !== slug) {
-    throw notFound("participant_not_found");
-  }
-
-  if (participantWithDates.event.status === "CLOSED") {
-    throw conflict("event_closed");
-  }
-
-  return participantWithDates;
-}
-
 export async function saveAvailability(
   slug: string,
   locale: AppLocale,
@@ -403,114 +440,156 @@ export async function saveAvailability(
 ) {
   await ensureAvailabilityDigestSchedulerStarted();
 
-  const participant = await verifyParticipantMutation(slug, cookieValue);
-  const eventType = participant.event.type === "FULL_DAY" ? "full_day" : "time_grid";
-  const eventDateKeys = participant.event.dates.map((date) => date.dateKey);
-  const allowedSlots =
-    eventType === "full_day"
-      ? getAllowedFullDaySlotStarts({
-          dates: eventDateKeys,
-          timezone: participant.event.timezone,
-        })
-      : getAllowedSlotStarts({
-          dates: eventDateKeys,
-          timezone: participant.event.timezone,
-          dayStartMinutes: participant.event.dayStartMinutes,
-          dayEndMinutes: participant.event.dayEndMinutes,
-          slotMinutes: participant.event.slotMinutes,
-        });
+  const parsedSession = parseParticipantCookieValue(cookieValue);
+  const authenticatedParticipant = await getParticipantForSession(slug, cookieValue);
+  if (!parsedSession || !authenticatedParticipant) {
+    throw unauthorized("participant_session_missing");
+  }
 
   const uniqueSlotStarts = Array.from(new Set(mutation.selectedSlotStarts));
-  const invalidSlot = uniqueSlotStarts.find((slotStart) => !allowedSlots.has(slotStart));
-  if (invalidSlot) {
-    throw conflict("invalid_slots");
-  }
+  const result = await runLockedEventTransaction({
+    eventId: authenticatedParticipant.eventId,
+    mode: "share",
+    missingCode: "event_not_found",
+    operation: async (transaction) => {
+      if (!(await lockParticipantRow(transaction, parsedSession.participantId))) {
+        throw unauthorized("participant_session_missing");
+      }
 
-  const currentSelectionSignature = participant.availabilitySlots
-    .map((slot) => slot.slotStartAt.toISOString())
-    .sort()
-    .join("|");
-  const nextSelectionSignature = [...uniqueSlotStarts].sort().join("|");
-  const didAvailabilityChange = currentSelectionSignature !== nextSelectionSignature;
+      const participant = await transaction.participant.findUnique({
+        where: { id: parsedSession.participantId },
+        include: {
+          event: {
+            include: {
+              dates: {
+                orderBy: {
+                  dateKey: "asc",
+                },
+              },
+              availabilityNotification: {
+                select: {
+                  recipientEmail: true,
+                },
+              },
+            },
+          },
+          availabilitySlots: {
+            select: {
+              slotStartAt: true,
+            },
+          },
+        },
+      });
 
-  if (!didAvailabilityChange) {
-    await prisma.participant.update({
-      where: {
-        id: participant.id,
-      },
-      data: {
-        lastSeenAt: new Date(),
-      },
-    });
+      if (
+        !participant ||
+        participant.event.slug !== slug ||
+        participant.editTokenHash !== hashSecret(parsedSession.token)
+      ) {
+        throw unauthorized("participant_session_missing");
+      }
 
-    const event = await getEventWithRelationsById(participant.eventId);
-    if (!event) {
-      throw notFound("event_not_found");
-    }
+      if (participant.event.status === "CLOSED") {
+        throw conflict("event_closed");
+      }
 
-    return {
-      snapshot: toSnapshot(event, locale, participant.id),
-    };
-  }
+      const eventType = participant.event.type === "FULL_DAY" ? "full_day" : "time_grid";
+      const eventDateKeys = participant.event.dates.map((date) => date.dateKey);
+      const allowedSlots =
+        eventType === "full_day"
+          ? getAllowedFullDaySlotStarts({
+              dates: eventDateKeys,
+              timezone: participant.event.timezone,
+            })
+          : getAllowedSlotStarts({
+              dates: eventDateKeys,
+              timezone: participant.event.timezone,
+              dayStartMinutes: participant.event.dayStartMinutes,
+              dayEndMinutes: participant.event.dayEndMinutes,
+              slotMinutes: participant.event.slotMinutes,
+            });
 
-  await prisma.$transaction([
-    prisma.availabilitySlot.deleteMany({
-      where: {
-        participantId: participant.id,
-      },
-    }),
-    ...(uniqueSlotStarts.length
-      ? [
-          prisma.availabilitySlot.createMany({
+      if (uniqueSlotStarts.some((slotStart) => !allowedSlots.has(slotStart))) {
+        throw conflict("invalid_slots");
+      }
+
+      const currentSelectionSignature = participant.availabilitySlots
+        .map((slot) => slot.slotStartAt.toISOString())
+        .sort()
+        .join("|");
+      const nextSelectionSignature = [...uniqueSlotStarts].sort().join("|");
+      const didAvailabilityChange = currentSelectionSignature !== nextSelectionSignature;
+
+      if (didAvailabilityChange) {
+        await transaction.availabilitySlot.deleteMany({
+          where: {
+            participantId: participant.id,
+          },
+        });
+
+        if (uniqueSlotStarts.length > 0) {
+          await transaction.availabilitySlot.createMany({
             data: uniqueSlotStarts.map((slotStart) => ({
               eventId: participant.eventId,
               participantId: participant.id,
               slotStartAt: new Date(slotStart),
             })),
-          }),
-        ]
-      : []),
-    prisma.participant.update({
-      where: {
-        id: participant.id,
-      },
-      data: {
-        lastSeenAt: new Date(),
-      },
-    }),
-  ]);
+          });
+        }
+      }
 
-  const event = await getEventWithRelationsById(participant.eventId);
-  if (!event) {
-    throw notFound("event_not_found");
-  }
+      await transaction.participant.update({
+        where: {
+          id: participant.id,
+        },
+        data: {
+          lastSeenAt: new Date(),
+        },
+      });
 
-  await publishEventUpdate({
-    eventId: participant.eventId,
-    kind: "availability-saved",
-    participantId: participant.id,
+      const event = await getEventWithRelationsById(participant.eventId, transaction);
+      if (!event) {
+        throw notFound("event_not_found");
+      }
+
+      return {
+        didAvailabilityChange,
+        event,
+        eventId: participant.eventId,
+        notificationEmail: participant.event.availabilityNotification?.recipientEmail ?? null,
+        participantId: participant.id,
+      };
+    },
   });
 
-  if (participant.event.availabilityNotification?.recipientEmail) {
+  if (result.didAvailabilityChange) {
+    await publishEventUpdate({
+      eventId: result.eventId,
+      kind: "availability-saved",
+      participantId: result.participantId,
+    });
+  }
+
+  if (result.didAvailabilityChange && result.notificationEmail) {
     await queueAvailabilityDigest({
-      eventId: participant.eventId,
-      participantId: participant.id,
-      recipientEmail: participant.event.availabilityNotification.recipientEmail,
+      eventId: result.eventId,
+      participantId: result.participantId,
+      recipientEmail: result.notificationEmail,
     });
   }
 
   return {
-    snapshot: toSnapshot(event, locale, participant.id),
+    snapshot: toSnapshot(result.event, locale, result.participantId),
   };
 }
 
-async function verifyManageKey(manageKey: string) {
+async function verifyManageKey(manageKey: string, client: EventReader = prisma) {
   const parsed = parseManageKey(manageKey);
   if (!parsed) {
     throw notFound("manage_key_invalid");
   }
 
-  const event = await getEventWithRelationsById(parsed.eventId);
+  const event = await getEventWithRelationsById(parsed.eventId, client);
   if (!event) {
     throw notFound("manage_key_invalid");
   }
@@ -522,6 +601,212 @@ async function verifyManageKey(manageKey: string) {
   }
 
   return event;
+}
+
+function parseFinalSlotStart(event: EventWithRelations, finalSlotStart: string) {
+  const eventType = event.type === "FULL_DAY" ? "full_day" : "time_grid";
+  const eventDateKeys = event.dates.map((date) => date.dateKey);
+  const allowedFinalSlotStarts =
+    eventType === "full_day"
+      ? getAllowedFullDaySlotStarts({
+          dates: eventDateKeys,
+          timezone: event.timezone,
+        })
+      : getAllowedFinalSlotStarts({
+          dates: eventDateKeys,
+          timezone: event.timezone,
+          dayStartMinutes: event.dayStartMinutes,
+          dayEndMinutes: event.dayEndMinutes,
+          slotMinutes: event.slotMinutes,
+          meetingDurationMinutes: event.meetingDurationMinutes,
+        });
+
+  if (!allowedFinalSlotStarts.has(finalSlotStart)) {
+    throw conflict("final_slot_invalid");
+  }
+
+  return new Date(finalSlotStart);
+}
+
+async function updateLockedSchedule(
+  transaction: Prisma.TransactionClient,
+  event: EventWithRelations,
+  input: Extract<ManageUpdateInput, { action: "updateSchedule" }>,
+) {
+  if (event.status === "CLOSED") {
+    throw conflict("event_closed");
+  }
+
+  const currentScheduleSignature = buildScheduleSignature({
+    dates: event.dates.map((date) => date.dateKey),
+    dayStartMinutes: event.dayStartMinutes,
+    dayEndMinutes: event.dayEndMinutes,
+  });
+  if (input.expectedScheduleSignature !== currentScheduleSignature) {
+    throw conflict("schedule_changed");
+  }
+
+  const eventType = event.type === "FULL_DAY" ? "full_day" : "time_grid";
+  const nextDateKeys = sortDateKeys(input.dates);
+  const maxDates = eventType === "full_day" ? fullDayDateLimit : timeGridDateLimit;
+  if (nextDateKeys.length > maxDates) {
+    throw badRequest("too_many_dates", {
+      params: {
+        limit: maxDates,
+      },
+    });
+  }
+
+  const nextDayStartMinutes =
+    eventType === "time_grid" && input.dayStartMinutes != null
+      ? input.dayStartMinutes
+      : event.dayStartMinutes;
+  const nextDayEndMinutes =
+    eventType === "time_grid" && input.dayEndMinutes != null
+      ? input.dayEndMinutes
+      : event.dayEndMinutes;
+
+  if (nextDayEndMinutes <= nextDayStartMinutes) {
+    throw badRequest("invalid_day_window");
+  }
+
+  if (
+    eventType === "full_day" &&
+    nextDateKeys.some(
+      (dateKey) => !doesZonedCivilDateExist({ dateKey, timezone: event.timezone }),
+    )
+  ) {
+    throw badRequest("full_day_date_unavailable");
+  }
+
+  if (
+    eventType === "full_day" &&
+    event.fullDayStartMinutes != null &&
+    nextDateKeys.some(
+      (dateKey) =>
+        !isExistingZonedWallTime({
+          dateKey,
+          minutes: event.fullDayStartMinutes ?? 0,
+          timezone: event.timezone,
+        }),
+    )
+  ) {
+    throw badRequest("full_day_start_unavailable");
+  }
+
+  if (
+    eventType === "time_grid" &&
+    !hasFinalizableMeetingWindowOnEveryDate({
+      dates: nextDateKeys,
+      timezone: event.timezone,
+      dayStartMinutes: nextDayStartMinutes,
+      dayEndMinutes: nextDayEndMinutes,
+      slotMinutes: event.slotMinutes,
+      meetingDurationMinutes: event.meetingDurationMinutes,
+    })
+  ) {
+    throw badRequest("schedule_no_valid_meeting_window", {
+      params: {
+        duration: event.meetingDurationMinutes,
+      },
+    });
+  }
+
+  const currentDateKeys = event.dates.map((date) => date.dateKey);
+  const currentAllowedSlotStarts =
+    eventType === "full_day"
+      ? getAllowedFullDaySlotStarts({
+          dates: currentDateKeys,
+          timezone: event.timezone,
+        })
+      : getAllowedSlotStarts({
+          dates: currentDateKeys,
+          timezone: event.timezone,
+          dayStartMinutes: event.dayStartMinutes,
+          dayEndMinutes: event.dayEndMinutes,
+          slotMinutes: event.slotMinutes,
+        });
+  const nextAllowedSlotStarts =
+    eventType === "full_day"
+      ? getAllowedFullDaySlotStarts({
+          dates: nextDateKeys,
+          timezone: event.timezone,
+        })
+      : getAllowedSlotStarts({
+          dates: nextDateKeys,
+          timezone: event.timezone,
+          dayStartMinutes: nextDayStartMinutes,
+          dayEndMinutes: nextDayEndMinutes,
+          slotMinutes: event.slotMinutes,
+        });
+  const retainedSlotStarts = new Set(
+    Array.from(currentAllowedSlotStarts).filter((slotStart) => nextAllowedSlotStarts.has(slotStart)),
+  );
+  // Slots that were already invalid are legacy orphans. Always remove them instead of
+  // silently resurrecting old availability when a date or time is added back later.
+  const retainedSlotStartDates = Array.from(retainedSlotStarts).map((iso) => new Date(iso));
+  const affectedParticipantIds = new Set<string>();
+  let deletedVotes = 0;
+
+  for (const participant of event.participants) {
+    for (const slot of participant.availabilitySlots) {
+      if (!retainedSlotStarts.has(slot.slotStartAt.toISOString())) {
+        deletedVotes += 1;
+        affectedParticipantIds.add(participant.id);
+      }
+    }
+  }
+
+  if (
+    input.expectedDeletedVotes !== deletedVotes ||
+    input.expectedAffectedParticipants !== affectedParticipantIds.size
+  ) {
+    throw conflict("schedule_preview_stale");
+  }
+
+  if (deletedVotes > 0) {
+    const deletion = await transaction.availabilitySlot.deleteMany({
+      where: {
+        eventId: event.id,
+        slotStartAt: { notIn: retainedSlotStartDates },
+      },
+    });
+
+    if (deletion.count !== deletedVotes) {
+      throw conflict("schedule_preview_stale");
+    }
+  }
+
+  if (
+    eventType === "time_grid" &&
+    (nextDayStartMinutes !== event.dayStartMinutes || nextDayEndMinutes !== event.dayEndMinutes)
+  ) {
+    await transaction.event.update({
+      where: { id: event.id },
+      data: {
+        dayStartMinutes: nextDayStartMinutes,
+        dayEndMinutes: nextDayEndMinutes,
+      },
+    });
+  }
+
+  const currentDateKeySet = new Set(currentDateKeys);
+  const nextDateKeySet = new Set(nextDateKeys);
+  const removedDateKeys = [...currentDateKeySet].filter((dateKey) => !nextDateKeySet.has(dateKey));
+  const addedDateKeys = nextDateKeys.filter((dateKey) => !currentDateKeySet.has(dateKey));
+
+  if (removedDateKeys.length > 0) {
+    await transaction.eventDate.deleteMany({
+      where: { eventId: event.id, dateKey: { in: removedDateKeys } },
+    });
+  }
+
+  if (addedDateKeys.length > 0) {
+    await transaction.eventDate.createMany({
+      data: addedDateKeys.map((dateKey) => ({ eventId: event.id, dateKey })),
+      skipDuplicates: true,
+    });
+  }
 }
 
 export async function getManageEventView(
@@ -548,58 +833,63 @@ export async function getManageEventView(
 
 export async function updateManagedEvent(
   manageKey: string,
-  input:
-    | {
-        action: "updateTitle";
-        title: string;
-      }
-    | {
-        action: "closeEvent";
-        finalSlotStart: string;
-      }
-    | {
-        action: "updateFixedDate";
-        finalSlotStart: string;
-      }
-    | {
-        action: "reopenEvent";
-      }
-    | {
-        action: "renameParticipant";
-        participantId: string;
-        displayName: string;
-      }
-    | {
-        action: "updateNotificationEmail";
-        notificationEmail?: string;
-      },
+  input: ManageUpdateInput,
 ) {
-  const event = await verifyManageKey(manageKey);
+  if (
+    input.action === "closeEvent" ||
+    input.action === "updateFixedDate" ||
+    input.action === "reopenEvent" ||
+    input.action === "updateSchedule"
+  ) {
+    const authorizedEvent = await verifyManageKey(manageKey);
 
-  function parseFinalSlotStart(finalSlotStart: string) {
-    const eventType = event.type === "FULL_DAY" ? "full_day" : "time_grid";
-    const eventDateKeys = event.dates.map((date) => date.dateKey);
-    const allowedFinalSlotStarts =
-      eventType === "full_day"
-        ? getAllowedFullDaySlotStarts({
-            dates: eventDateKeys,
-            timezone: event.timezone,
-          })
-        : getAllowedFinalSlotStarts({
-            dates: eventDateKeys,
-            timezone: event.timezone,
-            dayStartMinutes: event.dayStartMinutes,
-            dayEndMinutes: event.dayEndMinutes,
-            slotMinutes: event.slotMinutes,
-            meetingDurationMinutes: event.meetingDurationMinutes,
+    await runLockedEventTransaction({
+      eventId: authorizedEvent.id,
+      mode: "update",
+      missingCode: "manage_key_invalid",
+      operation: async (transaction) => {
+        const event = await verifyManageKey(manageKey, transaction);
+
+        if (input.action === "closeEvent" || input.action === "updateFixedDate") {
+          await transaction.event.update({
+            where: {
+              id: event.id,
+            },
+            data: {
+              status: "CLOSED",
+              finalSlotStartAt: parseFinalSlotStart(event, input.finalSlotStart),
+            },
           });
+          return;
+        }
 
-    if (!allowedFinalSlotStarts.has(finalSlotStart)) {
-      throw conflict("final_slot_invalid");
-    }
+        if (input.action === "reopenEvent") {
+          await transaction.event.update({
+            where: {
+              id: event.id,
+            },
+            data: {
+              status: "OPEN",
+              finalSlotStartAt: null,
+            },
+          });
+          return;
+        }
 
-    return new Date(finalSlotStart);
+        await updateLockedSchedule(transaction, event, input);
+      },
+    });
+
+    await publishEventUpdate({
+      eventId: authorizedEvent.id,
+      kind: "event-updated",
+      participantId: undefined,
+    });
+
+    return {};
   }
+
+  const event = await verifyManageKey(manageKey);
 
   if (input.action === "updateTitle") {
     await prisma.event.update({
@@ -608,30 +898,6 @@ export async function updateManagedEvent(
       },
       data: {
         title: input.title,
-      },
-    });
-  }
-
-  if (input.action === "closeEvent" || input.action === "updateFixedDate") {
-    await prisma.event.update({
-      where: {
-        id: event.id,
-      },
-      data: {
-        status: "CLOSED",
-        finalSlotStartAt: parseFinalSlotStart(input.finalSlotStart),
-      },
-    });
-  }
-
-  if (input.action === "reopenEvent") {
-    await prisma.event.update({
-      where: {
-        id: event.id,
-      },
-      data: {
-        status: "OPEN",
-        finalSlotStartAt: null,
       },
     });
   }
@@ -692,21 +958,29 @@ export async function updateManagedEvent(
 }
 
 export async function deleteParticipant(manageKey: string, participantId: string) {
-  const event = await verifyManageKey(manageKey);
+  const authorizedEvent = await verifyManageKey(manageKey);
 
-  const deleted = await prisma.participant.deleteMany({
-    where: {
-      id: participantId,
-      eventId: event.id,
+  await runLockedEventTransaction({
+    eventId: authorizedEvent.id,
+    mode: "update",
+    missingCode: "manage_key_invalid",
+    operation: async (transaction) => {
+      const event = await verifyManageKey(manageKey, transaction);
+      const deleted = await transaction.participant.deleteMany({
+        where: {
+          id: participantId,
+          eventId: event.id,
+        },
+      });
+
+      if (deleted.count === 0) {
+        throw notFound("participant_not_found");
+      }
     },
   });
 
-  if (deleted.count === 0) {
-    throw notFound("participant_not_found");
-  }
-
   await publishEventUpdate({
-    eventId: event.id,
+    eventId: authorizedEvent.id,
     kind: "participant-removed",
     participantId,
   });

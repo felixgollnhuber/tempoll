@@ -8,7 +8,38 @@ import { renderWithI18n } from "@/test/render-with-i18n";
 import type { PublicEventSnapshot } from "@/lib/types";
 
 const mockedGetViewerTimezone = vi.hoisted(() => vi.fn(() => "Europe/Vienna"));
+const mockedToastError = vi.hoisted(() => vi.fn());
 const defaultTimezones = ["Europe/Vienna", "America/New_York", "UTC"];
+const defaultEventSource = globalThis.EventSource;
+
+function installEventSourceCapture() {
+  const listeners = new Map<string, Array<(event: Event) => void>>();
+
+  class CapturingEventSource {
+    addEventListener(type: string, listener: EventListener) {
+      const current = listeners.get(type) ?? [];
+      current.push(listener);
+      listeners.set(type, current);
+    }
+
+    close() {}
+  }
+
+  Object.defineProperty(globalThis, "EventSource", {
+    configurable: true,
+    writable: true,
+    value: CapturingEventSource,
+  });
+
+  return {
+    emit(type: string, data: unknown) {
+      const event = new MessageEvent(type, { data: JSON.stringify(data) });
+      for (const listener of listeners.get(type) ?? []) {
+        listener(event);
+      }
+    },
+  };
+}
 
 vi.mock("@/lib/availability", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/availability")>();
@@ -18,6 +49,13 @@ vi.mock("@/lib/availability", async (importOriginal) => {
     getViewerTimezone: mockedGetViewerTimezone,
   };
 });
+
+vi.mock("sonner", () => ({
+  toast: {
+    error: mockedToastError,
+    success: vi.fn(),
+  },
+}));
 
 function createSnapshot(options?: {
   status?: PublicEventSnapshot["status"];
@@ -245,6 +283,11 @@ beforeEach(() => {
   setViewportWidth(1024);
   mockedGetViewerTimezone.mockReturnValue("Europe/Vienna");
   window.localStorage.clear();
+  Object.defineProperty(globalThis, "EventSource", {
+    configurable: true,
+    writable: true,
+    value: defaultEventSource,
+  });
 });
 
 afterEach(() => {
@@ -585,6 +628,446 @@ describe("PublicEventClient", () => {
     });
 
     vi.useRealTimers();
+  });
+
+  it("applies a valid refresh when a later refresh fails", async () => {
+    const eventSource = installEventSourceCapture();
+    const initialSnapshot = createSnapshot({ withCurrentUser: false });
+    const closedSnapshot: PublicEventSnapshot = {
+      ...initialSnapshot,
+      status: "CLOSED",
+    };
+    let resolveFirstRefresh!: (response: Response) => void;
+    const firstRefreshResponse = new Promise<Response>((resolve) => {
+      resolveFirstRefresh = resolve;
+    });
+    const fetchMock = vi
+      .fn()
+      .mockReturnValueOnce(firstRefreshResponse)
+      .mockResolvedValueOnce({ ok: false } as Response);
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    renderWithI18n(
+      <PublicEventClient
+        slug="test-event"
+        initialSnapshot={initialSnapshot}
+        initialSession={null}
+      />,
+    );
+
+    eventSource.emit("event-update", { kind: "event-updated", eventId: "event_1" });
+    eventSource.emit("event-update", { kind: "event-updated", eventId: "event_1" });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+    resolveFirstRefresh({
+      ok: true,
+      json: async () => ({ snapshot: closedSnapshot }),
+    } as Response);
+
+    await waitFor(() => expect(screen.getAllByText("Closed").length).toBeGreaterThan(0));
+  });
+
+  it("applies a later valid refresh after an earlier refresh was applied", async () => {
+    const eventSource = installEventSourceCapture();
+    const initialSnapshot = createSnapshot({ withCurrentUser: false });
+    let resolveFirstRefresh!: (response: Response) => void;
+    let resolveSecondRefresh!: (response: Response) => void;
+    const firstRefreshResponse = new Promise<Response>((resolve) => {
+      resolveFirstRefresh = resolve;
+    });
+    const secondRefreshResponse = new Promise<Response>((resolve) => {
+      resolveSecondRefresh = resolve;
+    });
+    const fetchMock = vi
+      .fn()
+      .mockReturnValueOnce(firstRefreshResponse)
+      .mockReturnValueOnce(secondRefreshResponse)
+      .mockResolvedValue({ ok: false } as Response);
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    renderWithI18n(
+      <PublicEventClient
+        slug="test-event"
+        initialSnapshot={initialSnapshot}
+        initialSession={null}
+      />,
+    );
+
+    eventSource.emit("event-update", { kind: "event-updated", eventId: "event_1" });
+    eventSource.emit("event-update", { kind: "event-updated", eventId: "event_1" });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+    resolveFirstRefresh({
+      ok: true,
+      json: async () => ({
+        snapshot: {
+          ...initialSnapshot,
+          title: "First snapshot",
+        },
+      }),
+    } as Response);
+    expect(await screen.findByText("First snapshot")).toBeInTheDocument();
+
+    resolveSecondRefresh({
+      ok: true,
+      json: async () => ({
+        snapshot: {
+          ...initialSnapshot,
+          title: "Second snapshot",
+          status: "CLOSED",
+        },
+      }),
+    } as Response);
+
+    await waitFor(() => expect(screen.getAllByText("Closed").length).toBeGreaterThan(0));
+    expect(screen.getByText("Second snapshot")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not let an availability response overwrite an observed organizer update", async () => {
+    vi.useFakeTimers();
+    const eventSource = installEventSourceCapture();
+    const initialSnapshot = createSnapshot();
+    const savedOpenSnapshot: PublicEventSnapshot = {
+      ...initialSnapshot,
+      slots: initialSnapshot.slots.map((slot) =>
+        slot.slotStart === "2026-03-30T07:30:00.000Z"
+          ? {
+              ...slot,
+              availabilityCount: slot.availabilityCount + 1,
+              participantIds: [...slot.participantIds, "p1"],
+              selectedByCurrentUser: true,
+            }
+          : slot,
+      ),
+      status: "OPEN",
+    };
+    const closedSnapshot: PublicEventSnapshot = {
+      ...savedOpenSnapshot,
+      status: "CLOSED",
+    };
+    let resolveSave!: (response: Response) => void;
+    let resolveFirstRefresh!: (response: Response) => void;
+    const saveResponse = new Promise<Response>((resolve) => {
+      resolveSave = resolve;
+    });
+    const firstRefreshResponse = new Promise<Response>((resolve) => {
+      resolveFirstRefresh = resolve;
+    });
+    let refreshCount = 0;
+    global.fetch = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/events/test-event/availability") {
+        return saveResponse;
+      }
+      if (url === "/api/events/test-event") {
+        refreshCount += 1;
+        if (refreshCount === 1) {
+          return firstRefreshResponse;
+        }
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ snapshot: closedSnapshot }),
+        } as Response);
+      }
+      throw new Error(`Unhandled fetch call: ${url}`);
+    }) as unknown as typeof fetch;
+
+    renderWithI18n(
+      <PublicEventClient
+        slug="test-event"
+        initialSnapshot={initialSnapshot}
+        initialSession={{ participantId: "p1", displayName: "Felix" }}
+      />,
+    );
+
+    const slot = screen.getByRole("button", {
+      name: /Mon, Mar 30 09:30 · 1\/4 available/i,
+    });
+    fireEvent.pointerDown(slot, { pointerId: 1, isPrimary: true });
+    fireEvent.pointerUp(slot, { pointerId: 1, isPrimary: true });
+    await vi.advanceTimersByTimeAsync(600);
+    vi.useRealTimers();
+
+    eventSource.emit("event-update", { kind: "event-updated", eventId: "event_1" });
+    resolveSave({
+      ok: true,
+      json: async () => ({ snapshot: savedOpenSnapshot }),
+    } as Response);
+
+    await waitFor(() => expect(screen.getAllByText("Closed").length).toBeGreaterThan(0));
+
+    resolveFirstRefresh({
+      ok: true,
+      json: async () => ({ snapshot: savedOpenSnapshot }),
+    } as Response);
+    await waitFor(() => expect(screen.getAllByText("Closed").length).toBeGreaterThan(0));
+  });
+
+  it("preserves a local availability draft across another participant's SSE update", async () => {
+    vi.useFakeTimers();
+    const eventSource = installEventSourceCapture();
+    const initialSnapshot = createSnapshot();
+    const savedSnapshot: PublicEventSnapshot = {
+      ...initialSnapshot,
+      slots: initialSnapshot.slots.map((slot) =>
+        slot.slotStart === "2026-03-30T07:30:00.000Z"
+          ? {
+              ...slot,
+              availabilityCount: slot.availabilityCount + 1,
+              participantIds: [...slot.participantIds, "p1"],
+              selectedByCurrentUser: true,
+            }
+          : slot,
+      ),
+    };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
+      void _init;
+      const url = String(input);
+      if (url === "/api/events/test-event") {
+        return {
+          ok: true,
+          json: async () => ({ snapshot: initialSnapshot }),
+        };
+      }
+      if (url === "/api/events/test-event/availability") {
+        return {
+          ok: true,
+          json: async () => ({ snapshot: savedSnapshot }),
+        };
+      }
+      throw new Error(`Unhandled fetch call: ${url}`);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    renderWithI18n(
+      <PublicEventClient
+        slug="test-event"
+        initialSnapshot={initialSnapshot}
+        initialSession={{ participantId: "p1", displayName: "Felix" }}
+      />,
+    );
+    const slot = screen.getByRole("button", {
+      name: /Mon, Mar 30 09:30 · 1\/4 available/i,
+    });
+    fireEvent.pointerDown(slot, { pointerId: 1, isPrimary: true });
+    fireEvent.pointerUp(slot, { pointerId: 1, isPrimary: true });
+
+    eventSource.emit("event-update", {
+      kind: "availability-saved",
+      eventId: "event_1",
+      participantId: "p2",
+    });
+    await vi.advanceTimersByTimeAsync(600);
+
+    const saveCall = fetchMock.mock.calls.find(
+      ([input]) => String(input) === "/api/events/test-event/availability",
+    );
+    expect(saveCall).toBeTruthy();
+    expect(JSON.parse(String((saveCall?.[1] as RequestInit).body))).toMatchObject({
+      selectedSlotStarts: ["2026-03-30T07:00:00.000Z", "2026-03-30T07:30:00.000Z"],
+    });
+    vi.useRealTimers();
+  });
+
+  it("keeps the successful save baseline when a follow-up reconciliation fetch fails", async () => {
+    vi.useFakeTimers();
+    const eventSource = installEventSourceCapture();
+    const initialSnapshot = createSnapshot();
+    const savedSnapshot: PublicEventSnapshot = {
+      ...initialSnapshot,
+      slots: initialSnapshot.slots.map((slot) =>
+        slot.slotStart === "2026-03-30T07:30:00.000Z"
+          ? {
+              ...slot,
+              availabilityCount: slot.availabilityCount + 1,
+              participantIds: [...slot.participantIds, "p1"],
+              selectedByCurrentUser: true,
+            }
+          : slot,
+      ),
+    };
+    let resolveFirstSave!: (response: Response) => void;
+    const firstSaveResponse = new Promise<Response>((resolve) => {
+      resolveFirstSave = resolve;
+    });
+    let availabilityCallCount = 0;
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/events/test-event/availability") {
+        availabilityCallCount += 1;
+        return availabilityCallCount === 1
+          ? firstSaveResponse
+          : Promise.resolve({
+              ok: true,
+              json: async () => ({ snapshot: initialSnapshot }),
+            } as Response);
+      }
+      if (url === "/api/events/test-event") {
+        return Promise.reject(new Error("refresh failed"));
+      }
+      throw new Error(`Unhandled fetch call: ${url}`);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    renderWithI18n(
+      <PublicEventClient
+        slug="test-event"
+        initialSnapshot={initialSnapshot}
+        initialSession={{ participantId: "p1", displayName: "Felix" }}
+      />,
+    );
+    const slot = screen.getByRole("button", {
+      name: /Mon, Mar 30 09:30 · 1\/4 available/i,
+    });
+    fireEvent.pointerDown(slot, { pointerId: 1, isPrimary: true });
+    fireEvent.pointerUp(slot, { pointerId: 1, isPrimary: true });
+    await vi.advanceTimersByTimeAsync(600);
+
+    eventSource.emit("event-update", { kind: "event-updated", eventId: "event_1" });
+    resolveFirstSave({
+      ok: true,
+      json: async () => ({ snapshot: savedSnapshot }),
+    } as Response);
+    await vi.advanceTimersByTimeAsync(0);
+
+    const selectedSlot = screen.getByRole("button", {
+      name: /Mon, Mar 30 09:30 · 2\/4 available/i,
+    });
+    fireEvent.pointerDown(selectedSlot, { pointerId: 2, isPrimary: true });
+    fireEvent.pointerUp(selectedSlot, { pointerId: 2, isPrimary: true });
+    await vi.advanceTimersByTimeAsync(600);
+
+    expect(availabilityCallCount).toBe(2);
+    vi.useRealTimers();
+  });
+
+  it("marks the baseline unknown when a newer snapshot applied before a stale save response", async () => {
+    vi.useFakeTimers();
+    const eventSource = installEventSourceCapture();
+    const initialSnapshot = createSnapshot();
+    const savedSnapshot: PublicEventSnapshot = {
+      ...initialSnapshot,
+      slots: initialSnapshot.slots.map((slot) =>
+        slot.slotStart === "2026-03-30T07:30:00.000Z"
+          ? {
+              ...slot,
+              availabilityCount: slot.availabilityCount + 1,
+              participantIds: [...slot.participantIds, "p1"],
+              selectedByCurrentUser: true,
+            }
+          : slot,
+      ),
+    };
+    const newerSnapshot: PublicEventSnapshot = {
+      ...initialSnapshot,
+      slots: initialSnapshot.slots.map((slot) =>
+        slot.slotStart === "2026-03-31T07:00:00.000Z"
+          ? {
+              ...slot,
+              availabilityCount: slot.availabilityCount + 1,
+              participantIds: [...slot.participantIds, "p1"],
+              selectedByCurrentUser: true,
+            }
+          : slot,
+      ),
+    };
+    let resolveFirstSave!: (response: Response) => void;
+    const firstSaveResponse = new Promise<Response>((resolve) => {
+      resolveFirstSave = resolve;
+    });
+    let availabilityCallCount = 0;
+    let refreshCallCount = 0;
+    global.fetch = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/events/test-event/availability") {
+        availabilityCallCount += 1;
+        return availabilityCallCount === 1
+          ? firstSaveResponse
+          : Promise.resolve({
+              ok: true,
+              json: async () => ({ snapshot: savedSnapshot }),
+            } as Response);
+      }
+      if (url === "/api/events/test-event") {
+        refreshCallCount += 1;
+        return refreshCallCount === 1
+          ? Promise.resolve({
+              ok: true,
+              json: async () => ({ snapshot: newerSnapshot }),
+            } as Response)
+          : Promise.reject(new Error("reconciliation failed"));
+      }
+      throw new Error(`Unhandled fetch call: ${url}`);
+    }) as unknown as typeof fetch;
+
+    renderWithI18n(
+      <PublicEventClient
+        slug="test-event"
+        initialSnapshot={initialSnapshot}
+        initialSession={{ participantId: "p1", displayName: "Felix" }}
+      />,
+    );
+    const slot = screen.getByRole("button", {
+      name: /Mon, Mar 30 09:30 · 1\/4 available/i,
+    });
+    fireEvent.pointerDown(slot, { pointerId: 1, isPrimary: true });
+    fireEvent.pointerUp(slot, { pointerId: 1, isPrimary: true });
+    await vi.advanceTimersByTimeAsync(600);
+
+    eventSource.emit("event-update", { kind: "event-updated", eventId: "event_1" });
+    await vi.advanceTimersByTimeAsync(0);
+    resolveFirstSave({
+      ok: true,
+      json: async () => ({ snapshot: savedSnapshot }),
+    } as Response);
+    await vi.advanceTimersByTimeAsync(0);
+
+    const selectedSlot = screen.getByRole("button", {
+      name: /Mon, Mar 30 09:30 · 2\/4 available/i,
+    });
+    fireEvent.pointerDown(selectedSlot, { pointerId: 2, isPrimary: true });
+    fireEvent.pointerUp(selectedSlot, { pointerId: 2, isPrimary: true });
+    fireEvent.pointerDown(selectedSlot, { pointerId: 3, isPrimary: true });
+    fireEvent.pointerUp(selectedSlot, { pointerId: 3, isPrimary: true });
+    await vi.advanceTimersByTimeAsync(600);
+
+    expect(availabilityCallCount).toBe(2);
+    vi.useRealTimers();
+  });
+
+  it("reverts the optimistic selection and reports a failed availability save", async () => {
+    vi.useFakeTimers();
+    const initialSnapshot = createSnapshot();
+    global.fetch = vi.fn(async () => {
+      throw new Error("offline");
+    }) as unknown as typeof fetch;
+
+    renderWithI18n(
+      <PublicEventClient
+        slug="test-event"
+        initialSnapshot={initialSnapshot}
+        initialSession={{ participantId: "p1", displayName: "Felix" }}
+      />,
+    );
+    const slot = screen.getByRole("button", {
+      name: /Mon, Mar 30 09:30 · 1\/4 available/i,
+    });
+    fireEvent.pointerDown(slot, { pointerId: 1, isPrimary: true });
+    fireEvent.pointerUp(slot, { pointerId: 1, isPrimary: true });
+    expect(
+      screen.getByRole("button", { name: /Mon, Mar 30 09:30 · 2\/4 available/i }),
+    ).toBeInTheDocument();
+
+    await vi.advanceTimersByTimeAsync(600);
+    vi.useRealTimers();
+
+    await waitFor(() =>
+      expect(mockedToastError).toHaveBeenCalledWith("Unable to save availability."),
+    );
+    expect(
+      screen.getByRole("button", { name: /Mon, Mar 30 09:30 · 1\/4 available/i }),
+    ).toBeInTheDocument();
   });
 
   it("renders a full-day picker and saves selected days", async () => {

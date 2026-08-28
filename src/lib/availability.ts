@@ -113,12 +113,29 @@ function addDaysToDateKey(dateKey: string, days: number) {
   return formatDateKey(date);
 }
 
+export function getNextDateKey(dateKey: string) {
+  return addDaysToDateKey(dateKey, 1);
+}
+
 export function buildFullDaySlotStart(dateKey: string, timezone: string) {
+  if (!doesZonedCivilDateExist({ dateKey, timezone })) {
+    throw new RangeError(`The civil date ${dateKey} does not exist in ${timezone}.`);
+  }
+
+  // Keep the historical midnight-derived value as the opaque availability identity so
+  // existing full-day votes remain valid even when a timezone skips local midnight.
   return buildSlotStart(dateKey, 0, timezone);
 }
 
 function buildFullDaySlotEnd(dateKey: string, timezone: string) {
-  return buildFullDaySlotStart(addDaysToDateKey(dateKey, 1), timezone);
+  for (let days = 1; days <= 3; days += 1) {
+    const nextStart = getZonedCivilDateStart(addDaysToDateKey(dateKey, days), timezone);
+    if (nextStart) {
+      return nextStart.toISOString();
+    }
+  }
+
+  throw new RangeError(`Could not resolve the end of ${dateKey} in ${timezone}.`);
 }
 
 const timedFullDayCalendarDurationMinutes = 60;
@@ -150,6 +167,88 @@ function getDateKeyInTimezone(date: Date, timezone: string) {
 function getMinutesInTimezone(date: Date, timezone: string) {
   const [hoursText = "00", minutesText = "00"] = formatInTimeZone(date, timezone, "HH:mm").split(":");
   return Number(hoursText) * 60 + Number(minutesText);
+}
+
+export function isExistingZonedWallTime({
+  dateKey,
+  minutes,
+  timezone,
+}: {
+  dateKey: string;
+  minutes: number;
+  timezone: string;
+}) {
+  try {
+    const instant = fromZonedTime(
+      `${dateKey}T${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}:00`,
+      timezone,
+    );
+
+    return (
+      getDateKeyInTimezone(instant, timezone) === dateKey &&
+      getMinutesInTimezone(instant, timezone) === minutes
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function doesZonedCivilDateExist({
+  dateKey,
+  timezone,
+}: {
+  dateKey: string;
+  timezone: string;
+}) {
+  try {
+    return ["00:00:00", "06:00:00", "12:00:00", "18:00:00", "23:59:00"].some(
+      (time) =>
+        getDateKeyInTimezone(fromZonedTime(`${dateKey}T${time}`, timezone), timezone) === dateKey,
+    );
+  } catch {
+    return false;
+  }
+}
+
+function getZonedCivilDateStart(dateKey: string, timezone: string) {
+  if (!doesZonedCivilDateExist({ dateKey, timezone })) {
+    return null;
+  }
+
+  const midnightCandidate = fromZonedTime(`${dateKey}T00:00:00`, timezone);
+  if (
+    getDateKeyInTimezone(midnightCandidate, timezone) === dateKey &&
+    getDateKeyInTimezone(new Date(midnightCandidate.getTime() - 60 * 1000), timezone) !== dateKey
+  ) {
+    return midnightCandidate;
+  }
+
+  let cursor = fromZonedTime(`${dateKey}T12:00:00`, timezone);
+  for (let hours = 0; hours < 72; hours += 1) {
+    const previousHour = new Date(cursor.getTime() - 60 * 60 * 1000);
+    if (getDateKeyInTimezone(previousHour, timezone) !== dateKey) {
+      break;
+    }
+    cursor = previousHour;
+  }
+
+  for (let minutes = 0; minutes < 60; minutes += 1) {
+    const previousMinute = new Date(cursor.getTime() - 60 * 1000);
+    if (getDateKeyInTimezone(previousMinute, timezone) !== dateKey) {
+      break;
+    }
+    cursor = previousMinute;
+  }
+
+  for (let seconds = 0; seconds < 60; seconds += 1) {
+    const previousSecond = new Date(cursor.getTime() - 1000);
+    if (getDateKeyInTimezone(previousSecond, timezone) !== dateKey) {
+      break;
+    }
+    cursor = previousSecond;
+  }
+
+  return cursor;
 }
 
 function getTimeZoneShortName(timezone: string, locale: AppLocale, date: Date) {
@@ -193,6 +292,18 @@ export function sortDateKeys(dateKeys: string[]) {
   return [...new Set(dateKeys)].sort((a, b) => a.localeCompare(b));
 }
 
+export function buildScheduleSignature({
+  dates,
+  dayStartMinutes,
+  dayEndMinutes,
+}: {
+  dates: string[];
+  dayStartMinutes: number;
+  dayEndMinutes: number;
+}) {
+  return JSON.stringify([sortDateKeys(dates), dayStartMinutes, dayEndMinutes]);
+}
+
 export function buildSlotStart(dateKey: string, minutes: number, timezone: string) {
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
@@ -204,9 +315,10 @@ function getCompactDateFormat(locale: AppLocale) {
 }
 
 export function formatDateKeyLabel(dateKey: string, timezone: string, locale: AppLocale) {
+  void timezone;
   return formatInTimeZone(
-    fromZonedTime(`${dateKey}T12:00:00`, timezone),
-    timezone,
+    parseDateKey(dateKey),
+    "UTC",
     getCompactDateFormat(locale),
     {
       locale: getDateFnsLocale(locale),
@@ -227,9 +339,19 @@ export function formatFullDayDateLabel({
 }) {
   const dateLabel = formatDateKeyLabel(dateKey, timezone, locale);
 
-  return fullDayStartMinutes === null || fullDayStartMinutes === undefined
-    ? dateLabel
-    : `${dateLabel} · ${minutesToLabel(fullDayStartMinutes)}`;
+  if (fullDayStartMinutes === null || fullDayStartMinutes === undefined) {
+    return dateLabel;
+  }
+
+  const resolvedStart = new Date(
+    buildTimedFullDaySlotWindow({
+      dateKey,
+      fullDayStartMinutes,
+      timezone,
+    }).slotStart,
+  );
+
+  return `${dateLabel} · ${minutesToLabel(getMinutesInTimezone(resolvedStart, timezone))}`;
 }
 
 export function getViewerTimezone() {
@@ -286,8 +408,11 @@ export function enumerateEventSlots({
   const eventSlots: EnumeratedEventSlot[] = [];
 
   for (const dateKey of sortDateKeys(dates)) {
-    const utcDayStart = fromZonedTime(`${dateKey}T00:00:00`, timezone);
-    const utcNextDayStart = fromZonedTime(`${addDaysToDateKey(dateKey, 1)}T00:00:00`, timezone);
+    const utcDayStart = getZonedCivilDateStart(dateKey, timezone);
+    if (!utcDayStart) {
+      continue;
+    }
+    const utcNextDayStart = new Date(buildFullDaySlotEnd(dateKey, timezone));
 
     for (
       let slotTime = utcDayStart.getTime();
@@ -323,12 +448,18 @@ export function enumerateFullDayEventSlots({
   dates: string[];
   timezone: string;
 }) {
-  return sortDateKeys(dates).map((dateKey) => ({
-    slotStart: buildFullDaySlotStart(dateKey, timezone),
-    dateKey,
-    minutes: 0,
-    label: "All day",
-  }));
+  return sortDateKeys(dates).flatMap((dateKey) => {
+    return doesZonedCivilDateExist({ dateKey, timezone })
+      ? [
+          {
+            slotStart: buildSlotStart(dateKey, 0, timezone),
+            dateKey,
+            minutes: 0,
+            label: "All day",
+          },
+        ]
+      : [];
+  });
 }
 
 function getMeetingWindowSize(slotMinutes: number, meetingDurationMinutes: number) {
@@ -342,6 +473,7 @@ export function buildMeetingWindows({
   dayEndMinutes,
   slotMinutes,
   meetingDurationMinutes,
+  allowLegacyFinalizedWindow = false,
 }: {
   dates: string[];
   timezone: string;
@@ -349,6 +481,7 @@ export function buildMeetingWindows({
   dayEndMinutes: number;
   slotMinutes: number;
   meetingDurationMinutes: number;
+  allowLegacyFinalizedWindow?: boolean;
 }) {
   const meetingWindows: MeetingWindow[] = [];
   const eventSlots = enumerateEventSlots({
@@ -378,9 +511,32 @@ export function buildMeetingWindows({
         continue;
       }
 
-      const slotEnd = new Date(
-        new Date(slotStarts[slotStarts.length - 1]).getTime() + slotMinutes * 60 * 1000,
-      ).toISOString();
+      const finalWindowSlot = windowSlots.at(-1);
+      if (!finalWindowSlot) {
+        continue;
+      }
+
+      const slotStartAt = new Date(slotStart);
+      const slotEndAt = new Date(
+        new Date(finalWindowSlot.slotStart).getTime() + slotMinutes * 60 * 1000,
+      );
+      const slotEndDateKey = getDateKeyInTimezone(slotEndAt, timezone);
+      const slotEndMinutes = getMinutesInTimezone(slotEndAt, timezone);
+      const endsWithinDailyWindow =
+        dayEndMinutes === 24 * 60
+          ? slotEndDateKey === dateKey ||
+            (slotEndDateKey === addDaysToDateKey(dateKey, 1) && slotEndMinutes === 0)
+          : slotEndDateKey === dateKey && slotEndMinutes <= dayEndMinutes;
+
+      if (
+        !allowLegacyFinalizedWindow &&
+        (!endsWithinDailyWindow ||
+          slotEndAt.getTime() - slotStartAt.getTime() !== meetingDurationMinutes * 60 * 1000)
+      ) {
+        continue;
+      }
+
+      const slotEnd = slotEndAt.toISOString();
 
       meetingWindows.push({
         dateKey,
@@ -616,14 +772,24 @@ export function buildFinalizedSlot({
     };
   }
 
-  const meetingWindow = buildMeetingWindows({
+  const meetingWindowInput = {
     dates,
     timezone,
     dayStartMinutes,
     dayEndMinutes,
     slotMinutes,
     meetingDurationMinutes,
-  }).find((candidate) => candidate.slotStart === finalSlotStart);
+  };
+  const meetingWindow =
+    buildMeetingWindows(meetingWindowInput).find(
+      (candidate) => candidate.slotStart === finalSlotStart,
+    ) ??
+    // Existing closed events may have been finalized under the older, wall-time-only rules.
+    // Keep those published results renderable; new close/update requests use the strict set.
+    buildMeetingWindows({
+      ...meetingWindowInput,
+      allowLegacyFinalizedWindow: true,
+    }).find((candidate) => candidate.slotStart === finalSlotStart);
 
   if (!meetingWindow) {
     return null;
@@ -974,5 +1140,38 @@ export function getAllowedFinalSlotStarts({
       slotMinutes,
       meetingDurationMinutes,
     }).map((meetingWindow) => meetingWindow.slotStart),
+  );
+}
+
+export function hasFinalizableMeetingWindowOnEveryDate({
+  dates,
+  timezone,
+  dayStartMinutes,
+  dayEndMinutes,
+  slotMinutes,
+  meetingDurationMinutes,
+}: {
+  dates: string[];
+  timezone: string;
+  dayStartMinutes: number;
+  dayEndMinutes: number;
+  slotMinutes: number;
+  meetingDurationMinutes: number;
+}) {
+  const sortedDates = sortDateKeys(dates);
+
+  return (
+    sortedDates.length > 0 &&
+    sortedDates.every(
+      (dateKey) =>
+        buildMeetingWindows({
+          dates: [dateKey],
+          timezone,
+          dayStartMinutes,
+          dayEndMinutes,
+          slotMinutes,
+          meetingDurationMinutes,
+        }).length > 0,
+    )
   );
 }

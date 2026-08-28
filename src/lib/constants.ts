@@ -11,6 +11,8 @@ export const participantColors = [
 
 export const slotMinuteOptions = [15, 30, 60] as const;
 export const meetingDurationOptions = [30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330, 360] as const;
+export const timeGridDateLimit = 31;
+export const fullDayDateLimit = 366;
 
 export const popularTimezones = [
   "UTC",

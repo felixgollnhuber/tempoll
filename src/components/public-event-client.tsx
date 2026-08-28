@@ -77,13 +77,22 @@ export function PublicEventClient({
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
   const [draftVersion, setDraftVersion] = useState(0);
+  const selectedMapRef = useRef(getSelectedMap(initialSnapshot));
+  const serverSelectedMapRef = useRef(getSelectedMap(initialSnapshot));
+  const availabilityDraftDirtyRef = useRef(false);
+  const snapshotEpochRef = useRef(0);
+  const snapshotLocalMutationEpochRef = useRef(0);
+  const snapshotFetchSequenceRef = useRef(0);
+  const snapshotAppliedFetchSequenceRef = useRef(0);
   const localAvailabilityEchoRef = useRef<{
     participantId: string;
     expiresAt: number;
   } | null>(null);
   const saveInFlightRef = useRef(false);
   const queuedSelectedSlotStartsRef = useRef<string[] | null>(null);
-  const lastSavedSignatureRef = useRef(getSelectedSlotStarts(initialSnapshot).join("|"));
+  const lastSavedSignatureRef = useRef<string | null>(
+    getSelectedSlotStarts(initialSnapshot).join("|"),
+  );
   const {
     viewerTimezone,
     viewerTimezoneSelectValue,
@@ -94,14 +103,50 @@ export function PublicEventClient({
     [snapshot.dates, timezones],
   );
 
-  const applySnapshot = useCallback((nextSnapshot: PublicEventSnapshot) => {
-    setSnapshot(nextSnapshot);
-    setSelectedMap(getSelectedMap(nextSnapshot));
-    if (nextSnapshot.status !== "OPEN") {
-      setPreferredMode("view");
-    }
-    lastSavedSignatureRef.current = getSelectedSlotStarts(nextSnapshot).join("|");
-  }, []);
+  const applySnapshot = useCallback(
+    (
+      nextSnapshot: PublicEventSnapshot,
+      {
+        preserveDirtySelection = false,
+        source = "local",
+      }: {
+        preserveDirtySelection?: boolean;
+        source?: "local" | "refresh";
+      } = {},
+    ) => {
+      snapshotEpochRef.current += 1;
+      if (source === "local") {
+        snapshotLocalMutationEpochRef.current += 1;
+      }
+      const serverSelectedMap = getSelectedMap(nextSnapshot);
+      serverSelectedMapRef.current = serverSelectedMap;
+      lastSavedSignatureRef.current = getSelectedSlotStarts(nextSnapshot).join("|");
+
+      let nextSelectedMap = serverSelectedMap;
+      if (
+        preserveDirtySelection &&
+        availabilityDraftDirtyRef.current &&
+        nextSnapshot.status === "OPEN"
+      ) {
+        nextSelectedMap = { ...serverSelectedMap };
+        for (const slot of nextSnapshot.slots) {
+          if (Object.hasOwn(selectedMapRef.current, slot.slotStart)) {
+            nextSelectedMap[slot.slotStart] = selectedMapRef.current[slot.slotStart];
+          }
+        }
+      } else {
+        availabilityDraftDirtyRef.current = false;
+      }
+
+      selectedMapRef.current = nextSelectedMap;
+      setSnapshot(nextSnapshot);
+      setSelectedMap(nextSelectedMap);
+      if (nextSnapshot.status !== "OPEN") {
+        setPreferredMode("view");
+      }
+    },
+    [],
+  );
   const canEdit = Boolean(session && snapshot.status === "OPEN");
   const mode = canEdit ? preferredMode : "view";
   const shouldShowPreJoin = !session && snapshot.status === "OPEN";
@@ -146,16 +191,41 @@ export function PublicEventClient({
   );
 
   const fetchSnapshot = useCallback(async () => {
-    const response = await fetch(`/api/events/${slug}`, {
-      cache: "no-store",
-    });
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      const fetchSequence = snapshotFetchSequenceRef.current + 1;
+      snapshotFetchSequenceRef.current = fetchSequence;
+      const fetchStartLocalMutationEpoch = snapshotLocalMutationEpochRef.current;
+      try {
+        const response = await fetch(`/api/events/${slug}`, {
+          cache: "no-store",
+        });
 
-    if (!response.ok) {
-      return;
+        if (!response.ok) {
+          return false;
+        }
+
+        const payload = (await response.json()) as { snapshot?: PublicEventSnapshot };
+        if (
+          !payload.snapshot ||
+          fetchSequence < snapshotAppliedFetchSequenceRef.current
+        ) {
+          return false;
+        }
+        if (snapshotLocalMutationEpochRef.current !== fetchStartLocalMutationEpoch) {
+          continue;
+        }
+        snapshotAppliedFetchSequenceRef.current = fetchSequence;
+        applySnapshot(payload.snapshot, {
+          preserveDirtySelection: true,
+          source: "refresh",
+        });
+        return true;
+      } catch {
+        return false;
+      }
     }
 
-    const payload = (await response.json()) as { snapshot: PublicEventSnapshot };
-    applySnapshot(payload.snapshot);
+    return false;
   }, [applySnapshot, slug]);
 
   useEffect(() => {
@@ -210,6 +280,7 @@ export function PublicEventClient({
 
             const nextSignature = nextSelectedSlotStarts.join("|");
             if (nextSignature === lastSavedSignatureRef.current) {
+              availabilityDraftDirtyRef.current = false;
               continue;
             }
 
@@ -217,29 +288,90 @@ export function PublicEventClient({
               participantId: session.participantId,
               expiresAt: Date.now() + 5_000,
             };
+            const requestSnapshotEpoch = snapshotEpochRef.current;
+            const requestFetchSequence = snapshotFetchSequenceRef.current;
 
-            const response = await fetch(`/api/events/${slug}/availability`, {
-              method: "PUT",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                selectedSlotStarts: nextSelectedSlotStarts,
-              }),
-            });
-
-            if (!response.ok) {
-              const payload = (await response.json()) as { error?: string };
+            let response: Response;
+            try {
+              response = await fetch(`/api/events/${slug}/availability`, {
+                method: "PUT",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  selectedSlotStarts: nextSelectedSlotStarts,
+                }),
+              });
+            } catch {
+              queuedSelectedSlotStartsRef.current = null;
               localAvailabilityEchoRef.current = null;
-              toast.error(payload.error ?? saveAvailabilityFallback);
-              continue;
+              availabilityDraftDirtyRef.current = false;
+              toast.error(saveAvailabilityFallback);
+              if (!(await fetchSnapshot())) {
+                const serverSelectedMap = { ...serverSelectedMapRef.current };
+                selectedMapRef.current = serverSelectedMap;
+                setSelectedMap(serverSelectedMap);
+              }
+              break;
             }
 
-            const payload = (await response.json()) as { snapshot?: PublicEventSnapshot };
-            if (payload.snapshot) {
-              applySnapshot(payload.snapshot);
-            } else {
+            let payload: { error?: string; snapshot?: PublicEventSnapshot } | null = null;
+            try {
+              const value: unknown = await response.json();
+              if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+                payload = value as { error?: string; snapshot?: PublicEventSnapshot };
+              }
+            } catch {
+              payload = null;
+            }
+
+            if (!response.ok || !payload?.snapshot) {
+              queuedSelectedSlotStartsRef.current = null;
+              localAvailabilityEchoRef.current = null;
+              availabilityDraftDirtyRef.current = false;
+              toast.error(
+                response.ok
+                  ? saveAvailabilityFallback
+                  : typeof payload?.error === "string"
+                    ? payload.error
+                    : saveAvailabilityFallback,
+              );
+              if (!(await fetchSnapshot())) {
+                const serverSelectedMap = { ...serverSelectedMapRef.current };
+                selectedMapRef.current = serverSelectedMap;
+                setSelectedMap(serverSelectedMap);
+              }
+              break;
+            }
+
+            const currentDraftSignature = payload.snapshot.slots
+              .filter((slot) => selectedMapRef.current[slot.slotStart])
+              .map((slot) => slot.slotStart)
+              .join("|");
+            const hasNewerDraft = currentDraftSignature !== nextSignature;
+            const snapshotAdvanced = snapshotEpochRef.current !== requestSnapshotEpoch;
+            if (!snapshotAdvanced) {
+              serverSelectedMapRef.current = getSelectedMap(payload.snapshot);
               lastSavedSignatureRef.current = nextSignature;
+            }
+            if (
+              snapshotEpochRef.current === requestSnapshotEpoch &&
+              snapshotFetchSequenceRef.current === requestFetchSequence
+            ) {
+              applySnapshot(payload.snapshot, {
+                preserveDirtySelection: hasNewerDraft,
+              });
+              availabilityDraftDirtyRef.current = hasNewerDraft;
+            } else {
+              const didRefresh = await fetchSnapshot();
+              if (!didRefresh) {
+                if (snapshotAdvanced) {
+                  lastSavedSignatureRef.current = null;
+                  availabilityDraftDirtyRef.current = true;
+                } else {
+                  availabilityDraftDirtyRef.current = hasNewerDraft;
+                }
+              }
             }
 
             localAvailabilityEchoRef.current = {
@@ -264,6 +396,7 @@ export function PublicEventClient({
     applySnapshot,
     canEdit,
     draftVersion,
+    fetchSnapshot,
     saveAvailabilityFallback,
     selectedMap,
     session,
@@ -323,10 +456,13 @@ export function PublicEventClient({
         }
 
         didChange = true;
-        return {
+        const next = {
           ...current,
           [slotStart]: targetValue,
         };
+        selectedMapRef.current = next;
+        availabilityDraftDirtyRef.current = true;
+        return next;
       });
 
       if (didChange) {

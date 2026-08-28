@@ -102,6 +102,38 @@ describe("GET /api/events/[slug]/ics", () => {
     expect(body).not.toContain("DTSTART;TZID=");
   });
 
+  it("derives an all-day end date from calendar arithmetic across a midnight gap", async () => {
+    getPublicEventSnapshot.mockResolvedValue({
+      snapshot: {
+        slug: "santiago-day",
+        title: "Santiago Day",
+        eventType: "full_day",
+        timezone: "America/Santiago",
+        status: "CLOSED",
+        finalizedSlot: {
+          slotStart: "2026-09-05T04:00:00.000Z",
+          // This instant formats as Sep 5 at 23:00 under the old midnight conversion.
+          slotEnd: "2026-09-06T03:00:00.000Z",
+          dateKey: "2026-09-05",
+          label: "Sat, Sep 5",
+          localLabel: null,
+          availableCount: 1,
+          participantIds: ["p1"],
+        },
+      },
+    });
+
+    const { GET } = await import("./route");
+    const response = await GET(
+      new Request("https://tempoll.example.com/api/events/santiago-day/ics"),
+      { params: Promise.resolve({ slug: "santiago-day" }) },
+    );
+    const body = await response.text();
+
+    expect(body).toContain("DTSTART;VALUE=DATE:20260905");
+    expect(body).toContain("DTEND;VALUE=DATE:20260906");
+  });
+
   it("returns a timed calendar file for closed full-day events with a start time", async () => {
     getPublicEventSnapshot.mockResolvedValue({
       snapshot: {

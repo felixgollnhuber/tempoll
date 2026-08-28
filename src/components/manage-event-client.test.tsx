@@ -2,13 +2,44 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { buildFinalizedSlot } from "@/lib/availability";
+import { buildFinalizedSlot, buildScheduleSignature, buildSnapshot } from "@/lib/availability";
 import type { ManageEventView, PublicEventSnapshot } from "@/lib/types";
 import { renderWithI18n } from "@/test/render-with-i18n";
 import { ManageEventClient } from "./manage-event-client";
 
 const mockedGetViewerTimezone = vi.hoisted(() => vi.fn(() => "Europe/Vienna"));
+const mockedToastError = vi.hoisted(() => vi.fn());
+const mockedToastSuccess = vi.hoisted(() => vi.fn());
 const defaultTimezones = ["Europe/Vienna", "America/New_York", "UTC"];
+const defaultEventSource = globalThis.EventSource;
+
+function installEventSourceCapture() {
+  const listeners = new Map<string, Array<(event: Event) => void>>();
+
+  class CapturingEventSource {
+    addEventListener(type: string, listener: EventListener) {
+      const current = listeners.get(type) ?? [];
+      current.push(listener);
+      listeners.set(type, current);
+    }
+
+    close() {}
+  }
+
+  Object.defineProperty(globalThis, "EventSource", {
+    configurable: true,
+    writable: true,
+    value: CapturingEventSource,
+  });
+
+  return {
+    emit(type: string) {
+      for (const listener of listeners.get(type) ?? []) {
+        listener(new Event(type));
+      }
+    },
+  };
+}
 
 vi.mock("@/lib/availability", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/availability")>();
@@ -21,8 +52,8 @@ vi.mock("@/lib/availability", async (importOriginal) => {
 
 vi.mock("sonner", () => ({
   toast: {
-    error: vi.fn(),
-    success: vi.fn(),
+    error: mockedToastError,
+    success: mockedToastSuccess,
   },
 }));
 
@@ -155,6 +186,19 @@ function buildPublishedFinalizedSlot(
   return finalizedSlot;
 }
 
+function getCalendarDayButton(date: Date) {
+  const dataDay = date.toLocaleDateString("en-US");
+  const button = Array.from(document.querySelectorAll<HTMLButtonElement>("button[data-day]")).find(
+    (candidate) => candidate.dataset.day === dataDay,
+  );
+
+  if (!button) {
+    throw new Error(`Calendar day button ${dataDay} was not found.`);
+  }
+
+  return button;
+}
+
 function createFullDayManageView(): ManageEventView {
   const view = createManageView();
 
@@ -243,7 +287,13 @@ function installManageFetchMock(view: ManageEventView) {
         | { action: "closeEvent"; finalSlotStart: string }
         | { action: "updateFixedDate"; finalSlotStart: string }
         | { action: "reopenEvent" }
-        | { action: "updateNotificationEmail"; notificationEmail?: string };
+        | { action: "updateNotificationEmail"; notificationEmail?: string }
+        | {
+            action: "updateSchedule";
+            dates: string[];
+            dayStartMinutes?: number;
+            dayEndMinutes?: number;
+          };
 
       switch (payload.action) {
         case "updateTitle":
@@ -274,6 +324,27 @@ function installManageFetchMock(view: ManageEventView) {
             pendingDigest: payload.notificationEmail ? currentNotification.pendingDigest : null,
           };
           break;
+        case "updateSchedule": {
+          const nextDateKeys = new Set(payload.dates);
+          const nextDayStartMinutes = payload.dayStartMinutes ?? currentSnapshot.dayStartMinutes;
+          const nextDayEndMinutes = payload.dayEndMinutes ?? currentSnapshot.dayEndMinutes;
+          currentSnapshot = {
+            ...currentSnapshot,
+            dates: payload.dates.map((dateKey) => ({ dateKey, label: dateKey })),
+            dayStartMinutes: nextDayStartMinutes,
+            dayEndMinutes: nextDayEndMinutes,
+            timeRows: currentSnapshot.timeRows.filter(
+              (row) => row.minutes >= nextDayStartMinutes && row.minutes < nextDayEndMinutes,
+            ),
+            slots: currentSnapshot.slots.filter(
+              (slot) =>
+                nextDateKeys.has(slot.dateKey) &&
+                (currentSnapshot.eventType === "full_day" ||
+                  (slot.minutes >= nextDayStartMinutes && slot.minutes < nextDayEndMinutes)),
+            ),
+          };
+          break;
+        }
       }
 
       return {
@@ -287,13 +358,26 @@ function installManageFetchMock(view: ManageEventView) {
 
   global.fetch = fetchMock as unknown as typeof fetch;
 
-  return fetchMock;
+  Object.assign(fetchMock, {
+    setCurrentSnapshot(nextSnapshot: PublicEventSnapshot) {
+      currentSnapshot = structuredClone(nextSnapshot) as PublicEventSnapshot;
+    },
+  });
+
+  return fetchMock as typeof fetchMock & {
+    setCurrentSnapshot: (snapshot: PublicEventSnapshot) => void;
+  };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockedGetViewerTimezone.mockReturnValue("Europe/Vienna");
   window.localStorage.clear();
+  Object.defineProperty(globalThis, "EventSource", {
+    configurable: true,
+    writable: true,
+    value: defaultEventSource,
+  });
 });
 
 describe("ManageEventClient", () => {
@@ -683,5 +767,613 @@ describe("ManageEventClient", () => {
     renderWithI18n(<ManageEventClient initialView={view} />);
 
     expect(screen.queryByText("Best windows right now")).not.toBeInTheDocument();
+  });
+
+  it("shows the dates & times editor while the event is open and hides it once closed", () => {
+    const openView = createManageView({ status: "OPEN" });
+    const { unmount } = renderWithI18n(<ManageEventClient initialView={openView} />);
+    expect(screen.getByText("Dates & times")).toBeInTheDocument();
+    unmount();
+
+    const closedView = createManageView({
+      status: "CLOSED",
+      finalizedSlot: buildPublishedFinalizedSlot(
+        createManageView().snapshot,
+        "2026-04-02T07:00:00.000Z",
+      ),
+    });
+    renderWithI18n(<ManageEventClient initialView={closedView} />);
+    expect(screen.queryByText("Dates & times")).not.toBeInTheDocument();
+  });
+
+  it("saves a widened daily window immediately without a confirmation dialog", async () => {
+    const view = createManageView();
+    const fetchMock = installManageFetchMock(view);
+    const user = userEvent.setup();
+
+    renderWithI18n(<ManageEventClient initialView={view} />);
+
+    await user.click(screen.getByRole("combobox", { name: "Daily end" }));
+    await user.click(screen.getByRole("option", { name: "11:30" }));
+    await user.click(screen.getByRole("button", { name: "Save dates & times" }));
+
+    expect(screen.queryByText("Delete marked availability?")).not.toBeInTheDocument();
+
+    await waitFor(() => {
+      const scheduleCall = fetchMock.mock.calls.find(
+        ([input, init]) =>
+          String(input) === `/api/manage/${view.manageKey}` &&
+          (init as RequestInit | undefined)?.method === "PATCH" &&
+          String((init as RequestInit).body).includes("updateSchedule"),
+      );
+      expect(scheduleCall).toBeTruthy();
+      const body = JSON.parse(String((scheduleCall![1] as RequestInit).body));
+      expect(body).toMatchObject({
+        action: "updateSchedule",
+        dates: ["2026-04-02"],
+        dayStartMinutes: 9 * 60,
+        dayEndMinutes: 11 * 60 + 30,
+        expectedScheduleSignature: buildScheduleSignature({
+          dates: ["2026-04-02"],
+          dayStartMinutes: 9 * 60,
+          dayEndMinutes: 11 * 60,
+        }),
+        expectedDeletedVotes: 0,
+        expectedAffectedParticipants: 0,
+      });
+    });
+  });
+
+  it("confirms before saving a change that deletes marked availability", async () => {
+    const view = createManageView();
+    const fetchMock = installManageFetchMock(view);
+    const user = userEvent.setup();
+
+    renderWithI18n(<ManageEventClient initialView={view} />);
+
+    // Narrowing the day to 10:00 removes the 10:00 slot, which has one vote.
+    const dailyEnd = screen.getByRole("combobox", { name: "Daily end" });
+    await user.click(dailyEnd);
+    await user.click(screen.getByRole("option", { name: "10:00" }));
+    expect(dailyEnd).toHaveTextContent("10:00");
+    await user.click(screen.getByRole("button", { name: "Save dates & times" }));
+
+    expect(await screen.findByText("Delete marked availability?")).toBeInTheDocument();
+    expect(
+      screen.getByText(/1 availability mark across 1 participant/),
+    ).toBeInTheDocument();
+
+    // No PATCH should be sent until the organizer confirms.
+    expect(
+      fetchMock.mock.calls.some(
+        ([, init]) =>
+          (init as RequestInit | undefined)?.method === "PATCH" &&
+          String((init as RequestInit).body).includes("updateSchedule"),
+      ),
+    ).toBe(false);
+
+    await user.click(screen.getByRole("button", { name: "Delete and save" }));
+
+    await waitFor(() => {
+      const scheduleCall = fetchMock.mock.calls.find(
+        ([input, init]) =>
+          String(input) === `/api/manage/${view.manageKey}` &&
+          (init as RequestInit | undefined)?.method === "PATCH" &&
+          String((init as RequestInit).body).includes("updateSchedule"),
+      );
+      expect(scheduleCall).toBeTruthy();
+      const body = JSON.parse(String((scheduleCall![1] as RequestInit).body));
+      expect(body).toMatchObject({
+        action: "updateSchedule",
+        dates: ["2026-04-02"],
+        dayEndMinutes: 10 * 60,
+        expectedDeletedVotes: 1,
+        expectedAffectedParticipants: 1,
+      });
+    });
+  });
+
+  it("blocks a daily window that cannot fit the full meeting duration", async () => {
+    const view = createManageView();
+    const user = userEvent.setup();
+
+    renderWithI18n(<ManageEventClient initialView={view} />);
+
+    const dailyEnd = screen.getByRole("combobox", { name: "Daily end" });
+    await user.click(dailyEnd);
+    await user.click(screen.getByRole("option", { name: "09:30" }));
+
+    expect(
+      screen.getByText("Choose dates and times with room for the full 60-minute meeting."),
+    ).toHaveAttribute("role", "alert");
+    expect(screen.getByRole("combobox", { name: "Daily start" })).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+    expect(dailyEnd).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("button", { name: "Save dates & times" })).toBeDisabled();
+  });
+
+  it("blocks a schedule when an added date has no finalizable meeting window", async () => {
+    const view = createManageView();
+    view.snapshot = buildSnapshot({
+      id: view.snapshot.id,
+      slug: view.snapshot.slug,
+      title: view.snapshot.title,
+      eventType: "time_grid",
+      locale: "en",
+      timezone: "Europe/Vienna",
+      status: "OPEN",
+      slotMinutes: 30,
+      meetingDurationMinutes: 60,
+      dayStartMinutes: 2 * 60,
+      dayEndMinutes: 3 * 60,
+      dates: ["2026-03-30"],
+      participants: [],
+      finalSlotStart: null,
+    });
+    const user = userEvent.setup();
+
+    renderWithI18n(<ManageEventClient initialView={view} />);
+    await user.click(screen.getByLabelText("Dates"));
+    await user.click(getCalendarDayButton(new Date(2026, 2, 29)));
+
+    expect(
+      screen.getByText("Choose dates and times with room for the full 60-minute meeting."),
+    ).toHaveAttribute("role", "alert");
+    expect(screen.getByRole("button", { name: "Save dates & times" })).toBeDisabled();
+  });
+
+  it("associates the date label and empty-selection error with the calendar trigger", async () => {
+    const view = createManageView();
+    const user = userEvent.setup();
+
+    renderWithI18n(<ManageEventClient initialView={view} />);
+
+    const datesTrigger = screen.getByLabelText("Dates");
+    expect(datesTrigger).toHaveAccessibleDescription("You can select up to 31 dates.");
+
+    await user.click(datesTrigger);
+    await user.click(getCalendarDayButton(new Date(2026, 3, 2)));
+
+    const error = screen.getByText("Pick at least one date.");
+    expect(error).toHaveAttribute("role", "alert");
+    expect(datesTrigger).toHaveAttribute("aria-invalid", "true");
+    expect(datesTrigger.getAttribute("aria-describedby")).toContain(error.id);
+  });
+
+  it("keeps the date selection stable at the time-grid limit", async () => {
+    const view = createManageView();
+    const extraDates = Array.from({ length: 30 }, (_, index) => {
+      const date = new Date(2026, 4, 1 + index);
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+        date.getDate(),
+      ).padStart(2, "0")}`;
+    });
+    view.snapshot.dates = ["2026-04-02", ...extraDates].map((dateKey) => ({
+      dateKey,
+      label: dateKey,
+    }));
+    const user = userEvent.setup();
+
+    renderWithI18n(<ManageEventClient initialView={view} />);
+    await user.click(screen.getByLabelText("Dates"));
+
+    const unselectedDay = getCalendarDayButton(new Date(2026, 3, 3));
+    expect(unselectedDay).toBeDisabled();
+    expect(screen.getByText("You can select up to 31 dates.")).toBeInTheDocument();
+
+    await user.click(getCalendarDayButton(new Date(2026, 3, 2)));
+    expect(screen.getByText("30 dates")).toBeInTheDocument();
+    expect(getCalendarDayButton(new Date(2026, 3, 3))).not.toBeDisabled();
+  });
+
+  it("updates full-day dates without sending daily time fields", async () => {
+    const view = createFullDayManageView();
+    const fetchMock = installManageFetchMock(view);
+    const user = userEvent.setup();
+
+    renderWithI18n(<ManageEventClient initialView={view} />);
+
+    expect(screen.queryByRole("combobox", { name: "Daily start" })).not.toBeInTheDocument();
+    expect(screen.getByText("You can select up to 366 dates.")).toBeInTheDocument();
+    await user.click(screen.getByLabelText("Dates"));
+    await user.click(getCalendarDayButton(new Date(2026, 3, 3)));
+    await user.click(screen.getByRole("button", { name: "Save dates & times" }));
+    await user.click(await screen.findByRole("button", { name: "Delete and save" }));
+
+    await waitFor(() => {
+      const scheduleCall = fetchMock.mock.calls.find(([, init]) =>
+        String((init as RequestInit | undefined)?.body).includes("updateSchedule"),
+      );
+      expect(scheduleCall).toBeTruthy();
+      const body = JSON.parse(String((scheduleCall![1] as RequestInit).body));
+      expect(body).toMatchObject({
+        action: "updateSchedule",
+        dates: ["2026-04-02"],
+        expectedDeletedVotes: 1,
+        expectedAffectedParticipants: 1,
+      });
+      expect(body).not.toHaveProperty("dayStartMinutes");
+      expect(body).not.toHaveProperty("dayEndMinutes");
+    });
+  });
+
+  it("preserves a dirty schedule draft when another organizer changes the schedule", async () => {
+    const eventSource = installEventSourceCapture();
+    const view = createManageView();
+    const fetchMock = installManageFetchMock(view);
+    const user = userEvent.setup();
+
+    renderWithI18n(<ManageEventClient initialView={view} />);
+    await user.click(screen.getByRole("combobox", { name: "Daily end" }));
+    await user.click(screen.getByRole("option", { name: "11:30" }));
+
+    fetchMock.setCurrentSnapshot({
+      ...view.snapshot,
+      dayEndMinutes: 12 * 60,
+    });
+    eventSource.emit("event-update");
+
+    expect(await screen.findByText("The schedule changed elsewhere.")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Daily end" })).toHaveTextContent("11:30");
+    expect(screen.getByRole("button", { name: "Save dates & times" })).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: "Keep my changes" }));
+    expect(screen.queryByText("The schedule changed elsewhere.")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save dates & times" })).toBeEnabled();
+  });
+
+  it("shows a fallback error and keeps the schedule retryable when the request fails", async () => {
+    const view = createManageView();
+    const user = userEvent.setup();
+    global.fetch = vi.fn(async () => {
+      throw new Error("offline");
+    }) as unknown as typeof fetch;
+
+    renderWithI18n(<ManageEventClient initialView={view} />);
+    await user.click(screen.getByRole("combobox", { name: "Daily end" }));
+    await user.click(screen.getByRole("option", { name: "11:30" }));
+    await user.click(screen.getByRole("button", { name: "Save dates & times" }));
+
+    await waitFor(() => {
+      expect(mockedToastError).toHaveBeenCalledWith("Unable to update event.");
+    });
+    expect(mockedToastSuccess).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Save dates & times" })).toBeEnabled(),
+    );
+  });
+
+  it("disables the fixed-date action while a schedule save is in flight", async () => {
+    const view = createManageView();
+    const baseFetch = installManageFetchMock(view);
+    let resolveSchedule!: (response: Response) => void;
+    const scheduleResponse = new Promise<Response>((resolve) => {
+      resolveSchedule = resolve;
+    });
+    global.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      if (
+        String(input) === `/api/manage/${view.manageKey}` &&
+        String(init?.body).includes("updateSchedule")
+      ) {
+        return scheduleResponse;
+      }
+      return baseFetch(input, init) as unknown as Promise<Response>;
+    }) as unknown as typeof fetch;
+    const user = userEvent.setup();
+
+    renderWithI18n(<ManageEventClient initialView={view} />);
+    await user.click(
+      screen.getByRole("button", { name: /Thu, Apr 2 09:00 · 2\/2 available/i }),
+    );
+    const fixedDateAction = screen.getByRole("button", {
+      name: "Set fixed date and close event",
+    });
+    expect(fixedDateAction).toBeEnabled();
+
+    await user.click(screen.getByRole("combobox", { name: "Daily end" }));
+    await user.click(screen.getByRole("option", { name: "11:30" }));
+    await user.click(screen.getByRole("button", { name: "Save dates & times" }));
+    await waitFor(() => expect(fixedDateAction).toBeDisabled());
+
+    resolveSchedule({
+      ok: true,
+      json: async () => ({ ok: true }),
+    } as Response);
+    await waitFor(() => expect(fixedDateAction).toBeEnabled());
+  });
+
+  it("ignores an older schedule refresh that resolves after a newer one", async () => {
+    const eventSource = installEventSourceCapture();
+    const view = createManageView();
+    let resolveFirst!: (response: Response) => void;
+    let resolveSecond!: (response: Response) => void;
+    const firstResponse = new Promise<Response>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const secondResponse = new Promise<Response>((resolve) => {
+      resolveSecond = resolve;
+    });
+    global.fetch = vi
+      .fn()
+      .mockReturnValueOnce(firstResponse)
+      .mockReturnValueOnce(secondResponse) as unknown as typeof fetch;
+
+    renderWithI18n(<ManageEventClient initialView={view} />);
+    eventSource.emit("event-update");
+    eventSource.emit("event-update");
+
+    resolveSecond({
+      ok: true,
+      json: async () => ({
+        snapshot: {
+          ...view.snapshot,
+          dayEndMinutes: 12 * 60,
+        },
+      }),
+    } as Response);
+    expect(await screen.findByRole("combobox", { name: "Daily end" })).toHaveTextContent("12:00");
+
+    resolveFirst({
+      ok: true,
+      json: async () => ({
+        snapshot: {
+          ...view.snapshot,
+          dayEndMinutes: 11 * 60 + 30,
+        },
+      }),
+    } as Response);
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "Daily end" })).toHaveTextContent("12:00"),
+    );
+  });
+
+  it("applies a valid schedule refresh when a later refresh fails", async () => {
+    const eventSource = installEventSourceCapture();
+    const view = createManageView();
+    let resolveFirst!: (response: Response) => void;
+    const firstResponse = new Promise<Response>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const fetchMock = vi
+      .fn()
+      .mockReturnValueOnce(firstResponse)
+      .mockResolvedValueOnce({ ok: false } as Response);
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    renderWithI18n(<ManageEventClient initialView={view} />);
+    eventSource.emit("event-update");
+    eventSource.emit("event-update");
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+    resolveFirst({
+      ok: true,
+      json: async () => ({
+        snapshot: {
+          ...view.snapshot,
+          status: "CLOSED",
+        },
+      }),
+    } as Response);
+
+    await waitFor(() => expect(screen.getAllByText("Closed").length).toBeGreaterThan(0));
+  });
+
+  it("applies a later valid schedule refresh after an earlier refresh was applied", async () => {
+    const eventSource = installEventSourceCapture();
+    const view = createManageView();
+    let resolveFirst!: (response: Response) => void;
+    let resolveSecond!: (response: Response) => void;
+    const firstResponse = new Promise<Response>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const secondResponse = new Promise<Response>((resolve) => {
+      resolveSecond = resolve;
+    });
+    const fetchMock = vi
+      .fn()
+      .mockReturnValueOnce(firstResponse)
+      .mockReturnValueOnce(secondResponse)
+      .mockResolvedValue({ ok: false } as Response);
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    renderWithI18n(<ManageEventClient initialView={view} />);
+    eventSource.emit("event-update");
+    eventSource.emit("event-update");
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+    resolveFirst({
+      ok: true,
+      json: async () => ({
+        snapshot: {
+          ...view.snapshot,
+          dayEndMinutes: 11 * 60 + 30,
+        },
+      }),
+    } as Response);
+    expect(await screen.findByRole("combobox", { name: "Daily end" })).toHaveTextContent("11:30");
+
+    resolveSecond({
+      ok: true,
+      json: async () => ({
+        snapshot: {
+          ...view.snapshot,
+          status: "CLOSED",
+        },
+      }),
+    } as Response);
+
+    await waitFor(() => expect(screen.getAllByText("Closed").length).toBeGreaterThan(0));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not let an older refresh overwrite a local participant rename", async () => {
+    const eventSource = installEventSourceCapture();
+    const view = createManageView();
+    let resolveRefresh!: (response: Response) => void;
+    const refreshResponse = new Promise<Response>((resolve) => {
+      resolveRefresh = resolve;
+    });
+    let eventRefreshCount = 0;
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === `/api/events/${view.snapshot.slug}`) {
+        eventRefreshCount += 1;
+        return eventRefreshCount === 1
+          ? refreshResponse
+          : Promise.resolve({ ok: false } as Response);
+      }
+
+      if (String(input) === `/api/manage/${view.manageKey}` && init?.method === "PATCH") {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ ok: true }),
+        } as Response);
+      }
+
+      throw new Error(`Unhandled fetch call: ${String(input)}`);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const user = userEvent.setup();
+
+    renderWithI18n(<ManageEventClient initialView={view} />);
+    eventSource.emit("event-update");
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    const participantInput = screen.getByDisplayValue("Felix");
+    await user.clear(participantInput);
+    await user.type(participantInput, "Felix Updated");
+    await user.tab();
+    await waitFor(() => expect(screen.getByText("Felix Updated")).toBeInTheDocument());
+
+    resolveRefresh({
+      ok: true,
+      json: async () => ({ snapshot: view.snapshot }),
+    } as Response);
+
+    await waitFor(() => expect(eventRefreshCount).toBe(2));
+    expect(screen.getByText("Felix Updated")).toBeInTheDocument();
+  });
+
+  it("preserves a dirty draft while another organizer closes and reopens the event", async () => {
+    const eventSource = installEventSourceCapture();
+    const view = createManageView();
+    const fetchMock = installManageFetchMock(view);
+    const user = userEvent.setup();
+
+    renderWithI18n(<ManageEventClient initialView={view} />);
+    await user.click(screen.getByRole("combobox", { name: "Daily end" }));
+    await user.click(screen.getByRole("option", { name: "11:30" }));
+
+    fetchMock.setCurrentSnapshot({ ...view.snapshot, status: "CLOSED" });
+    eventSource.emit("event-update");
+    await waitFor(() => expect(screen.queryByText("Dates & times")).not.toBeInTheDocument());
+
+    fetchMock.setCurrentSnapshot({ ...view.snapshot, status: "OPEN" });
+    eventSource.emit("event-update");
+    expect(await screen.findByRole("combobox", { name: "Daily end" })).toHaveTextContent("11:30");
+  });
+
+  it("includes legacy orphaned votes in an additive schedule confirmation", async () => {
+    const view = createManageView();
+    view.snapshot.participants = view.snapshot.participants.map((participant) =>
+      participant.id === "participant_1"
+        ? { ...participant, selectedSlotCount: participant.selectedSlotCount + 1 }
+        : participant,
+    );
+    const fetchMock = installManageFetchMock(view);
+    const user = userEvent.setup();
+
+    renderWithI18n(<ManageEventClient initialView={view} />);
+    await user.click(screen.getByRole("combobox", { name: "Daily end" }));
+    await user.click(screen.getByRole("option", { name: "11:30" }));
+    await user.click(screen.getByRole("button", { name: "Save dates & times" }));
+
+    expect(await screen.findByText(/1 availability mark across 1 participant/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Delete and save" }));
+
+    await waitFor(() => {
+      const scheduleCall = fetchMock.mock.calls.find(([, init]) =>
+        String((init as RequestInit | undefined)?.body).includes("updateSchedule"),
+      );
+      const body = JSON.parse(String((scheduleCall?.[1] as RequestInit).body));
+      expect(body).toMatchObject({
+        expectedDeletedVotes: 1,
+        expectedAffectedParticipants: 1,
+      });
+    });
+  });
+
+  it("refreshes after a malformed successful schedule response", async () => {
+    const view = createManageView();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "PATCH") {
+        return {
+          ok: true,
+          json: async () => {
+            throw new Error("invalid json");
+          },
+        };
+      }
+
+      expect(String(input)).toBe(`/api/events/${view.snapshot.slug}`);
+      return {
+        ok: true,
+        json: async () => ({ snapshot: view.snapshot }),
+      };
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const user = userEvent.setup();
+
+    renderWithI18n(<ManageEventClient initialView={view} />);
+    await user.click(screen.getByRole("combobox", { name: "Daily end" }));
+    await user.click(screen.getByRole("option", { name: "11:30" }));
+    await user.click(screen.getByRole("button", { name: "Save dates & times" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(mockedToastError).toHaveBeenCalledWith("Unable to update event.");
+  });
+
+  it("does not drop a participant rename while a schedule request is pending", async () => {
+    const view = createManageView();
+    const baseFetch = installManageFetchMock(view);
+    let resolveSchedule!: (response: Response) => void;
+    const scheduleResponse = new Promise<Response>((resolve) => {
+      resolveSchedule = resolve;
+    });
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(init?.body).includes("updateSchedule")) {
+        return scheduleResponse;
+      }
+      return baseFetch(input, init) as unknown as Promise<Response>;
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const user = userEvent.setup();
+
+    renderWithI18n(<ManageEventClient initialView={view} />);
+    await user.click(screen.getByRole("combobox", { name: "Daily end" }));
+    await user.click(screen.getByRole("option", { name: "11:30" }));
+    await user.click(screen.getByRole("button", { name: "Save dates & times" }));
+
+    const participantInput = screen.getByDisplayValue("Felix");
+    await user.clear(participantInput);
+    await user.type(participantInput, "Felix Updated");
+    await user.tab();
+
+    await waitFor(() =>
+      expect(
+        baseFetch.mock.calls.some(([, init]) =>
+          String((init as RequestInit | undefined)?.body).includes("renameParticipant"),
+        ),
+      ).toBe(true),
+    );
+
+    resolveSchedule({
+      ok: true,
+      json: async () => ({ ok: true }),
+    } as Response);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Save dates & times" })).toBeEnabled(),
+    );
   });
 });

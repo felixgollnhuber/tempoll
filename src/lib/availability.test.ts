@@ -6,11 +6,15 @@ import {
   buildSlotStart,
   buildSnapshot,
   buildTimeOptions,
+  doesZonedCivilDateExist,
   enumerateEventSlots,
   enumerateFullDayEventSlots,
+  formatFullDayDateLabel,
   getAllowedFullDaySlotStarts,
   getAllowedFinalSlotStarts,
   getAllowedSlotStarts,
+  hasFinalizableMeetingWindowOnEveryDate,
+  isExistingZonedWallTime,
 } from "./availability";
 
 describe("availability helpers", () => {
@@ -362,5 +366,263 @@ describe("availability helpers", () => {
       slotMinutes: 30,
       meetingDurationMinutes: 60,
     })).toEqual(new Set(expectedMeetingWindows.map((meetingWindow) => meetingWindow.slotStart)));
+  });
+
+  it("does not combine repeated fallback-hour occurrences into an overlong meeting", () => {
+    const windows = buildMeetingWindows({
+      dates: ["2026-10-25"],
+      timezone: "Europe/Vienna",
+      dayStartMinutes: 2 * 60,
+      dayEndMinutes: 2 * 60 + 30,
+      slotMinutes: 30,
+      meetingDurationMinutes: 60,
+    });
+
+    expect(windows).toEqual([]);
+  });
+
+  it("rejects a meeting window that exists only inside the spring-forward gap", () => {
+    expect(
+      getAllowedFinalSlotStarts({
+        dates: ["2026-03-29"],
+        timezone: "Europe/Vienna",
+        dayStartMinutes: 2 * 60,
+        dayEndMinutes: 3 * 60,
+        slotMinutes: 30,
+        meetingDurationMinutes: 60,
+      }),
+    ).toEqual(new Set());
+  });
+
+  it("requires a finalizable meeting window on every selected date", () => {
+    const schedule = {
+      timezone: "Europe/Vienna",
+      dayStartMinutes: 2 * 60,
+      dayEndMinutes: 3 * 60,
+      slotMinutes: 30,
+      meetingDurationMinutes: 60,
+    };
+
+    expect(
+      hasFinalizableMeetingWindowOnEveryDate({
+        ...schedule,
+        dates: ["2026-03-29", "2026-03-30"],
+      }),
+    ).toBe(false);
+    expect(
+      hasFinalizableMeetingWindowOnEveryDate({
+        ...schedule,
+        dates: ["2026-03-30", "2026-03-31"],
+      }),
+    ).toBe(true);
+  });
+
+  it("rejects meetings whose real DST-adjusted end is after the daily end", () => {
+    expect(
+      getAllowedFinalSlotStarts({
+        dates: ["2026-03-29"],
+        timezone: "Europe/Vienna",
+        dayStartMinutes: 1 * 60,
+        dayEndMinutes: 2 * 60 + 30,
+        slotMinutes: 30,
+        meetingDurationMinutes: 60,
+      }),
+    ).toEqual(new Set());
+  });
+
+  it("rejects a slot-aligned meeting that extends past a half-hour daily boundary", () => {
+    expect(
+      getAllowedFinalSlotStarts({
+        dates: ["2026-04-02"],
+        timezone: "Europe/Vienna",
+        dayStartMinutes: 9 * 60 + 30,
+        dayEndMinutes: 10 * 60 + 30,
+        slotMinutes: 60,
+        meetingDurationMinutes: 60,
+      }),
+    ).toEqual(new Set());
+  });
+
+  it("keeps rendering a legacy finalized DST window while rejecting it for new closes", () => {
+    const finalSlotStart = buildSlotStart("2026-03-29", 1 * 60, "Europe/Vienna");
+    const secondSlotStart = new Date(new Date(finalSlotStart).getTime() + 30 * 60 * 1000).toISOString();
+    const snapshot = buildSnapshot({
+      id: "event_1",
+      slug: "legacy-dst-event",
+      title: "Legacy DST event",
+      locale: "en",
+      timezone: "Europe/Vienna",
+      status: "CLOSED",
+      slotMinutes: 30,
+      meetingDurationMinutes: 60,
+      dayStartMinutes: 1 * 60,
+      dayEndMinutes: 2 * 60 + 30,
+      dates: ["2026-03-29"],
+      finalSlotStart,
+      participants: [
+        {
+          id: "participant_1",
+          displayName: "Felix",
+          color: "red",
+          availabilitySlotStarts: [finalSlotStart, secondSlotStart],
+        },
+      ],
+    });
+
+    expect(snapshot.finalizedSlot).not.toBeNull();
+    expect(snapshot.finalizedSlot?.slotStart).toBe(finalSlotStart);
+  });
+
+  it("detects nonexistent full-day civil dates and timed starts", () => {
+    expect(
+      doesZonedCivilDateExist({
+        dateKey: "2011-12-30",
+        timezone: "Pacific/Apia",
+      }),
+    ).toBe(false);
+    expect(
+      doesZonedCivilDateExist({
+        dateKey: "2026-09-06",
+        timezone: "America/Santiago",
+      }),
+    ).toBe(true);
+    expect(
+      doesZonedCivilDateExist({
+        dateKey: "2000-01-15",
+        timezone: "Africa/Khartoum",
+      }),
+    ).toBe(true);
+    expect(
+      isExistingZonedWallTime({
+        dateKey: "2011-12-30",
+        minutes: 0,
+        timezone: "Pacific/Apia",
+      }),
+    ).toBe(false);
+    expect(
+      isExistingZonedWallTime({
+        dateKey: "2026-03-29",
+        minutes: 2 * 60 + 30,
+        timezone: "Europe/Vienna",
+      }),
+    ).toBe(false);
+    expect(
+      isExistingZonedWallTime({
+        dateKey: "2026-10-25",
+        minutes: 2 * 60 + 30,
+        timezone: "Europe/Vienna",
+      }),
+    ).toBe(true);
+    expect(
+      formatFullDayDateLabel({
+        dateKey: "2026-03-29",
+        fullDayStartMinutes: 2 * 60 + 30,
+        timezone: "Europe/Vienna",
+        locale: "en",
+      }),
+    ).toContain("01:30");
+  });
+
+  it("keeps a stable full-day identity when a valid civil date skips midnight", () => {
+    const slotStart = buildFullDaySlotStart("2026-09-06", "America/Santiago");
+
+    expect(slotStart).toBe("2026-09-06T03:00:00.000Z");
+    expect(
+      getAllowedFullDaySlotStarts({
+        dates: ["2026-09-06"],
+        timezone: "America/Santiago",
+      }),
+    ).toEqual(new Set([slotStart]));
+
+    const snapshot = buildSnapshot({
+      id: "event_1",
+      slug: "santiago-day",
+      title: "Santiago Day",
+      eventType: "full_day",
+      locale: "en",
+      timezone: "America/Santiago",
+      status: "CLOSED",
+      slotMinutes: 30,
+      meetingDurationMinutes: 60,
+      dayStartMinutes: 0,
+      dayEndMinutes: 24 * 60,
+      dates: ["2026-09-06"],
+      finalSlotStart: slotStart,
+      participants: [
+        {
+          id: "p1",
+          displayName: "Felix",
+          color: "red",
+          availabilitySlotStarts: [slotStart],
+        },
+      ],
+    });
+
+    expect(snapshot.slots[0]?.slotStart).toBe(slotStart);
+    expect(snapshot.finalizedSlot?.slotStart).toBe(slotStart);
+  });
+
+  it("enumerates the complete time-grid day before a skipped-midnight transition", () => {
+    const slots = enumerateEventSlots({
+      dates: ["2026-09-05"],
+      timezone: "America/Santiago",
+      dayStartMinutes: 0,
+      dayEndMinutes: 24 * 60,
+      slotMinutes: 60,
+    });
+
+    expect(slots).toHaveLength(24);
+    expect(slots.at(-1)?.minutes).toBe(23 * 60);
+  });
+
+  it("keeps a valid civil date whose timezone skips local noon", () => {
+    expect(
+      enumerateFullDayEventSlots({
+        dates: ["2000-01-15"],
+        timezone: "Africa/Khartoum",
+      }),
+    ).toHaveLength(1);
+    expect(
+      enumerateEventSlots({
+        dates: ["2000-01-15"],
+        timezone: "Africa/Khartoum",
+        dayStartMinutes: 0,
+        dayEndMinutes: 24 * 60,
+        slotMinutes: 60,
+      }).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("finds the exact first instant after a historical sub-minute midnight jump", () => {
+    const slots = enumerateEventSlots({
+      dates: ["1914-01-01"],
+      timezone: "America/Manaus",
+      dayStartMinutes: 0,
+      dayEndMinutes: 60,
+      slotMinutes: 15,
+    });
+
+    expect(slots[0]?.slotStart).toBe("1914-01-01T04:00:04.000Z");
+  });
+
+  it("builds a full-day snapshot at the supported upper year boundary", () => {
+    expect(() =>
+      buildSnapshot({
+        id: "event_1",
+        slug: "far-future-event",
+        title: "Far future event",
+        eventType: "full_day",
+        locale: "en",
+        timezone: "UTC",
+        status: "OPEN",
+        slotMinutes: 30,
+        meetingDurationMinutes: 60,
+        dayStartMinutes: 0,
+        dayEndMinutes: 24 * 60,
+        dates: ["9998-12-31"],
+        finalSlotStart: null,
+        participants: [],
+      }),
+    ).not.toThrow();
   });
 });

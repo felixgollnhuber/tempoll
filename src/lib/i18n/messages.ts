@@ -405,6 +405,42 @@ export const en = {
       "Select a day to inspect availability and close the event from the day action.",
     openHeatmapDescriptionWindowed:
       "Select a slot to inspect availability and close the event from the slot action. Use the arrows to move through the date range.",
+    scheduleTitle: "Dates & times",
+    scheduleDescription:
+      "Add or remove dates, or adjust the daily time window. Removing a date or time also deletes any availability already marked there.",
+    scheduleDatesLabel: "Dates",
+    schedulePickDates: "Choose dates",
+    scheduleDatesSelected: {
+      one: "{count} date",
+      other: "{count} dates",
+    },
+    scheduleDayStartLabel: "Daily start",
+    scheduleDayEndLabel: "Daily end",
+    scheduleSave: "Save dates & times",
+    scheduleSaved: "Dates & times updated",
+    scheduleNoChanges: "There are no changes to save.",
+    scheduleDatesRequired: "Pick at least one date.",
+    scheduleDateLimit: "You can select up to {count} dates.",
+    scheduleInvalidWindow: "The daily end time must be after the start time.",
+    scheduleNoValidMeetingWindow:
+      "Choose dates and times with room for the full {duration}-minute meeting.",
+    scheduleRemoteChangeTitle: "The schedule changed elsewhere.",
+    scheduleRemoteChangeDescription:
+      "Your unsaved draft was kept. Choose whether to use the latest schedule or keep your changes.",
+    scheduleUseLatest: "Use latest",
+    scheduleKeepChanges: "Keep my changes",
+    scheduleConfirmTitle: "Delete marked availability?",
+    scheduleConfirmMarks: {
+      one: "{count} availability mark",
+      other: "{count} availability marks",
+    },
+    scheduleConfirmParticipants: {
+      one: "{count} participant",
+      other: "{count} participants",
+    },
+    scheduleConfirmDescription:
+      "Saving removes {marks} across {participants}. Deleted availability can't be recovered.",
+    scheduleConfirmAction: "Delete and save",
     peopleAvailable: {
       one: "{count} person available",
       other: "{count} people available",
@@ -669,6 +705,14 @@ export const en = {
       manageKeyInvalid: "Event not found.",
       finalSlotRequired: "Pick a fixed date before closing this event.",
       finalSlotInvalid: "Pick a valid fixed date that fits the full meeting duration.",
+      tooManyDates: "This event can include up to {limit} dates.",
+      invalidDayWindow: "The daily end time must be after the start time.",
+      scheduleNoValidMeetingWindow:
+        "Choose dates and times with room for the full {duration}-minute meeting.",
+      scheduleChanged:
+        "The dates or times changed elsewhere. Review the latest schedule before saving again.",
+      schedulePreviewStale:
+        "Availability changed while you reviewed this update. Check the new deletion count and try again.",
       notificationDeliveryUnavailable: "Email alerts are not available on this host.",
     },
     rateLimit: {
@@ -702,6 +746,12 @@ export const en = {
       supportedSlotSize: "Select a supported slot size.",
       supportedMeetingDuration: "Select a supported meeting duration.",
       endAfterStart: "End time must be later than start time.",
+      meetingWindowRequired:
+        "Choose dates and a daily window with room for the full meeting duration.",
+      fullDayDateUnavailable:
+        "At least one selected date does not exist in this timezone.",
+      fullDayStartUnavailable:
+        "The selected start time does not exist on every date in this timezone.",
       durationMatchesSlot: "Meeting duration must align with slot size.",
       dateRangeRequired: "Choose a start and end date for the event.",
       weekdayRequired: "Select at least one available weekday inside the date range.",
@@ -1147,6 +1197,42 @@ export const de: Messages = {
       "Wähle einen Tag aus, um die Verfügbarkeit zu prüfen und das Event über die Tagesaktion zu schließen.",
     openHeatmapDescriptionWindowed:
       "Wähle einen Slot aus, um die Verfügbarkeit zu prüfen und das Event über die Slot-Aktion zu schließen. Mit den Pfeilen bewegst du dich durch den Datumsbereich.",
+    scheduleTitle: "Termine & Zeiten",
+    scheduleDescription:
+      "Füge Termine hinzu oder entferne sie oder passe das tägliche Zeitfenster an. Beim Entfernen eines Termins oder einer Zeit werden auch bereits markierte Verfügbarkeiten gelöscht.",
+    scheduleDatesLabel: "Termine",
+    schedulePickDates: "Termine auswählen",
+    scheduleDatesSelected: {
+      one: "{count} Termin",
+      other: "{count} Termine",
+    },
+    scheduleDayStartLabel: "Tagesbeginn",
+    scheduleDayEndLabel: "Tagesende",
+    scheduleSave: "Termine & Zeiten speichern",
+    scheduleSaved: "Termine & Zeiten aktualisiert",
+    scheduleNoChanges: "Es gibt keine Änderungen zum Speichern.",
+    scheduleDatesRequired: "Wähle mindestens einen Termin aus.",
+    scheduleDateLimit: "Du kannst bis zu {count} Termine auswählen.",
+    scheduleInvalidWindow: "Das Tagesende muss nach dem Tagesbeginn liegen.",
+    scheduleNoValidMeetingWindow:
+      "Wähle Termine und Zeiten mit Platz für die gesamten {duration} Minuten Meetingdauer.",
+    scheduleRemoteChangeTitle: "Der Zeitplan wurde an anderer Stelle geändert.",
+    scheduleRemoteChangeDescription:
+      "Dein ungespeicherter Entwurf wurde beibehalten. Entscheide, ob du den neuesten Zeitplan oder deine Änderungen verwenden möchtest.",
+    scheduleUseLatest: "Neuesten Stand verwenden",
+    scheduleKeepChanges: "Meine Änderungen behalten",
+    scheduleConfirmTitle: "Markierte Verfügbarkeit löschen?",
+    scheduleConfirmMarks: {
+      one: "{count} Verfügbarkeitsmarkierung",
+      other: "{count} Verfügbarkeitsmarkierungen",
+    },
+    scheduleConfirmParticipants: {
+      one: "{count} teilnehmende Person",
+      other: "{count} teilnehmende Personen",
+    },
+    scheduleConfirmDescription:
+      "Beim Speichern werden {marks} von {participants} entfernt. Gelöschte Verfügbarkeit kann nicht wiederhergestellt werden.",
+    scheduleConfirmAction: "Löschen und speichern",
     peopleAvailable: {
       one: "{count} Person verfügbar",
       other: "{count} Personen verfügbar",
@@ -1426,6 +1512,14 @@ export const de: Messages = {
         "Wähle ein fixes Datum aus, bevor du dieses Event schließt.",
       finalSlotInvalid:
         "Wähle ein gültiges fixes Datum, das zur gesamten Meeting-Dauer passt.",
+      tooManyDates: "Dieses Event kann höchstens {limit} Termine enthalten.",
+      invalidDayWindow: "Das Tagesende muss nach dem Tagesbeginn liegen.",
+      scheduleNoValidMeetingWindow:
+        "Wähle Termine und Zeiten mit Platz für die gesamten {duration} Minuten Meetingdauer.",
+      scheduleChanged:
+        "Die Termine oder Zeiten wurden an anderer Stelle geändert. Prüfe den neuesten Zeitplan und speichere erneut.",
+      schedulePreviewStale:
+        "Die Verfügbarkeit hat sich während deiner Prüfung geändert. Prüfe die neue Löschanzahl und versuche es erneut.",
       notificationDeliveryUnavailable:
         "E-Mail-Benachrichtigungen sind auf diesem Host nicht verfügbar.",
     },
@@ -1464,6 +1558,12 @@ export const de: Messages = {
       supportedSlotSize: "Bitte wähle eine unterstützte Slot-Größe.",
       supportedMeetingDuration: "Bitte wähle eine unterstützte Meeting-Dauer.",
       endAfterStart: "Die Endzeit muss nach der Startzeit liegen.",
+      meetingWindowRequired:
+        "Wähle Termine und ein tägliches Zeitfenster mit Platz für die gesamte Meeting-Dauer.",
+      fullDayDateUnavailable:
+        "Mindestens ein ausgewählter Termin existiert in dieser Zeitzone nicht.",
+      fullDayStartUnavailable:
+        "Die gewählte Startzeit existiert nicht an jedem Termin in dieser Zeitzone.",
       durationMatchesSlot: "Die Meeting-Dauer muss zur Slot-Größe passen.",
       dateRangeRequired: "Bitte wähle Start- und Enddatum für das Event.",
       weekdayRequired:
