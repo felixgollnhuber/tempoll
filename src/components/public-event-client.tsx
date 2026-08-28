@@ -81,6 +81,7 @@ export function PublicEventClient({
   const serverSelectedMapRef = useRef(getSelectedMap(initialSnapshot));
   const availabilityDraftDirtyRef = useRef(false);
   const snapshotEpochRef = useRef(0);
+  const snapshotLocalMutationEpochRef = useRef(0);
   const snapshotFetchSequenceRef = useRef(0);
   const snapshotAppliedFetchSequenceRef = useRef(0);
   const localAvailabilityEchoRef = useRef<{
@@ -105,9 +106,18 @@ export function PublicEventClient({
   const applySnapshot = useCallback(
     (
       nextSnapshot: PublicEventSnapshot,
-      { preserveDirtySelection = false }: { preserveDirtySelection?: boolean } = {},
+      {
+        preserveDirtySelection = false,
+        source = "local",
+      }: {
+        preserveDirtySelection?: boolean;
+        source?: "local" | "refresh";
+      } = {},
     ) => {
       snapshotEpochRef.current += 1;
+      if (source === "local") {
+        snapshotLocalMutationEpochRef.current += 1;
+      }
       const serverSelectedMap = getSelectedMap(nextSnapshot);
       serverSelectedMapRef.current = serverSelectedMap;
       lastSavedSignatureRef.current = getSelectedSlotStarts(nextSnapshot).join("|");
@@ -184,7 +194,7 @@ export function PublicEventClient({
     for (let attempt = 1; attempt <= 2; attempt += 1) {
       const fetchSequence = snapshotFetchSequenceRef.current + 1;
       snapshotFetchSequenceRef.current = fetchSequence;
-      const fetchStartEpoch = snapshotEpochRef.current;
+      const fetchStartLocalMutationEpoch = snapshotLocalMutationEpochRef.current;
       try {
         const response = await fetch(`/api/events/${slug}`, {
           cache: "no-store",
@@ -201,11 +211,14 @@ export function PublicEventClient({
         ) {
           return false;
         }
-        if (snapshotEpochRef.current !== fetchStartEpoch) {
+        if (snapshotLocalMutationEpochRef.current !== fetchStartLocalMutationEpoch) {
           continue;
         }
         snapshotAppliedFetchSequenceRef.current = fetchSequence;
-        applySnapshot(payload.snapshot, { preserveDirtySelection: true });
+        applySnapshot(payload.snapshot, {
+          preserveDirtySelection: true,
+          source: "refresh",
+        });
         return true;
       } catch {
         return false;

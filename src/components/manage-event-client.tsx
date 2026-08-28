@@ -226,7 +226,7 @@ export function ManageEventClient({
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [isReopenDialogOpen, setIsReopenDialogOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const snapshotEpochRef = useRef(0);
+  const snapshotLocalMutationEpochRef = useRef(0);
   const snapshotRefreshSequenceRef = useRef(0);
   const snapshotAppliedRefreshSequenceRef = useRef(0);
   const hasAnyAvailability = snapshot.participants.some(
@@ -316,7 +316,7 @@ export function ManageEventClient({
       for (let attempt = 1; attempt <= 2; attempt += 1) {
         const refreshSequence = snapshotRefreshSequenceRef.current + 1;
         snapshotRefreshSequenceRef.current = refreshSequence;
-        const refreshStartEpoch = snapshotEpochRef.current;
+        const refreshStartLocalMutationEpoch = snapshotLocalMutationEpochRef.current;
 
         try {
           const response = await fetch(`/api/events/${initialView.snapshot.slug}`, {
@@ -335,13 +335,14 @@ export function ManageEventClient({
             return false;
           }
 
-          if (snapshotEpochRef.current !== refreshStartEpoch) {
+          if (
+            snapshotLocalMutationEpochRef.current !== refreshStartLocalMutationEpoch
+          ) {
             continue;
           }
 
           const nextSnapshot = payload.snapshot as PublicEventSnapshot;
           snapshotAppliedRefreshSequenceRef.current = refreshSequence;
-          snapshotEpochRef.current += 1;
           setSnapshot(nextSnapshot);
           dispatchScheduleEditor({
             type: "serverReceived",
@@ -593,7 +594,7 @@ export function ManageEventClient({
         successMessage: messages.manageEvent.participantRenamed,
         errorMessage: messages.errors.routeFallbacks.updateEvent,
         onSuccess: () => {
-          snapshotEpochRef.current += 1;
+          snapshotLocalMutationEpochRef.current += 1;
           setSnapshot((current) => ({
             ...current,
             participants: current.participants.map((participant) =>

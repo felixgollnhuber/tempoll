@@ -667,6 +667,63 @@ describe("PublicEventClient", () => {
     await waitFor(() => expect(screen.getAllByText("Closed").length).toBeGreaterThan(0));
   });
 
+  it("applies a later valid refresh after an earlier refresh was applied", async () => {
+    const eventSource = installEventSourceCapture();
+    const initialSnapshot = createSnapshot({ withCurrentUser: false });
+    let resolveFirstRefresh!: (response: Response) => void;
+    let resolveSecondRefresh!: (response: Response) => void;
+    const firstRefreshResponse = new Promise<Response>((resolve) => {
+      resolveFirstRefresh = resolve;
+    });
+    const secondRefreshResponse = new Promise<Response>((resolve) => {
+      resolveSecondRefresh = resolve;
+    });
+    const fetchMock = vi
+      .fn()
+      .mockReturnValueOnce(firstRefreshResponse)
+      .mockReturnValueOnce(secondRefreshResponse)
+      .mockResolvedValue({ ok: false } as Response);
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    renderWithI18n(
+      <PublicEventClient
+        slug="test-event"
+        initialSnapshot={initialSnapshot}
+        initialSession={null}
+      />,
+    );
+
+    eventSource.emit("event-update", { kind: "event-updated", eventId: "event_1" });
+    eventSource.emit("event-update", { kind: "event-updated", eventId: "event_1" });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+    resolveFirstRefresh({
+      ok: true,
+      json: async () => ({
+        snapshot: {
+          ...initialSnapshot,
+          title: "First snapshot",
+        },
+      }),
+    } as Response);
+    expect(await screen.findByText("First snapshot")).toBeInTheDocument();
+
+    resolveSecondRefresh({
+      ok: true,
+      json: async () => ({
+        snapshot: {
+          ...initialSnapshot,
+          title: "Second snapshot",
+          status: "CLOSED",
+        },
+      }),
+    } as Response);
+
+    await waitFor(() => expect(screen.getAllByText("Closed").length).toBeGreaterThan(0));
+    expect(screen.getByText("Second snapshot")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("does not let an availability response overwrite an observed organizer update", async () => {
     vi.useFakeTimers();
     const eventSource = installEventSourceCapture();

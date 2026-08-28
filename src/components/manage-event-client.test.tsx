@@ -1160,6 +1160,54 @@ describe("ManageEventClient", () => {
     await waitFor(() => expect(screen.getAllByText("Closed").length).toBeGreaterThan(0));
   });
 
+  it("applies a later valid schedule refresh after an earlier refresh was applied", async () => {
+    const eventSource = installEventSourceCapture();
+    const view = createManageView();
+    let resolveFirst!: (response: Response) => void;
+    let resolveSecond!: (response: Response) => void;
+    const firstResponse = new Promise<Response>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const secondResponse = new Promise<Response>((resolve) => {
+      resolveSecond = resolve;
+    });
+    const fetchMock = vi
+      .fn()
+      .mockReturnValueOnce(firstResponse)
+      .mockReturnValueOnce(secondResponse)
+      .mockResolvedValue({ ok: false } as Response);
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    renderWithI18n(<ManageEventClient initialView={view} />);
+    eventSource.emit("event-update");
+    eventSource.emit("event-update");
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+    resolveFirst({
+      ok: true,
+      json: async () => ({
+        snapshot: {
+          ...view.snapshot,
+          dayEndMinutes: 11 * 60 + 30,
+        },
+      }),
+    } as Response);
+    expect(await screen.findByRole("combobox", { name: "Daily end" })).toHaveTextContent("11:30");
+
+    resolveSecond({
+      ok: true,
+      json: async () => ({
+        snapshot: {
+          ...view.snapshot,
+          status: "CLOSED",
+        },
+      }),
+    } as Response);
+
+    await waitFor(() => expect(screen.getAllByText("Closed").length).toBeGreaterThan(0));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("does not let an older refresh overwrite a local participant rename", async () => {
     const eventSource = installEventSourceCapture();
     const view = createManageView();
