@@ -3,8 +3,16 @@ WORKDIR /app
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
+# Stop at the failed download, before package resolution can hide the cause.
+RUN printf '%s\n' \
+    'APT::Update::Error-Mode "any";' \
+    'Acquire::Retries "0";' \
+    'Acquire::http::Timeout "20";' \
+    'Acquire::https::Timeout "20";' \
+    > /etc/apt/apt.conf.d/99download-policy
 # The slim image has no system CA bundle yet; use Node's roots to bootstrap HTTPS.
-RUN node -e "require('node:fs').writeFileSync('/tmp/node-root-certificates.pem', require('node:tls').rootCertificates.join('\n'))" \
+RUN rm -rf /var/lib/apt/lists/* \
+  && node -e "require('node:fs').writeFileSync('/tmp/node-root-certificates.pem', require('node:tls').rootCertificates.join('\n') + '\n')" \
   && sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list.d/debian.sources \
   && apt-get -o Acquire::https::CAInfo=/tmp/node-root-certificates.pem update \
   && apt-get -o Acquire::https::CAInfo=/tmp/node-root-certificates.pem install -y --no-install-recommends openssl ca-certificates \
