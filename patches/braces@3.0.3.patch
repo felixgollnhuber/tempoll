@@ -1,0 +1,127 @@
+diff --git a/lib/assert-depth.js b/lib/assert-depth.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..a5fddcd832b19a2b1667c820bec92e66260bead7
+--- /dev/null
++++ b/lib/assert-depth.js
+@@ -0,0 +1,22 @@
++'use strict';
++
++const { MAX_DEPTH } = require('./constants');
++
++module.exports = ast => {
++  const stack = [{ node: ast, depth: 0 }];
++
++  while (stack.length > 0) {
++    const { node, depth } = stack.pop();
++    if (depth > MAX_DEPTH) {
++      throw new RangeError(`Pattern nesting depth exceeds maximum of ${MAX_DEPTH}`);
++    }
++
++    if (node && node.nodes) {
++      for (const child of node.nodes) {
++        if (child && child.nodes) {
++          stack.push({ node: child, depth: depth + 1 });
++        }
++      }
++    }
++  }
++};
+diff --git a/lib/compile.js b/lib/compile.js
+index dce69beb90ece5c3b0ca234a949418f9f34eedbc..39b121fe4c3ffdbe7005105764c65d05b1fa168a 100644
+--- a/lib/compile.js
++++ b/lib/compile.js
+@@ -2,8 +2,10 @@
+ 
+ const fill = require('fill-range');
+ const utils = require('./utils');
++const assertDepth = require('./assert-depth');
+ 
+ const compile = (ast, options = {}) => {
++  assertDepth(ast);
+   const walk = (node, parent = {}) => {
+     const invalidBlock = utils.isInvalidBrace(parent);
+     const invalidNode = node.invalid === true && options.escapeInvalid === true;
+diff --git a/lib/constants.js b/lib/constants.js
+index 2bb3b8840382c56700869b3a9e1f958fcce01efd..de35512facaf21f1e27de97dc66bd37d87c2d0f9 100644
+--- a/lib/constants.js
++++ b/lib/constants.js
+@@ -2,6 +2,7 @@
+ 
+ module.exports = {
+   MAX_LENGTH: 10000,
++  MAX_DEPTH: 100,
+ 
+   // Digits
+   CHAR_0: '0', /* 0 */
+diff --git a/lib/expand.js b/lib/expand.js
+index 35b2c41d6afdb8f0197959e26079f266e48370d3..057895212740aea4aec9e97aeea4db83f12ffe8b 100644
+--- a/lib/expand.js
++++ b/lib/expand.js
+@@ -3,6 +3,7 @@
+ const fill = require('fill-range');
+ const stringify = require('./stringify');
+ const utils = require('./utils');
++const assertDepth = require('./assert-depth');
+ 
+ const append = (queue = '', stash = '', enclose = false) => {
+   const result = [];
+@@ -31,6 +32,7 @@ const append = (queue = '', stash = '', enclose = false) => {
+ };
+ 
+ const expand = (ast, options = {}) => {
++  assertDepth(ast);
+   const rangeLimit = options.rangeLimit === undefined ? 1000 : options.rangeLimit;
+ 
+   const walk = (node, parent = {}) => {
+diff --git a/lib/parse.js b/lib/parse.js
+index 3a6988e629f52aee6609dc5ec290a5e9ff47cecb..d93fd3e3dd7bb51dd5e56fa6f459b9ef10ecfb46 100644
+--- a/lib/parse.js
++++ b/lib/parse.js
+@@ -8,6 +8,7 @@ const stringify = require('./stringify');
+ 
+ const {
+   MAX_LENGTH,
++  MAX_DEPTH,
+   CHAR_BACKSLASH, /* \ */
+   CHAR_BACKTICK, /* ` */
+   CHAR_COMMA, /* , */
+@@ -143,6 +144,9 @@ const parse = (input, options = {}) => {
+      */
+ 
+     if (value === CHAR_LEFT_PARENTHESES) {
++      if (stack.length > MAX_DEPTH) {
++        throw new RangeError(`Pattern nesting depth exceeds maximum of ${MAX_DEPTH}`);
++      }
+       block = push({ type: 'paren', nodes: [] });
+       stack.push(block);
+       push({ type: 'text', value });
+@@ -195,6 +199,9 @@ const parse = (input, options = {}) => {
+      */
+ 
+     if (value === CHAR_LEFT_CURLY_BRACE) {
++      if (stack.length > MAX_DEPTH) {
++        throw new RangeError(`Pattern nesting depth exceeds maximum of ${MAX_DEPTH}`);
++      }
+       depth++;
+ 
+       const dollar = prev.value && prev.value.slice(-1) === '$' || block.dollar === true;
+diff --git a/lib/stringify.js b/lib/stringify.js
+index 8bcf872c31894f81a8c64d9202fd607e4fd7ea2b..df3cf443d281efad49d1cacea91718f6677a5d38 100644
+--- a/lib/stringify.js
++++ b/lib/stringify.js
+@@ -1,8 +1,10 @@
+ 'use strict';
+ 
+ const utils = require('./utils');
++const assertDepth = require('./assert-depth');
+ 
+ module.exports = (ast, options = {}) => {
++  assertDepth(ast);
+   const stringify = (node, parent = {}) => {
+     const invalidBlock = options.escapeInvalid && utils.isInvalidBrace(parent);
+     const invalidNode = node.invalid === true && options.escapeInvalid === true;
+@@ -29,4 +31,3 @@ module.exports = (ast, options = {}) => {
+ 
+   return stringify(ast);
+ };
+-

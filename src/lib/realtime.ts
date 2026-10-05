@@ -4,17 +4,21 @@ import { getDatabaseUrl } from "@/lib/config";
 import type { RealtimeEventPayload } from "@/lib/types";
 
 type EventSubscriber = (payload: RealtimeEventPayload) => void;
+type StreamSubscriber = {
+  notify: EventSubscriber;
+  close: () => void;
+};
 
 const encoder = new TextEncoder();
 const globalForRealtime = globalThis as unknown as {
   eventPool?: Pool;
   eventListenerPromise?: Promise<Client>;
-  eventSubscribers?: Map<string, Set<EventSubscriber>>;
+  eventSubscribers?: Map<string, Set<StreamSubscriber>>;
 };
 
 function getSubscribers() {
   if (!globalForRealtime.eventSubscribers) {
-    globalForRealtime.eventSubscribers = new Map<string, Set<EventSubscriber>>();
+    globalForRealtime.eventSubscribers = new Map<string, Set<StreamSubscriber>>();
   }
 
   return globalForRealtime.eventSubscribers;
@@ -25,22 +29,53 @@ function getPool() {
     globalForRealtime.eventPool = new Pool({
       connectionString: getDatabaseUrl(),
     });
+    globalForRealtime.eventPool.on("error", () => {
+      console.error("[realtime] Database notification pool connection failed.");
+    });
   }
 
   return globalForRealtime.eventPool;
 }
 
-async function ensureListener() {
+function ensureListener() {
   if (!globalForRealtime.eventListenerPromise) {
-    globalForRealtime.eventListenerPromise = (async () => {
-      const client = new Client({
-        connectionString: getDatabaseUrl(),
-      });
+    const client = new Client({
+      connectionString: getDatabaseUrl(),
+      connectionTimeoutMillis: 10_000,
+    });
 
-      await client.connect();
-      await client.query("LISTEN event_updates");
+    const disconnect = () => {
+      if (globalForRealtime.eventListenerPromise !== listenerPromise) {
+        return;
+      }
+
+      globalForRealtime.eventListenerPromise = undefined;
+      for (const subscribers of Array.from(getSubscribers().values())) {
+        for (const subscriber of Array.from(subscribers)) {
+          subscriber.close();
+        }
+      }
+
+      void client.end().catch(() => {});
+    };
+
+    client.on("error", disconnect);
+    client.on("end", disconnect);
+
+    const listenerPromise = Promise.resolve().then(async () => {
+      try {
+        await client.connect();
+        await client.query("LISTEN event_updates");
+      } catch (error) {
+        disconnect();
+        throw error;
+      }
 
       client.on("notification", (message) => {
+        if (globalForRealtime.eventListenerPromise !== listenerPromise) {
+          return;
+        }
+
         const payload = parseRealtimePayload(message.payload);
         if (!payload) {
           return;
@@ -52,16 +87,14 @@ async function ensureListener() {
         }
 
         for (const subscriber of subscribers) {
-          subscriber(payload);
+          subscriber.notify(payload);
         }
       });
 
-      client.on("error", () => {
-        globalForRealtime.eventListenerPromise = undefined;
-      });
-
       return client;
-    })();
+    });
+
+    globalForRealtime.eventListenerPromise = listenerPromise;
   }
 
   return globalForRealtime.eventListenerPromise;
@@ -86,8 +119,16 @@ export async function publishEventUpdate(payload: RealtimeEventPayload) {
   await getPool().query("SELECT pg_notify('event_updates', $1)", [JSON.stringify(payload)]);
 }
 
-export async function createEventStream(eventId: string, signal?: AbortSignal) {
-  await ensureListener();
+export async function createEventStream(
+  eventId: string,
+  signal?: AbortSignal,
+  onClose?: () => void,
+) {
+  const listenerPromise = ensureListener();
+  await listenerPromise;
+  if (globalForRealtime.eventListenerPromise !== listenerPromise) {
+    throw new Error("Realtime listener disconnected during initialization.");
+  }
 
   let cleanup = () => {};
 
@@ -99,7 +140,7 @@ export async function createEventStream(eventId: string, signal?: AbortSignal) {
 
       const removeSubscriber = () => {
         const current = subscribers.get(eventId);
-        current?.delete(callback);
+        current?.delete(subscriber);
         if (current && current.size === 0) {
           subscribers.delete(eventId);
         }
@@ -116,6 +157,16 @@ export async function createEventStream(eventId: string, signal?: AbortSignal) {
         }
         signal?.removeEventListener("abort", handleAbort);
         removeSubscriber();
+        onClose?.();
+      };
+
+      const closeStream = () => {
+        cleanupStream();
+        try {
+          controller.close();
+        } catch {
+          // Cancellation may have already closed the controller.
+        }
       };
 
       const safeEnqueue = (chunk: string) => {
@@ -135,21 +186,24 @@ export async function createEventStream(eventId: string, signal?: AbortSignal) {
       };
 
       const handleAbort = () => {
-        cleanupStream();
+        closeStream();
       };
 
+      const subscriber: StreamSubscriber = { notify: callback, close: closeStream };
       cleanup = cleanupStream;
 
       if (signal?.aborted) {
-        cleanupStream();
+        closeStream();
         return;
       }
 
-      const existing = subscribers.get(eventId) ?? new Set<EventSubscriber>();
-      existing.add(callback);
+      const existing = subscribers.get(eventId) ?? new Set<StreamSubscriber>();
+      existing.add(subscriber);
       subscribers.set(eventId, existing);
 
       safeEnqueue("event: connected\ndata: {}\n\n");
+      // Refresh snapshots after reconnecting, including updates missed during an outage.
+      callback({ eventId, kind: "event-updated" });
       heartbeat = setInterval(() => {
         safeEnqueue(": heartbeat\n\n");
       }, 15_000);
