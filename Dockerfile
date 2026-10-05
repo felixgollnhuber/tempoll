@@ -3,8 +3,12 @@ WORKDIR /app
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends openssl ca-certificates \
+# The slim image has no system CA bundle yet; use Node's roots to bootstrap HTTPS.
+RUN node -e "require('node:fs').writeFileSync('/tmp/node-root-certificates.pem', require('node:tls').rootCertificates.join('\n'))" \
+  && sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list.d/debian.sources \
+  && apt-get -o Acquire::https::CAInfo=/tmp/node-root-certificates.pem update \
+  && apt-get -o Acquire::https::CAInfo=/tmp/node-root-certificates.pem install -y --no-install-recommends openssl ca-certificates \
+  && rm -f /tmp/node-root-certificates.pem \
   && rm -rf /var/lib/apt/lists/*
 
 FROM base AS deps
