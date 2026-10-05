@@ -45,12 +45,10 @@ export async function GET(request: Request, { params }: Context) {
       code: "event_stream_concurrency_rate_limited",
     });
 
-    request.signal.addEventListener("abort", releaseConcurrencySlot, { once: true });
-
     let stream: ReadableStream<Uint8Array>;
 
     try {
-      stream = await createEventStream(event.id, request.signal);
+      stream = await createEventStream(event.id, request.signal, releaseConcurrencySlot);
     } catch (error) {
       releaseConcurrencySlot();
       throw error;

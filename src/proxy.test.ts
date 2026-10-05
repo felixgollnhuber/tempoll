@@ -1,7 +1,8 @@
 import { NextRequest } from "next/server";
+import { unstable_doesMiddlewareMatch as doesProxyMatch } from "next/experimental/testing/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { proxy } from "./proxy";
+import { config, proxy } from "./proxy";
 
 const { getParticipantSessionCookieFromEditLink } = vi.hoisted(() => ({
   getParticipantSessionCookieFromEditLink: vi.fn(),
@@ -72,5 +73,28 @@ describe("proxy", () => {
 
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toBe("https://tempoll.example.com/setup");
+  });
+
+  it.each(["/", "/new", "/e/team-sync", "/manage/event_1.private-token", "/api/manage/event_1.private-token"])(
+    "keeps %s behind the setup gate, including URLs with dots",
+    async (pathname) => {
+      process.env.APP_SETUP_COMPLETE = "false";
+      expect(doesProxyMatch({ config, nextConfig: {}, url: pathname })).toBe(true);
+      const response = await proxy(new NextRequest(`https://tempoll.example.com${pathname}`));
+      expect(response.status).toBe(pathname.startsWith("/api/") ? 503 : 307);
+    },
+  );
+
+  it.each(["/_next/static/chunk.js", "/_next/image", "/favicon.ico", "/tempoll-logo.png", "/icon-192x192.png"])(
+    "leaves the static asset %s outside the setup gate",
+    (pathname) => {
+      expect(doesProxyMatch({ config, nextConfig: {}, url: pathname })).toBe(false);
+    },
+  );
+
+  it.each(["/setup", "/api/health"])("keeps %s available during incomplete setup", async (pathname) => {
+    process.env.APP_SETUP_COMPLETE = "false";
+    const response = await proxy(new NextRequest(`https://tempoll.example.com${pathname}`));
+    expect(response.headers.get("x-middleware-next")).toBe("1");
   });
 });

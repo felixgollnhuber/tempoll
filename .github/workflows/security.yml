@@ -29,5 +29,8 @@ jobs:
       - name: Secret scan
         run: pnpm security:scan-secrets
 
-      - name: Production dependency audit
+      - name: Patched dependency regression tests
+        run: pnpm test:run scripts/braces-patch.test.mjs
+
+      - name: Dependency audit
         run: pnpm security:audit

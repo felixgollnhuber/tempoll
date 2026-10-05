@@ -1,3 +1,8 @@
 ignoredBuiltDependencies:
   - sharp
   - unrs-resolver
+
+# Mitigated by patches/braces@3.0.3.patch and enforced by the security workflow.
+auditConfig:
+  ignoreCves:
+    - CVE-2026-93687

@@ -109,26 +109,6 @@ That non-default `55432` port is intentional to avoid common Postgres collisions
 ```bash
 cp .env.example .env
 ```
-### Open-source safety notes
-
-- `.env.example` and `.env.coolify.example` intentionally contain placeholders and local-only example values. Do not commit your real `.env`.
-- Participant edit links are consumed server-side and immediately redirected to the canonical event URL, so raw participant tokens do not remain in the rendered page URL.
-- Organizer links are bearer secrets. They are stored only in browser-local recent history and are visibly marked as private in the UI.
-- Run `pnpm security:scan-secrets` and `pnpm security:audit` before publishing changes.
-
-### Local Postgres example
-
-For parallel Git worktrees, use the worktree-aware dev command:
-
-```bash
-pnpm dev:worktree
-```
-
-It starts a fresh Postgres container for the current worktree, picks free local ports,
-applies migrations, seeds demo events, writes a managed block to `.env.local`, and
-starts the Next dev server. The generated local env includes `TEMPOLL_DEV_MODE=true`,
-which enables the `/dev/database` status page and footer link.
-
 2. Start a local Postgres instance however you prefer. Example with Docker:
 
 ```bash
@@ -163,6 +143,26 @@ By default, `.env.example` starts with `APP_SETUP_COMPLETE=false`, so normal rou
 pnpm prisma:migrate
 pnpm dev
 ```
+
+### Parallel Git worktrees
+
+Use the worktree-aware dev command:
+
+```bash
+pnpm dev:worktree
+```
+
+It starts a fresh Postgres container for the current worktree, picks free local ports,
+applies migrations, seeds demo events, writes a managed block to `.env.local`, and
+starts the Next dev server. The generated local env includes `TEMPOLL_DEV_MODE=true`,
+which enables the `/dev/database` status page and footer link.
+
+### Open-source safety notes
+
+- `.env.example` and `.env.coolify.example` intentionally contain placeholders and local-only example values. Do not commit your real `.env`.
+- Participant edit links are consumed server-side and immediately redirected to the canonical event URL, so raw participant tokens do not remain in the rendered page URL.
+- Organizer links are bearer secrets. They are stored only in browser-local recent history and are visibly marked as private in the UI.
+- Run `pnpm security:scan-secrets` and `pnpm security:audit` before publishing changes.
 
 ### Run the bundled Docker Compose stack
 
@@ -232,6 +232,7 @@ Health checks stay available at `/api/health`, even while setup is incomplete.
 | `APP_SETUP_COMPLETE` | Yes | Gates the whole app. Only the setup wizard and `/api/health` stay open when this is not exactly `true`. |
 | `APP_NAME` | Yes | Product name shown in the UI. Defaults to `tempoll`. |
 | `APP_URL` | Yes | Canonical public base URL used for generated links. |
+| `APP_DEFAULT_LOCALE` | No | Default language (`de` or `en`). Defaults to `de`. |
 | `LEGAL_PAGES_ENABLED` | No | Enables `/imprint` and `/privacy`. Defaults to `false`. |
 | `DATAFAST_WEBSITE_ID` | No | Enables optional DataFast tracking when set together with `DATAFAST_DOMAIN`. |
 | `DATAFAST_DOMAIN` | No | Domain sent to DataFast when optional tracking is enabled. |
